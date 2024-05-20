@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "bs-stepper": "^1.7.0",
+    "dm-file-uploader": "^1.0.2"
+  }
+}
