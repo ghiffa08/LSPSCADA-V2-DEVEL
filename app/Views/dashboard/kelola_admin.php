@@ -16,6 +16,7 @@
                     <div class="card-header-action">
                         <button class="btn btn-primary" data-toggle="modal" data-target="#addAdminModal">
                             Tambah Admin
+                        </button>
                     </div>
                 </div>
                 <div class="card-body">
@@ -144,6 +145,7 @@
                                 </div>
                             <?php } ?>
                         </div>
+
                     </div>
                 </div>
                 <div class="modal-footer bg-whitesmoke br">
@@ -158,7 +160,7 @@
 
 <!-- edit-User-Modal -->
 <?php foreach ($listAdmin as $key => $value) { ?>
-    <form action="<?= site_url('/admin/update') ?>" method="post">
+    <form action="<?= site_url('/admin/update') ?>" method="post" enctype="multipart/form-data">
         <div class="modal fade" id="editAdminModal-<?= $value['userid'] ?>" data-backdrop="static" data-keyboard="false" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
                 <div class="modal-content">
@@ -219,6 +221,16 @@
                             <?php } ?>
                         </div>
 
+                        <div class="form-group">
+                            <label class="form-label" for="">Tanda Tangan</label>
+                            <input type="file" name="edit_tanda_tangan" class="tanda_tangan <?php if (session('errors.edit_tanda_tangan')) : ?>is-invalid<?php endif ?>">
+                            <?php if (session('errors.edit_tanda_tangan')) { ?>
+                                <div class="invalid-feedback">
+                                    <?= session('errors.edit_tanda_tangan') ?>
+                                </div>
+                            <?php } ?>
+                            <small>*Tipe Image (jpg/jpeg/png), Ukuran Maksimal 2 MB</small>
+                        </div>
                     </div>
                     <div class="modal-footer bg-whitesmoke br">
                         <button type="submit" class="btn btn-primary btn-lg btn-block">

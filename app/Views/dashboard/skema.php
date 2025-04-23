@@ -36,6 +36,7 @@
                                 <th>ID Skema</th>
                                 <th>Kode Skema</th>
                                 <th>Nama Skema</th>
+                                <th>Jenis</th>
                                 <th>Status</th>
                                 <th>Action</th>
                             </tr>
@@ -51,6 +52,7 @@
                                     <td><?= $value['id_skema'] ?></td>
                                     <td><?= $value['kode_skema'] ?></td>
                                     <td><?= $value['nama_skema'] ?></td>
+                                    <td><?= $value['jenis_skema'] ?></td>
                                     <td>
                                         <div class="badge badge-<?= $value['status'] == "Y" ? "success" : "danger" ?>"><?= $value['status'] == "Y" ? "Aktif" : "Tidak Aktif" ?></div>
                                     </td>
@@ -100,10 +102,24 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Nama Skema<span class="text-danger">*</span></label>
-                        <textarea rows="3" class="form-control summernote-simple <?php if (session('errors.nama_skema')) : ?>is-invalid<?php endif ?>" name="nama_skema"></textarea>
+                        <textarea rows="3" class="form-control <?php if (session('errors.nama_skema')) : ?>is-invalid<?php endif ?>" name="nama_skema"></textarea>
                         <?php if (session('errors.nama_skema')) { ?>
                             <div class="invalid-feedback">
                                 <?= session('errors.nama_skema') ?>
+                            </div>
+                        <?php } ?>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" class="form-label">Jenis Skema</label>
+                        <select class="form-control select2 <?php if (session('errors.jenis_skema')) : ?>is-invalid<?php endif ?>" name="jenis_skema">
+                            <option value="">Pilih Jenis Skema</option>
+                            <option value="KKNI">KKNI</option>
+                            <option value="Okupasi">Okupasi</option>
+                            <option value="Klaster">Klaster</option>
+                        </select>
+                        <?php if (session('errors.jenis_skema')) { ?>
+                            <div class="invalid-feedback">
+                                <?= session('errors.jenis_skema') ?>
                             </div>
                         <?php } ?>
                     </div>
@@ -195,10 +211,23 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">Nama Skema<span class="text-danger">*</span></label>
-                            <textarea rows="3" class="form-control summernote-simple <?php if (session('errors.edit_nama')) : ?>is-invalid<?php endif ?>" name="edit_nama"><?= $value['nama_skema'] ?></textarea>
+                            <textarea rows="3" class="form-control  <?php if (session('errors.edit_nama')) : ?>is-invalid<?php endif ?>" name="edit_nama"><?= $value['nama_skema'] ?></textarea>
                             <?php if (session('errors.edit_nama')) { ?>
                                 <div class="invalid-feedback">
                                     <?= session('errors.edit_nama') ?>
+                                </div>
+                            <?php } ?>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" class="form-label">Jenis Skema</label>
+                            <select class="form-control select2 <?php if (session('errors.edit_jenis_skema')) : ?>is-invalid<?php endif ?>" name="edit_jenis_skema">
+                                <option value="KKNI" <?= $value['jenis_skema'] == "KKNI" ? "selected" : ""; ?>>KKNI</option>
+                                <option value="Okupasi" <?= $value['jenis_skema'] == "Okupasi" ? "selected" : ""; ?>>Okupasi</option>
+                                <option value="Klaster" <?= $value['jenis_skema'] == "Klaster" ? "selected" : ""; ?>>Klaster</option>
+                            </select>
+                            <?php if (session('errors.edit_jenis_skema')) { ?>
+                                <div class="invalid-feedback">
+                                    <?= session('errors.edit_jenis_skema') ?>
                                 </div>
                             <?php } ?>
                         </div>

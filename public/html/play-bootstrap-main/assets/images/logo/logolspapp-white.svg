@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="1080" height="1080" viewBox="0 0 1080 1080" xml:space="preserve">
+<desc>Created with Fabric.js 5.2.4</desc>
+<defs>
+</defs>
+<g transform="matrix(1 0 0 1 540 540)" id="300f90e0-e67f-464e-b9af-df4c6d225a9f"  >
+<rect style="stroke: none; stroke-width: 1; stroke-dasharray: none; stroke-linecap: butt; stroke-dashoffset: 0; stroke-linejoin: miter; stroke-miterlimit: 4; fill: rgb(255,255,255); fill-rule: nonzero; opacity: 1; visibility: hidden;" vector-effect="non-scaling-stroke"  x="-540" y="-540" rx="0" ry="0" width="1080" height="1080" />
+</g>
+<g transform="matrix(1 0 0 1 540 540)" id="4862338b-f956-4675-853a-b0540777a92f"  >
+</g>
+<g transform="matrix(1.25 0 0 1.25 331.86 493.04)"  >
+<path style="stroke: none; stroke-width: 1; stroke-dasharray: none; stroke-linecap: butt; stroke-dashoffset: 0; stroke-linejoin: round; stroke-miterlimit: 2; fill: rgb(255,255,255); fill-rule: evenodd; opacity: 1;" vector-effect="non-scaling-stroke"  transform=" translate(-39.16, -37.5)" d="M 9.594 46.257 C -0.979000000000001 35.677 -0.979000000000001 18.508999999999997 9.594 7.936999999999998 C 20.167 -2.6430000000000025 37.341 -2.6430000000000025 47.914 7.936999999999998 L 76.66 36.674 L 76.66 74.994 L 38.339999999999996 75 L 9.594 46.257 Z" stroke-linecap="round" />
+</g>
+<g transform="matrix(1.25 0 0 1.25 329.79 586.87)"  >
+<path style="stroke: none; stroke-width: 1; stroke-dasharray: none; stroke-linecap: butt; stroke-dashoffset: 0; stroke-linejoin: round; stroke-miterlimit: 2; fill: rgb(255,255,255); fill-rule: evenodd; opacity: 1;" vector-effect="non-scaling-stroke"  transform=" translate(-37.5, -112.51)" d="M 28.752 142.07 L 0.007 113.327 L 0.013000000000000001 75.013 L 38.327999999999996 75.007 L 67.072 103.751 C 77.64500000000001 114.325 77.64500000000001 131.499 67.072 142.071 C 56.499 152.651 39.325 152.651 28.752000000000002 142.071 Z" stroke-linecap="round" />
+</g>
+<g transform="matrix(1 0 0 1 552.81 576.67)" style="" id="66ad9416-1185-4802-8b1e-820bdfef1920"  >
+		<text xml:space="preserve" font-family="Lato" font-size="28" font-style="normal" font-weight="400" style="stroke: none; stroke-width: 1; stroke-dasharray: none; stroke-linecap: butt; stroke-dashoffset: 0; stroke-linejoin: miter; stroke-miterlimit: 4; fill: rgb(255,255,255); fill-rule: nonzero; opacity: 1; white-space: pre;" ><tspan x="-146.2" y="8.8" >SMK Negeri 2 Kuningan</tspan></text>
+</g>
+<g transform="matrix(1 0 0 1 490.62 540)" style=""  >
+		<text xml:space="preserve" font-family="Lato" font-size="48" font-style="normal" font-weight="700" style="stroke: none; stroke-width: 1; stroke-dasharray: none; stroke-linecap: butt; stroke-dashoffset: 0; stroke-linejoin: miter; stroke-miterlimit: 4; fill: rgb(255,255,255); fill-rule: nonzero; opacity: 1; white-space: pre;" ><tspan x="-85.12" y="15.08" >LSPAPP</tspan></text>
+</g>
+</svg>

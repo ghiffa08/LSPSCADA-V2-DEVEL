@@ -182,9 +182,8 @@ class AuthController extends Controller
                         'required' => 'Kolom {field} harus diisi.',
                     ],
                 ],
-            ];
-    
-        ];
+            ],
+    ];
 
         if (!$this->validate($rules)) {
             return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());

@@ -18,7 +18,7 @@
                         <thead>
                             <tr>
                                 <th>No</th>
-                                <th>Tanggal</th>
+                                <th>Tanggal & Waktu</th>
                                 <th>Keterangan</th>
                                 <th>Status</th>
                                 <th>Action</th>
@@ -76,7 +76,7 @@
                     <p class="text-muted">General settings such as, site title, site description, address and so on.</p>
                     <div class="form-group">
                         <label class="form-label">Tanggal Asesi</label>
-                        <input type="date" name="tanggal" class="form-control <?php if (session('errors.tanggal')) : ?>is-invalid<?php endif ?>">
+                        <input type="datetime-local" name="tanggal" class="form-control <?php if (session('errors.tanggal')) : ?>is-invalid<?php endif ?>">
                         <?php if (session('errors.tanggal')) { ?>
                             <div class="invalid-feedback">
                                 <?= session('errors.tanggal') ?>
@@ -134,7 +134,7 @@
                         <div class="form-group">
                             <label class="form-label">Tanggal Asesi</label>
                             <input type="hidden" name="edit_id" value="<?= $value['id_tanggal'] ?>">
-                            <input type="date" name="edit_tanggal" class="form-control <?php if (session('errors.edit_tanggal')) : ?>is-invalid<?php endif ?>" value="<?= $value['tanggal'] ?>">
+                            <input type="datetime-local" name="edit_tanggal" class="form-control <?php if (session('errors.edit_tanggal')) : ?>is-invalid<?php endif ?>" value="<?= $value['tanggal'] ?>">
                             <?php if (session('errors.edit_tanggal')) { ?>
                                 <div class="invalid-feedback">
                                     <?= session('errors.edit_tanggal') ?>

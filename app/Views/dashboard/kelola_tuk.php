@@ -19,6 +19,7 @@
                             <tr>
                                 <th>No</th>
                                 <th>Nama TUK</th>
+                                <th>Jenis TUK</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -31,6 +32,7 @@
                                 <tr>
                                     <td><?= $no ?></td>
                                     <td><?= $value['nama_tuk'] ?></td>
+                                    <td><?= $value['jenis_tuk'] ?></td>
                                     <td>
                                         <div class="btn-group mb-3" role="group" aria-label="Basic example">
                                             <button type="button" class="btn btn-icon btn-info" data-toggle="modal" data-target="#editTUKModal-<?= $value['id_tuk']; ?>"><i class="fas fa-edit"></i></button>
@@ -75,6 +77,20 @@
                             </div>
                         <?php } ?>
                     </div>
+                    <div class="form-group">
+                        <label>Jenis TUK</label>
+                        <select class="form-control <?php if (session('errors.jenis_tuk')) : ?>is-invalid<?php endif ?> select2" name="jenis_tuk">
+                            <option value="">Pilih Jenis TUK</option>
+                            <option value="Sewaktu">Sewaktu</option>
+                            <option value="Tempat Kerja">Tempat Kerja</option>
+                            <option value="Mandiri">Mandiri</option>
+                        </select>
+                        <?php if (session('errors.jenis_tuk')) { ?>
+                            <div class="invalid-feedback">
+                                <?= session('errors.jenis_tuk') ?>
+                            </div>
+                        <?php } ?>
+                    </div>
                 </div>
                 <div class="modal-footer bg-whitesmoke br">
                     <button type="submit" class="btn btn-primary btn-lg btn-block">
@@ -109,6 +125,20 @@
                             <?php if (session('errors.edit_nama')) { ?>
                                 <div class="invalid-feedback">
                                     <?= session('errors.edit_nama') ?>
+                                </div>
+                            <?php } ?>
+                        </div>
+                        <div class="form-group">
+                            <label>Jenis TUK</label>
+                            <select class="form-control <?php if (session('errors.edit_jenis_tuk')) : ?>is-invalid<?php endif ?> select2" name="edit_jenis_tuk">
+                                <option value="">Pilih Jenis TUK</option>
+                                <option value="Sewaktu" <?= ($value['jenis_tuk'] == "Sewaktu") ? 'selected' : '' ?>>Sewaktu</option>
+                                <option value="Tempat Kerja" <?= ($value['jenis_tuk'] == "Tempat Kerja") ? 'selected' : '' ?>>Tempat Kerja</option>
+                                <option value="Mandiri" <?= ($value['jenis_tuk'] == "Mandiri") ? 'selected' : '' ?>>Mandiri</option>
+                            </select>
+                            <?php if (session('errors.edit_jenis_tuk')) { ?>
+                                <div class="invalid-feedback">
+                                    <?= session('errors.edit_jenis_tuk') ?>
                                 </div>
                             <?php } ?>
                         </div>

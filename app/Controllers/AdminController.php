@@ -45,11 +45,6 @@ class AdminController extends BaseController
     public function store()
     {
 
-        // Check if registration is allowed
-        if (!$this->config->allowRegistration) {
-            return redirect()->back()->withInput()->with('error', lang('Auth.registerDisabled'));
-        }
-
         $users = model(UserModel::class);
 
         // Validate basics first since some password rules rely on these fields
@@ -89,6 +84,7 @@ class AdminController extends BaseController
                     'required' => 'Kolom {field} harus diisi.',
                 ],
             ],
+
         ];
 
         if (!$this->validate($rules)) {
@@ -186,6 +182,15 @@ class AdminController extends BaseController
                     'numeric' => 'Kolom nomor HP harus berupa angka.',
                 ],
             ],
+            'edit_tanda_tangan' => [
+                'label' => 'Tanda Tangan',
+                'rules' => 'uploaded[edit_tanda_tangan]|max_size[edit_tanda_tangan,2048]|mime_in[edit_tanda_tangan,image/jpg,image/jpeg,image/png]',
+                'errors' => [
+                    'uploaded' => 'Harus upload {field} *',
+                    'max_size' => 'File maksimal 2MB *',
+                    'mime_in' => 'File harus berupa gambar / foto'
+                ],
+            ],
             // tambahkan aturan validasi lainnya sesuai kebutuhan
         ];
 
@@ -196,11 +201,16 @@ class AdminController extends BaseController
             return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
         }
 
+        $file_tanda_tangan = $this->request->getFile('edit_tanda_tangan');
+        $nama_tanda_tangan = $file_tanda_tangan->getRandomName();
+        $file_tanda_tangan->move('upload/tanda tangan', $nama_tanda_tangan);
+
         $data = [
             'email' => $this->request->getVar('edit_email'),
             'username' => $this->request->getVar('edit_username'),
             'fullname' => $this->request->getVar('edit_fullname'),
             'no_telp' => $this->request->getVar('edit_no_hp'),
+            'tanda_tangan' => $nama_tanda_tangan,
         ];
 
         // Lakukan simpan user dengan data di atas

@@ -16,6 +16,7 @@
                     <div class="card-header-action">
                         <button class="btn btn-primary" data-toggle="modal" data-target="#addAsesorModal">
                             Tambah Asesor
+                        </button>
                     </div>
                 </div>
                 <div class="card-body">

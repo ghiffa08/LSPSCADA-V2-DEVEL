@@ -133,8 +133,14 @@ class SubelemenController extends BaseController
                 'pertanyaan' => $value[5],
             ];
 
-            $this->subelemen->save($data);
+            try {
+                $this->subelemen->save($data);
+            } catch (\Exception $e) {
+                // Tangani kesalahan
+                echo "Terjadi kesalahan saat menyimpan data pada baris ke-$key: " . $e->getMessage();
+            }
         }
+
 
         session()->setFlashdata('pesan', 'Subelemen berhasil ditambahkan!');
         return redirect()->to('/subelemen');

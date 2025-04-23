@@ -30,11 +30,18 @@ class SkemaController extends BaseController
                 ],
             ],
             'nama_skema' => [
-                'label' => "nama Skema",
+                'label' => "Nama Skema",
                 'rules' => 'required|is_unique[skema.nama_skema]',
                 'errors' => [
                     'required' => 'Kolom {field} harus diisi.',
                     'is_unique' => 'nama_skema sudah terdaftar.'
+                ],
+            ],
+            'jenis_skema' => [
+                'label' => "Jenis Skema",
+                'rules' => 'required',
+                'errors' => [
+                    'required' => 'Kolom {field} harus diisi.',
                 ],
             ],
         ];
@@ -49,6 +56,7 @@ class SkemaController extends BaseController
         $data = [
             'kode_skema' => $this->request->getPost('kode_skema'),
             'nama_skema' => $this->request->getVar('nama_skema'),
+            'jenis_skema' => $this->request->getVar('jenis_skema'),
             'status' => $this->request->getVar('status')
         ];
 
@@ -127,6 +135,13 @@ class SkemaController extends BaseController
                     'required' => 'Kolom {field} harus diisi.',
                 ],
             ],
+            'edit_jenis_skema' => [
+                'label' => "Jenis Skema",
+                'rules' => 'required',
+                'errors' => [
+                    'required' => 'Kolom {field} harus diisi.',
+                ],
+            ],
         ];
 
         if (!$this->validate($rules)) {
@@ -139,6 +154,7 @@ class SkemaController extends BaseController
         $data = [
             'kode_skema' => $this->request->getVar('edit_kode'),
             'nama_skema' => $this->request->getVar('edit_nama'),
+            'jenis_skema' => $this->request->getVar('edit_jenis_skema'),
             'status' => $this->request->getVar('edit_status')
         ];
 

@@ -46,13 +46,13 @@ class SkemaSiswaModel extends Model
 
     public function getByIdSiswa($id_siswa)
     {
-        return $this->db->table('skema_siswa')
-            ->where('id_siswa', $id_siswa)
-            ->join('skema', 'skema.id_skema=skema_siswa.id_skema', 'left')
-            ->join('users', 'users.id=skema_siswa.id_siswa', 'left')
-            ->join('unit', 'unit.id_unit=skema_siswa.id_unit', 'left')
-            ->select('skema_siswa.*, skema.nama_skema,users.fullname,unit.nama_unit ')
-            ->Get()->getRowArray();
+        // return $this->db->table('skema_siswa')
+        //     ->where('id_siswa', $id_siswa)
+        //     ->join('skema', 'skema.id_skema=skema_siswa.id_skema', 'left')
+        //     ->join('users', 'users.id=skema_siswa.id_siswa', 'left')
+        //     ->join('unit', 'unit.id_unit=skema_siswa.id_unit', 'left')
+        //     ->select('skema_siswa.*, skema.nama_skema,users.fullname,unit.nama_unit ')
+        //     ->Get()->getRowArray();
     }
 
     public function getSkemaSiswa($id_siswa)

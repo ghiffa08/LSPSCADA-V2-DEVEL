@@ -123,7 +123,7 @@
                     </div>
                     <div class="form-group">
                         <label class="form-label">Nama Unit<span class="text-danger">*</span></label>
-                        <textarea class="form-control summernote-simple <?php if (session('errors.nama')) : ?>is-invalid<?php endif ?>" name="nama"></textarea>
+                        <textarea class="form-control  <?php if (session('errors.nama')) : ?>is-invalid<?php endif ?>" name="nama"></textarea>
                         <?php if (session('errors.nama')) { ?>
                             <div class="invalid-feedback">
                                 <?= session('errors.nama') ?>
@@ -133,7 +133,7 @@
 
                     <div class="form-group">
                         <label>Keterangan<span class="text-danger">*</span></label>
-                        <textarea class="form-control summernote-simple <?php if (session('errors.keterangan')) : ?>is-invalid<?php endif ?>" name="keterangan" id="inputDescription"></textarea>
+                        <textarea class="form-control  <?php if (session('errors.keterangan')) : ?>is-invalid<?php endif ?>" name="keterangan" id="inputDescription"></textarea>
                         <?php if (session('errors.keterangan')) { ?>
                             <div class="invalid-feedback">
                                 <?= session('errors.keterangan') ?>
@@ -252,7 +252,7 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">Nama Unit<span class="text-danger">*</span></label>
-                            <textarea class="form-control summernote-simple <?php if (session('errors.edit_nama')) : ?>is-invalid<?php endif ?>" name="edit_nama"><?= $value['nama_unit'] ?></textarea>
+                            <textarea class="form-control  <?php if (session('errors.edit_nama')) : ?>is-invalid<?php endif ?>" name="edit_nama"><?= $value['nama_unit'] ?></textarea>
                             <?php if (session('errors.edit_nama')) { ?>
                                 <div class="invalid-feedback">
                                     <?= session('errors.edit_nama') ?>
@@ -262,7 +262,7 @@
 
                         <div class="form-group">
                             <label>Keterangan<span class="text-danger">*</span></label>
-                            <textarea class="form-control summernote-simple <?php if (session('errors.edit_keterangan')) : ?>is-invalid<?php endif ?>" name="edit_keterangan" id="inputDescription"><?= $value['keterangan'] ?></textarea>
+                            <textarea class="form-control  <?php if (session('errors.edit_keterangan')) : ?>is-invalid<?php endif ?>" name="edit_keterangan" id="inputDescription"><?= $value['keterangan'] ?></textarea>
                             <?php if (session('errors.edit_keterangan')) { ?>
                                 <div class="invalid-feedback">
                                     <?= session('errors.edit_keterangan') ?>

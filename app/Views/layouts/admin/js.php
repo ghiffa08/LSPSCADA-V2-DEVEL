@@ -40,36 +40,16 @@
 <script src="<?= base_url(); ?>/stisla/node_modules/selectric/public/jquery.selectric.min.js"></script>
 <script src="<?= base_url(); ?>/stisla/node_modules/select2/dist/js/select2.full.min.js"></script>
 
-<script src="<?= base_url(); ?>/stisla/node_modules/jquery_upload_preview/assets/js/jquery.uploadPreview.min.js"></script>
-<script>
-    $.uploadPreview({
-        input_field: "#image-upload", // Default: .image-upload
-        preview_box: "#image-preview", // Default: .image-preview
-        label_field: "#image-label", // Default: .image-label
-        label_default: "Pilih File", // Default: Choose File
-        label_selected: "Change File", // Default: Change File
-        no_label: false, // Default: false
-        success_callback: null // Default: null
-    });
-    $.uploadPreview({
-        input_field: "#ktp-upload", // Default: .image-upload
-        preview_box: "#ktp-preview", // Default: .image-preview
-        label_field: "#ktp-label", // Default: .image-label
-        label_default: "Pilih File", // Default: Choose File
-        label_selected: "Change File", // Default: Change File
-        no_label: false, // Default: false
-        success_callback: null // Default: null
-    });
-    $.uploadPreview({
-        input_field: "#kartu-pelajar-upload", // Default: .image-upload
-        preview_box: "#kartu-pelajar-preview", // Default: .image-preview
-        label_field: "#kartu-pelajar-label", // Default: .image-label
-        label_default: "Pilih File", // Default: Choose File
-        label_selected: "Change File", // Default: Change File
-        no_label: false, // Default: false
-        success_callback: null // Default: null
-    });
-</script>
+<!-- ===== Filepond ===== -->
+<script src="<?= base_url("/stisla/node_modules/filepond-plugin-file-validate-size/filepond-plugin-file-validate-size.min.js") ?>"></script>
+<script src="<?= base_url("/stisla/node_modules/filepond-plugin-file-validate-type/filepond-plugin-file-validate-type.min.js") ?>"></script>
+<script src="<?= base_url("/stisla/node_modules/filepond-plugin-image-crop/filepond-plugin-image-crop.min.js") ?>"></script>
+<script src="<?= base_url("/stisla/node_modules/filepond-plugin-image-exif-orientation/filepond-plugin-image-exif-orientation.min.js") ?>"></script>
+<script src="<?= base_url("/stisla/node_modules/filepond-plugin-image-filter/filepond-plugin-image-filter.min.js") ?>"></script>
+<script src="<?= base_url("/stisla/node_modules/filepond-plugin-image-preview/filepond-plugin-image-preview.min.js") ?>"></script>
+<script src="<?= base_url("/stisla/node_modules/filepond-plugin-image-resize/filepond-plugin-image-resize.min.js") ?>"></script>
+<script src="<?= base_url("/stisla/node_modules/filepond/filepond.js") ?>"></script>
+<!-- ===== End ===== -->
 
 <!-- Data Tables -->
 <script src="<?= base_url() ?>/stisla/node_modules/datatables/media/js/jquery.dataTables.min.js"></script>
@@ -87,4 +67,42 @@
             // "scrollX": true
         });
     });
+</script>
+
+<script>
+    FilePond.registerPlugin(
+        FilePondPluginImagePreview,
+        FilePondPluginImageCrop,
+        FilePondPluginImageExifOrientation,
+        FilePondPluginImageFilter,
+        FilePondPluginImageResize,
+        FilePondPluginFileValidateSize,
+        FilePondPluginFileValidateType,
+    )
+
+    // Filepond: Image Preview
+    FilePond.create(document.querySelector(".filepond-tanda-tangan"), {
+        credits: null,
+        allowImagePreview: true,
+        allowImageFilter: true,
+        allowImageExifOrientation: false,
+        allowImageCrop: true,
+        imageCropAspectRatio: '1:1',
+        imageResizeTargetWidth: 200,
+        imageResizeTargetHeight: 200,
+        imageFilterColorMatrix: [
+            0.2126, 0.7152, 0.0722, 0, 0,
+            0.2126, 0.7152, 0.0722, 0, 0,
+            0.2126, 0.7152, 0.0722, 0, 0,
+            0, 0, 0, 1, 0,
+        ],
+        acceptedFileTypes: ["image/png", "image/jpg", "image/jpeg"],
+        fileValidateTypeDetectType: (source, type) =>
+            new Promise((resolve, reject) => {
+                // Do custom type detection here and return with promise
+                resolve(type)
+            }),
+        maxFileSize: '2MB',
+        storeAsFile: true,
+    })
 </script>

@@ -24,6 +24,10 @@ use App\Models\DashboardModel;
 use App\Models\SettanggalModel;
 use App\Models\PersyaratanModel;
 use App\Models\APL2Model;
+use App\Models\AsesmenModel;
+use App\Models\AKModel;
+use App\Models\APL2JawabanModel;
+use App\Models\FeedbackModel;
 use Myth\Auth\Models\UserModel as MythUser;
 
 /**
@@ -54,11 +58,15 @@ abstract class BaseController extends Controller
     protected $subelemen;
     protected $tuk;
     protected $dependent;
-    protected $apl1;
+    protected $apl1Model;
     protected $dashboard;
     protected $settanggal;
     protected $persyaratan;
     protected $apl2;
+    protected $jawaban_apl2;
+    protected $asesmen;
+    protected $ak1;
+    protected $feedback;
     protected $userMyth;
 
     /**
@@ -94,10 +102,14 @@ abstract class BaseController extends Controller
         $this->subelemen = new SubelemenModel();
         $this->tuk = new TUKModel();
         $this->dependent = new DynamicDependent();
-        $this->apl1 = new APL1Model();
+        $this->apl1Model = new APL1Model();
         $this->settanggal = new SettanggalModel();
         $this->persyaratan = new PersyaratanModel();
         $this->apl2 = new APL2Model();
+        $this->jawaban_apl2 = new APL2JawabanModel();
+        $this->asesmen = new AsesmenModel();
+        $this->ak1 = new AKModel();
+        $this->feedback = new FeedbackModel();
         $this->userMyth = new MythUser();
         // Preload any models, libraries, etc, here.
 

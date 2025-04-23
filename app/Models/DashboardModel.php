@@ -6,41 +6,25 @@ use CodeIgniter\Model;
 
 class DashboardModel extends Model
 {
-    // protected $table            = 'dashboards';
-    protected $primaryKey       = 'id';
-    protected $useAutoIncrement = true;
-    protected $returnType       = 'object';
-    protected $useSoftDeletes   = false;
-    protected $protectFields    = true;
-    protected $allowedFields    = [];
 
-    protected bool $allowEmptyInserts = false;
-    protected bool $updateOnlyChanged = true;
 
-    protected array $casts = [];
-    protected array $castHandlers = [];
+    public function total_asesi()
+    {
+        return $this->db->table('apl1')->countAll();
+    }
+    public function total_admin()
+    {
+        return $this->db->table('auth_groups_users')
+            ->join('auth_groups', 'auth_groups.id = auth_groups_users.group_id')
+            ->where('auth_groups.name', 'Admin')
+            ->countAllResults();
+    }
 
-    // Dates
-    protected $useTimestamps = false;
-    protected $dateFormat    = 'datetime';
-    protected $createdField  = 'created_at';
-    protected $updatedField  = 'updated_at';
-    protected $deletedField  = 'deleted_at';
-
-    // Validation
-    protected $validationRules      = [];
-    protected $validationMessages   = [];
-    protected $skipValidation       = false;
-    protected $cleanValidationRules = true;
-
-    // Callbacks
-    protected $allowCallbacks = true;
-    protected $beforeInsert   = [];
-    protected $afterInsert    = [];
-    protected $beforeUpdate   = [];
-    protected $afterUpdate    = [];
-    protected $beforeFind     = [];
-    protected $afterFind      = [];
-    protected $beforeDelete   = [];
-    protected $afterDelete    = [];
+    public function total_asesor()
+    {
+        return $this->db->table('auth_groups_users')
+            ->join('auth_groups', 'auth_groups.id = auth_groups_users.group_id')
+            ->where('auth_groups.name', 'Asesor')
+            ->countAllResults();
+    }
 }

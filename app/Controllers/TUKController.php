@@ -28,6 +28,14 @@ class TUKController extends BaseController
                     'is_unique' => '{field} sudah terdaftar.'
                 ],
             ],
+            'jenis_tuk' => [
+                'label' => "jenis Tempat Uji Kompetensi",
+                'rules' => 'required',
+                'errors' => [
+                    'required' => 'Kolom {field} harus diisi.',
+
+                ],
+            ],
         ];
 
         if (!$this->validate($rules)) {
@@ -39,6 +47,7 @@ class TUKController extends BaseController
 
         $data = [
             'nama_tuk' => $this->request->getVar('nama'),
+            'jenis_tuk' => $this->request->getVar('jenis'),
         ];
 
         $this->tuk->save($data);
@@ -56,6 +65,13 @@ class TUKController extends BaseController
                     'required' => 'Kolom {field} harus diisi.',
                 ],
             ],
+            'edit_jenis_tuk' => [
+                'label' => "Jenis Tempat Uji Kompetensi",
+                'rules' => 'required',
+                'errors' => [
+                    'required' => 'Kolom {field} harus diisi.',
+                ],
+            ],
         ];
 
         if (!$this->validate($rules)) {
@@ -67,6 +83,7 @@ class TUKController extends BaseController
 
         $data = [
             'nama_tuk' => $this->request->getVar('edit_nama'),
+            'jenis_tuk' => $this->request->getVar('edit_jenis_tuk'),
         ];
 
 

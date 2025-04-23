@@ -144,7 +144,7 @@
                     </div>
                     <div class="form-group  mb-0">
                         <label class="form-label">Pertanyaan<span class="text-danger">*</span></label>
-                        <textarea class="form-control summernote-simple <?php if (session('errors.pertanyaan')) : ?>is-invalid<?php endif ?>" name="pertanyaan"></textarea>
+                        <textarea class="form-control  <?php if (session('errors.pertanyaan')) : ?>is-invalid<?php endif ?>" name="pertanyaan"></textarea>
                         <?php if (session('errors.pertanyaan')) { ?>
                             <div class="invalid-feedback">
                                 <?= session('errors.pertanyaan') ?>
@@ -299,7 +299,7 @@
                         </div>
                         <div class="form-group">
                             <label class="form-label">Pertanyaan<span class="text-danger">*</span></label>
-                            <textarea class="form-control summernote-simple <?php if (session('errors.edit_pertanyaan')) : ?>is-invalid<?php endif ?>" name="edit_pertanyaan"><?= $value['pertanyaan'] ?></textarea>
+                            <textarea class="form-control  <?php if (session('errors.edit_pertanyaan')) : ?>is-invalid<?php endif ?>" name="edit_pertanyaan"><?= $value['pertanyaan'] ?></textarea>
                             <?php if (session('errors.edit_pertanyaan')) { ?>
                                 <div class="invalid-feedback">
                                     <?= session('errors.edit_pertanyaan') ?>

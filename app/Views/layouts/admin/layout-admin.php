@@ -9,8 +9,8 @@
 
     <!-- General CSS -->
     <link rel="stylesheet" href="<?= base_url() ?>/stisla/node_modules/bootstrap/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
-    <link rel="stylesheet" href="<?= base_url() ?>/stisla/node_modules/bootstrap-icons/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="<?= base_url() ?>/stisla/node_modules/@fortawesome/fontawesome-free/css/all.min.css">
+
     <!-- CSS Libraries -->
     <link rel="stylesheet" href="<?= base_url() ?>/stisla/node_modules/sweetalert2/dist/sweetalert2.min.css">
     <link rel="stylesheet" href="<?= base_url() ?>/stisla/node_modules/datatables.net-bs4/css/dataTables.bootstrap4.min.css">
@@ -19,8 +19,8 @@
     <link rel="stylesheet" href="<?= base_url() ?>/stisla/node_modules/select2/dist/css/select2.min.css">
     <link rel="stylesheet" href="<?= base_url() ?>/stisla/node_modules/chocolat/dist/css/chocolat.css">
     <link rel="stylesheet" href="<?= base_url() ?>/stisla/node_modules/summernote/dist/summernote-bs4.css">
-
-    <link rel="stylesheet" href="<?= base_url() ?>/bs-stepper/css/bs-stepper.min.css">
+    <link rel="stylesheet" href="<?= base_url() ?>/stisla/node_modules/filepond/filepond.css">
+    <link rel="stylesheet" href="<?= base_url() ?>/stisla/node_modules/filepond-plugin-image-preview/filepond-plugin-image-preview.css">
 
     <!-- Template CSS -->
     <link rel="stylesheet" href="<?= base_url("stisla/assets/css/style.css") ?>">
@@ -39,6 +39,7 @@
     </script>
     <!-- /END GA -->
 </head>
+
 
 <body>
     <div id="app">
@@ -95,13 +96,6 @@
 
     <?= $this->renderSection('js') ?>
 
-    <script src="<?= base_url(); ?>/bs-stepper/js/bs-stepper.min.js"></script>
-    <!-- BS-Stepper Init -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            window.stepper = new Stepper(document.querySelector('.bs-stepper'))
-        })
-    </script>
 
     <!-- JS Libraies -->
     <script src="<?= base_url(); ?>/stisla/node_modules/summernote/dist/summernote-bs4.js"></script>
@@ -136,6 +130,25 @@
             });
         <?php endif; ?>
     </script>
+
+    <script>
+        function showCard(cardNumber) {
+            for (let i = 1; i <= 3; i++) {
+                const tab = document.getElementById('tab-' + i);
+                tab.style.display = 'none';
+
+                const button = document.getElementById('nextToCard' + i);
+                button.classList.remove('active');
+            }
+
+            const activeTab = document.getElementById('tab-' + cardNumber);
+            activeTab.style.display = 'block';
+
+            const activeButton = document.getElementById('nextToCard' + cardNumber);
+            activeButton.classList.add('active');
+        }
+    </script>
+
     <!-- <script src="/path/to/jquery.dm-uploader.min.js"></script> -->
     <script src="<?= base_url(); ?>/stisla/node_modules/chocolat/dist/js/jquery.chocolat.min.js"></script>
     <script src="<?= base_url(); ?>/stisla/node_modules/selectric/public/jquery.selectric.min.js"></script>
@@ -177,7 +190,50 @@
     <script src="<?= base_url() ?>/stisla/node_modules/datatables.net-bs4/js/dataTables.bootstrap4.min.js"></script>
     <script src="<?= base_url() ?>/stisla/node_modules/datatables.net-select-bs4/js/select.bootstrap4.min.js"></script>
 
+    <!-- ===== Filepond ===== -->
+    <script src="<?= base_url("/stisla/node_modules/filepond-plugin-file-validate-size/filepond-plugin-file-validate-size.min.js") ?>"></script>
+    <script src="<?= base_url("/stisla/node_modules/filepond-plugin-file-validate-type/filepond-plugin-file-validate-type.min.js") ?>"></script>
+    <script src="<?= base_url("/stisla/node_modules/filepond-plugin-image-crop/filepond-plugin-image-crop.min.js") ?>"></script>
+    <script src="<?= base_url("/stisla/node_modules/filepond-plugin-image-exif-orientation/filepond-plugin-image-exif-orientation.min.js") ?>"></script>
+    <script src="<?= base_url("/stisla/node_modules/filepond-plugin-image-filter/filepond-plugin-image-filter.min.js") ?>"></script>
+    <script src="<?= base_url("/stisla/node_modules/filepond-plugin-image-preview/filepond-plugin-image-preview.min.js") ?>"></script>
+    <script src="<?= base_url("/stisla/node_modules/filepond-plugin-image-resize/filepond-plugin-image-resize.min.js") ?>"></script>
+    <script src="<?= base_url("/stisla/node_modules/filepond/filepond.js") ?>"></script>
+    <!-- ===== End ===== -->
 
+    <script>
+        FilePond.registerPlugin(
+            FilePondPluginImagePreview,
+            FilePondPluginImageCrop,
+            FilePondPluginImageExifOrientation,
+            FilePondPluginImageFilter,
+            FilePondPluginImageResize,
+            FilePondPluginFileValidateSize,
+            FilePondPluginFileValidateType,
+        )
+
+        const filePondConfig = {
+            credits: null,
+            allowImagePreview: true,
+            allowImageFilter: true,
+            allowImageExifOrientation: false,
+            allowImageCrop: false,
+            imageFilterColorMatrix: [
+                0.299, 0.587, 0.114, 0, 0, 0.299, 0.587, 0.114, 0, 0, 0.299, 0.587, 0.114,
+                0, 0, 0.0, 0.0, 0.0, 1, 0,
+            ],
+            acceptedFileTypes: ["image/png", "image/jpg", "image/jpeg"],
+            fileValidateTypeDetectType: (source, type) =>
+                new Promise((resolve, reject) => {
+                    // Do custom type detection here and return with promise
+                    resolve(type)
+                }),
+            storeAsFile: true,
+        };
+
+        FilePond.create(document.querySelector(".tanda_tangan"), filePondConfig);
+        FilePond.create(document.querySelector(".edit_tanda_tangan"), filePondConfig);
+    </script>
 
     <script>
         $(function() {
@@ -189,6 +245,94 @@
             });
         });
     </script>
+
+    <script>
+        $("document").ready(function() {
+
+            $("#filterTable").dataTable({
+                "searching": true
+            });
+
+            //Get a reference to the new datatable
+            var table = $('#filterTable').DataTable();
+
+            //Take the category filter drop down and append it to the datatables_filter div. 
+            //You can use this same idea to move the filter anywhere withing the datatable that you want.
+            $("#filterTable_filter.dataTables_filter").append($("#categoryFilter"));
+
+            //Get the column index for the Category column to be used in the method below ($.fn.dataTable.ext.search.push)
+            //This tells datatables what column to filter on when a user selects a value from the dropdown.
+            //It's important that the text used here (Category) is the same for used in the header of the column to filter
+            var categoryIndex = 0;
+            $("#filterTable th").each(function(i) {
+                if ($($(this)).html() == "Status") {
+                    categoryIndex = i;
+                    return false;
+                }
+            });
+
+            //Use the built in datatables API to filter the existing rows by the Category column
+            $.fn.dataTable.ext.search.push(
+                function(settings, data, dataIndex) {
+                    var selectedItem = $('#categoryFilter').val()
+                    var category = data[categoryIndex];
+                    if (selectedItem === "" || category.includes(selectedItem)) {
+                        return true;
+                    }
+                    return false;
+                }
+            );
+
+            //Set the change event for the Category Filter dropdown to redraw the datatable each time
+            //a user selects a new filter.
+            $("#categoryFilter").change(function(e) {
+                table.draw();
+            });
+
+            table.draw();
+        });
+    </script>
+
+    <script>
+        $("document").ready(function() {
+            // Inisialisasi DataTables
+            var table = $('#emailAPL1').DataTable({
+                "searching": true
+            });
+
+            // Buat fungsi pencarian khusus untuk rentang tanggal validasi
+            $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+                var minDate = $('#min').val();
+                var maxDate = $('#max').val();
+                var currentDate = data[5]; // Kolom ke-5 adalah kolom "Tanggal Validasi" pada tabel
+
+                // Ubah format tanggal menjadi objek Date
+                var currentDateFormat = new Date(currentDate);
+                var minDateFormat = new Date(minDate);
+                var maxDateFormat = new Date(maxDate);
+
+                // Jika rentang tanggal kosong, tampilkan semua data
+                if (minDate === '' && maxDate === '') {
+                    return true;
+                }
+
+                // Lakukan pencarian berdasarkan rentang tanggal
+                if ((minDate === '' || currentDateFormat >= minDateFormat) &&
+                    (maxDate === '' || currentDateFormat <= maxDateFormat)) {
+                    return true;
+                }
+                return false;
+            });
+
+            // Set ulang tabel ketika ada perubahan pada rentang tanggal
+            $("#min, #max").on('change', function() {
+                table.draw();
+            });
+        });
+    </script>
+
+
+
 
     <!-- Page Specific JS File -->
 

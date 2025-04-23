@@ -1,15 +1,14 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aktivasi Email</title>
+    <title>Data Pendaftaran Uji Kompetensi Keahlian</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             line-height: 1.6;
-            color: #333;
+            color: #000000;
             margin: 0;
             padding: 0;
             background-color: #f9f9f9;
@@ -25,12 +24,10 @@
         }
 
         .header {
-            text-align: center;
             margin-bottom: 30px;
         }
 
         .content {
-            text-align: center;
             margin-bottom: 30px;
         }
 
@@ -45,7 +42,7 @@
             display: inline-block;
             padding: 10px 20px;
             background-color: #007bff;
-            color: #fff;
+            color: #000000;
             text-decoration: none;
             border-radius: 5px;
             transition: background-color 0.3s ease;
@@ -68,17 +65,53 @@
 <body>
     <div class="container">
         <div class="header">
-            <h2>Hallo, <?= $name ?></h2>
+            <h2>Pendaftaran Uji Kompetensi Keahlian Telah Diterima</h2>
         </div>
         <div class="content">
-            <p>Selamat! Pendaftaran Anda untuk sertifikasi di LSP - p1 SMKN 2 Kuningan telah berhasil.</p>
-            <p>Informasi Anda sekarang sedang dalam proses validasi. Mohon tunggu untuk informasi selanjutnya melalui email.</p>
-            <p>Terima kasih atas partisipasi Anda.</p>
+            <p>Hai <?= $name ?>,</p>
+
+            <p>Terima kasih telah mendaftar Uji Kompetensi Keahlian di LSP - P1 SMK Negeri 2 Kuningan!</p>
+
+            <p>Data pendaftaran kamu dengan ID Pendaftaran <?= $id ?> telah kami terima dan sedang dalam proses validasi.</p>
+
+            <p>Berikut detail data pendaftarannya:</p>
+            <table>
+                <tr>
+                    <td>Nama Lengkap</td>
+                    <td>:</td>
+                    <td><?= $name ?></td>
+                </tr>
+                <tr>
+                    <td>ID Pendaftaran</td>
+                    <td>:</td>
+                    <td><?= $id ?></td>
+                </tr>
+            </table>
+
+            <p>Mohon tunggu beberapa saat sementara kami melakukan validasi data pendaftaran kamu.</p>
+
+            <p>Jika ada informasi yang perlu diperbaiki, kami akan segera menghubungi kamu melalui email ini.</p>
+
+            <p><b>Alur Pendaftaran Sertfikasi:</b></p>
+
+            <ul>
+                <li>Mengisi form pendaftaran sertifikasi profesi LSP - P1 SMK Negeri 2 Kuningan</li>
+                <li>Data pendaftaran sertifikasi Anda akan diverifikasi oleh Admin</li>
+                <li>Mengisi asesmen mandiri</li>
+                <li>Jawaban asesmen mandiri Anda akan divalidasi oleh Asesor</li>
+                <li>Informasi status pendaftaran Anda Dan informasi asesmen selanjutnya</li>
+            </ul>
+
+            <p>Terima kasih atas kesabaran dan kerjasamanya.</p>
+
+            <p>Salam,</p>
+
+            <p>Tim LSP - P1 SMK Negeri 2 Kuningan</p>
         </div>
 
         <div class="footer">
             <p>Email ini dikirimkan secara otomatis. Jangan membalas email ini.</p>
-            <p>&copy; <?= date('Y') ?> Sertifikasi LSP SMKN 2 Kuningan. Hak cipta dilindungi undang-undang.</p>
+            <p>&copy; <?= date('Y') ?> Sertifikasi LSP - P1 SMKN 2 Kuningan. Hak cipta dilindungi undang-undang.</p>
         </div>
     </div>
 </body>

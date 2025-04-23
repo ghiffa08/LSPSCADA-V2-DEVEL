@@ -27,6 +27,14 @@ $routes->get('/asesmen-mandiri/(:any)', 'LandingpageController::asesmen/$1');
 
 $routes->post('/store-asesmen-mandiri', 'LandingpageController::store_asesmen');
 
+$routes->get('/scan-tanda-tangan-asesi/(:segment)', 'APL1Controller::scan_ttd_asesi/$1');
+
+$routes->get('/scan-tanda-tangan-admin/(:segment)', 'APL1Controller::scan_ttd_admin/$1');
+
+$routes->get('/scan-tanda-tangan-asesor/(:segment)', 'APL2Controller::scan_ttd_asesor/$1');
+
+$routes->post('/send-feedback', 'LandingpageController::send_feedback');
+
 
 
 
@@ -36,19 +44,11 @@ $routes->get('/tes', 'TesController::index');
 
 $routes->get('/dashboard', 'Dashboard::index', ['filter' => 'login']);
 
-$routes->get('/settings', 'Settings::index', ['filter' => 'login']);
-// $routes->get('/groups-setting', 'Settings::groups_setting', ['filter' => 'role:LSP,Superadmin']);
-$routes->get('/groups-setting', 'Settings::groups_setting', ['filter' => 'login']);
-$routes->post('/store-group', 'Settings::store_group');
-$routes->post('/update-group', 'Settings::update_group');
-$routes->post('/delete-group', 'Settings::delete_group');
-$routes->post('/group-users-update', 'Settings::update_group_user');
+$routes->get('/settings', 'Settings::index', ['filter' => 'login']);;
 
 $routes->get('/profile/(:any)', 'UserController::profile/$1', ['filter' => 'login']);
+
 $routes->post('/user-update', 'UserController::updateUser');
-$routes->post('/user-save', 'UserController::simpanUser');
-$routes->post('/delete-user', 'UserController::delete_user');
-$routes->post('/group/simpan', 'Settings::simpan');
 
 $routes->group('admin', ['filter' => 'login'], function ($routes) {
     $routes->get('/', 'AdminController::index');
@@ -63,20 +63,11 @@ $routes->post('/store-asesor', 'AsesorController::store');
 $routes->post('/update-asesor', 'AsesorController::update');
 $routes->post('/delete-asesor', 'AsesorController::delete');
 
-$routes->get('/peserta', 'PesertaController::index', ['filter' => 'login']);
-$routes->post('/store-peserta', 'PesertaController::store');
-$routes->post('/update-peserta', 'PesertaController::update');
-$routes->post('/delete-peserta', 'PesertaController::delete');
-
-
 $routes->get('/skema', 'SkemaController::index', ['filter' => 'login']);
 $routes->post('/store-skema', 'SkemaController::store');
 $routes->post('/import-skema', 'SkemaController::import');
 $routes->post('/update-skema', 'SkemaController::update');
 $routes->post('/delete-skema', 'SkemaController::delete');
-
-$routes->get('/skema-siswa', 'SkemaSiswaController::index', ['filter' => 'login']);
-$routes->post('/store-skema-siswa', 'SkemaSiswaController::store');
 
 $routes->get('/unit', 'UnitController::index', ['filter' => 'login']);
 $routes->post('/store-unit', 'UnitController::store');
@@ -101,19 +92,49 @@ $routes->post('/store-tuk', 'TUKController::store');
 $routes->post('/update-tuk', 'TUKController::update');
 $routes->post('/delete-tuk', 'TUKController::delete');
 
-$routes->get('/apl1', 'APL1Controller::index', ['filter' => 'login']);
-$routes->get('/validasi-apl1/(:any)', 'APL1Controller::detailAPL1/$1', ['filter' => 'login']);
-$routes->post('/store-apl1', 'APL1Controller::store');
-$routes->post('/store-dokumen-apl1', 'APL1Controller::storeDocument');
-$routes->get('/edit-apl1', 'APL1Controller::edit', ['filter' => 'login']);
-$routes->get('/apl1-pdf-(:any)', 'APL1Controller::pdf/$1', ['filter' => 'login']);
-$routes->post('/update-apl1', 'APL1Controller::update');
-$routes->post('/validasi-apl1', 'APL1Controller::validasi');
 
-$routes->get('/asesmen-mandiri', 'APL2Controller::index', ['filter' => 'login']);
-// $routes->get('/asesmen-mandiri/(:any)', 'APL2Controller::asesmen/$1', ['filter' => 'login']);
-$routes->get('/apl2-pdf/(:any)', 'APL2Controller::pdf/$1', ['filter' => 'login']);
-// $routes->post('/store-asesmen-mandiri', 'APL2Controller::store');
+$routes->get('/monitoring-asesi', 'MonitoringController::index', ['filter' => 'login']);
+
+$routes->group('kelola_apl1', ['filter' => 'login'], function ($routes) {
+    $routes->get('/', 'APL1Controller::index');
+    $routes->post('store', 'APL1Controller::store');
+    $routes->get('validasi', 'APL1Controller::validasi');
+    $routes->get('send-email-validasi', 'APL1Controller::email_validasi');
+    $routes->post('store-validasi', 'APL1Controller::store_validasi');
+    $routes->post('store-email-validasi', 'APL1Controller::send_email_validasi');
+    $routes->post('store-email-validasi-by-date', 'APL1Controller::send_email_validasi_by_date');
+    $routes->post('delete', 'APL1Controller::delete');
+    $routes->get('pdf-(:any)', 'APL1Controller::pdf/$1');
+});
+
+$routes->group('kelola_apl2', ['filter' => 'login'], function ($routes) {
+    $routes->get('/', 'APL2Controller::index');
+    $routes->post('store', 'APL2Controller::store');
+    $routes->get('validasi', 'APL2Controller::validasi');
+    $routes->post('validasi-store', 'APL2Controller::store_validasi');
+    $routes->get('send-email-validasi', 'APL2Controller::email_validasi');
+    $routes->post('store-email-validasi', 'APL2Controller::send_email_validasi');
+    $routes->post('store-email-validasi-by-date', 'APL2Controller::send_email_validasi_by_date');
+    $routes->post('delete', 'APL2Controller::delete');
+    $routes->get('pdf-(:any)', 'APL2Controller::pdf/$1');
+});
+
+$routes->group('persetujuan-asesmen', ['filter' => 'login'], function ($routes) {
+    $routes->get('/', 'AKController::index');
+    $routes->post('store', 'AKController::store');
+    $routes->get('pdf-(:any)', 'AKController::pdf/$1');
+    $routes->post('import', 'AKController::import');
+    $routes->post('update', 'AKController::update');
+    $routes->post('delete', 'AKController::delete');
+});
+
+$routes->group('asesmen', ['filter' => 'login'], function ($routes) {
+    $routes->get('/', 'AsesmenController::index');
+    $routes->post('store', 'AsesmenController::store');
+    $routes->post('import', 'AsesmenController::import');
+    $routes->post('update', 'AsesmenController::update');
+    $routes->post('delete', 'AsesmenController::delete');
+});
 
 $routes->get('/settanggal', 'SettanggalController::index', ['filter' => 'login']);
 $routes->post('/store-settanggal', 'SettanggalController::store');
@@ -126,9 +147,16 @@ $routes->post('/store-persyaratan', 'PersyaratanController::store');
 $routes->post('/update-persyaratan', 'PersyaratanController::update');
 $routes->post('/delete-persyaratan', 'PersyaratanController::delete');
 
+$routes->get('/umpan-balik', 'FeedbackController::index');
+$routes->post('/delete-umpan-balik', 'FeedbackController::delete');
+
+// AJAX
+$routes->post('/get-jadwal', 'AsesmenController::getJadwal');
+$routes->post('/get-tuk', 'AsesmenController::getTuk');
 $routes->post('/getUnit', 'UnitController::getUnit');
 $routes->post('/getElemen', 'ElemenController::getElemen');
 $routes->post('/kabupaten', 'APL1Controller::kabupaten');
 $routes->post('/kecamatan', 'APL1Controller::kecamatan');
 $routes->post('/desa', 'APL1Controller::desa');
-$routes->get('/OAuth/proses', '\Myth\Auth\Controllers\AuthController::proses');
+$routes->post('/getDateValidated1', 'APL1Controller::getDateValidated');
+$routes->post('/getDateValidated2', 'APL2Controller::getDateValidated');

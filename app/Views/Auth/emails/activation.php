@@ -71,7 +71,7 @@
             <h2>Aktivasi Akun</h2>
         </div>
         <div class="content">
-            <p>Ini adalah email aktivasi untuk akun Anda di <a href="<?= site_url('/') ?>">Sertifikasi LSP SMKN 2 Kuningan</a>.</p>
+            <p>Ini adalah email aktivasi untuk akun Anda di <a href="<?= site_url('/dashboard') ?>">Sertifikasi LSP SMKN 2 Kuningan</a>.</p>
             <p>Untuk mengaktifkan akun Anda, klik tombol di bawah ini:</p>
             <p><a href="<?= url_to('activate-account') . '?token=' . $hash ?>" class="button">Aktifkan Akun</a></p>
             <p>Jika Anda tidak mendaftar di situs ini, Anda dapat mengabaikan email ini dengan aman.</p>

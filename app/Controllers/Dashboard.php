@@ -7,13 +7,16 @@ use CodeIgniter\HTTP\ResponseInterface;
 
 class Dashboard extends BaseController
 {
+
     public function index()
     {
+
         $data = [
             'siteTitle' => 'Dashboard',
-            'listSkema' => $this->skema->AllSkema(),
-            'listAPL1' => $this->apl1->getUnvalidatedData(),
-            'listAPL1Sucess' => $this->apl1->getValidatedData(),
+            'totalAdmin' => $this->dashboard->total_admin(),
+            'totalAsesor' => $this->dashboard->total_asesor(),
+            'totalAsesi' => $this->dashboard->total_asesi(),
+
         ];
 
         return view('dashboard', $data);

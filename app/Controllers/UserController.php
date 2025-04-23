@@ -111,12 +111,13 @@ class UserController extends BaseController
     {
 
         $rules = [
-            'username' => [
-                // 'rules' => 'required|is_unique[users.username]',
-                'rules' => 'required',
+            'tanda_tangan' => [
+                'label' => 'Tanda Tangan',
+                'rules' => 'uploaded[tanda_tangan]|max_size[tanda_tangan,2048]|mime_in[tanda_tangan,image/jpg,image/jpeg,image/png]',
                 'errors' => [
-                    'required' => 'Kolom username harus diisi.',
-                    // 'is_unique' => 'Username sudah digunakan, silakan pilih username lain.'
+                    'uploaded' => 'Harus upload {field} *',
+                    'max_size' => 'File maksimal 2MB *',
+                    'mime_in' => 'File harus berupa gambar / foto'
                 ],
             ],
             // tambahkan aturan validasi lainnya sesuai kebutuhan
@@ -126,11 +127,16 @@ class UserController extends BaseController
             return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
         }
 
+        $tanda_tangan = $this->request->getFile('tanda_tangan');
+        $nama_tanda_tangan = $tanda_tangan->getRandomName();
+        $tanda_tangan->move('html/upload/tanda tangan', $nama_tanda_tangan);
+
         $data = [
             'username' => $this->request->getVar('username'),
             'fullname' => $this->request->getVar('fullname'),
             'no_telp' => $this->request->getVar('no_telp'),
             'user_image' => $this->request->getVar('user_image'),
+            'tanda_tangan' => $nama_tanda_tangan,
         ];
 
         $this->usermodel->update($this->request->getVar('id'), $data);

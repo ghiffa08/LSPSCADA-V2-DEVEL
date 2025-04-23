@@ -15,7 +15,7 @@ class Auth extends \Myth\Auth\Config\Auth
      *
      * @var string
      */
-    public $defaultUserGroup = 'Peserta';
+    public $defaultUserGroup = 'asesor';
 
     /**
      * --------------------------------------------------------------------
@@ -30,7 +30,7 @@ class Auth extends \Myth\Auth\Config\Auth
      *
      * @var string
      */
-    public $landingRoute = '/';
+    public $landingRoute = '/dashboard';
 
     /**
      * --------------------------------------------------------------------
@@ -173,7 +173,7 @@ class Auth extends \Myth\Auth\Config\Auth
      *
      * @var bool
      */
-    public $allowRegistration = true;
+    public $allowRegistration = false;
 
     /**
      * --------------------------------------------------------------------
@@ -185,8 +185,8 @@ class Auth extends \Myth\Auth\Config\Auth
      *
      * @var string|null Name of the ActivatorInterface class
      */
-    public $requireActivation = 'Myth\Auth\Authentication\Activators\EmailActivator';
-    // public $requireActivation = null;
+    // public $requireActivation = 'Myth\Auth\Authentication\Activators\EmailActivator';
+    public $requireActivation = null;
 
     /**
      * --------------------------------------------------------------------
@@ -198,8 +198,8 @@ class Auth extends \Myth\Auth\Config\Auth
      *
      * @var string|null Name of the ResetterInterface class
      */
-    public $activeResetter = 'Myth\Auth\Authentication\Resetters\EmailResetter';
-    // public $activeResetter = null;
+    // public $activeResetter = 'Myth\Auth\Authentication\Resetters\EmailResetter';
+    public $activeResetter = null;
 
     /**
      * --------------------------------------------------------------------

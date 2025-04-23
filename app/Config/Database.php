@@ -28,7 +28,7 @@ class Database extends Config
         'DSN'          => '',
         'hostname'     => 'localhost',
         'username'     => 'root',
-        'password'     => '',
+        'password'     => 'kng@874824',
         'database'     => 'lsp_scada',
         'DBDriver'     => 'MySQLi',
         'DBPrefix'     => '',

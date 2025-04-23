@@ -21,7 +21,7 @@ class APL1Model extends Model
     protected array $castHandlers = [];
 
     // Dates
-    protected $useTimestamps = false;
+    protected $useTimestamps = true;
     protected $dateFormat    = 'datetime';
     protected $createdField  = 'created_at';
     protected $updatedField  = 'updated_at';
@@ -44,47 +44,128 @@ class APL1Model extends Model
     protected $beforeDelete   = [];
     protected $afterDelete    = [];
 
-    public function getAllAPL1($id_siswa)
+    public function findAllAPL1()
     {
 
         return $this->db->table('apl1')
-            ->where('id_siswa', $id_siswa)
+            ->join('asesmen', 'asesmen.id_asesmen=apl1.id_asesmen', 'left')
+            ->join('skema', 'skema.id_skema=asesmen.id_skema', 'left')
+            ->select('apl1.*,apl1.id_apl1, apl1.updated_at as tanggal_validasi, skema.nama_skema, skema.id_skema as skema_id ')
+            ->Get()->getResultArray();
+    }
+
+    public function getAPL1($id)
+    {
+
+        return $this->db->table('apl1')
+            ->where('apl1.id_apl1', $id)
             ->join('wilayah_provinsi', 'wilayah_provinsi.id=apl1.provinsi', 'left')
             ->join('wilayah_kabupaten', 'wilayah_kabupaten.id=apl1.kabupaten', 'left')
             ->join('wilayah_kecamatan', 'wilayah_kecamatan.id=apl1.kecamatan', 'left')
             ->join('wilayah_desa', 'wilayah_desa.id=apl1.kelurahan', 'left')
-            ->join('skema', 'skema.id_skema=apl1.id_skema', 'left')
-            ->select('apl1.*,apl1.id_apl1, wilayah_provinsi.nama as nama_provinsi, wilayah_kabupaten.nama as nama_kabupaten, wilayah_kecamatan.nama as nama_kecamatan, wilayah_desa.nama as nama_kelurahan, skema.nama_skema, skema.id_skema as skema_id')
+            ->join('asesmen', 'asesmen.id_asesmen=apl1.id_asesmen', 'left')
+            ->join('users as admin_users', 'admin_users.id=apl1.validasi_admin', 'left')
+            ->join('skema', 'skema.id_skema=asesmen.id_skema', 'left')
+            ->select('apl1.*,apl1.id_apl1, wilayah_provinsi.nama as nama_provinsi, wilayah_kabupaten.nama as nama_kabupaten, wilayah_kecamatan.nama as nama_kecamatan, wilayah_desa.nama as nama_kelurahan, skema.nama_skema, skema.id_skema as skema_id, skema.jenis_skema, asesmen.tujuan,admin_users.fullname as validator_apl1, admin_users.tanda_tangan as ttd_validator_apl1')
             ->Get()->getRowArray();
     }
 
-    public function getAPL1byid($id)
+    public function getEmailValidasiToday()
     {
 
         return $this->db->table('apl1')
-            ->where('id_apl1', $id)
-            ->join('wilayah_provinsi', 'wilayah_provinsi.id=apl1.provinsi', 'left')
-            ->join('wilayah_kabupaten', 'wilayah_kabupaten.id=apl1.kabupaten', 'left')
-            ->join('wilayah_kecamatan', 'wilayah_kecamatan.id=apl1.kecamatan', 'left')
-            ->join('wilayah_desa', 'wilayah_desa.id=apl1.kelurahan', 'left')
-            ->join('skema', 'skema.id_skema=apl1.id_skema', 'left')
-            ->select('apl1.*,apl1.id_apl1, wilayah_provinsi.nama as nama_provinsi, wilayah_kabupaten.nama as nama_kabupaten, wilayah_kecamatan.nama as nama_kecamatan, wilayah_desa.nama as nama_kelurahan, skema.nama_skema, skema.id_skema as skema_id')
+            ->whereIn('validasi_apl1', ['validated', 'unvalid'])
+            ->where('DATE(apl1.updated_at)', date('Y-m-d'))
+            ->where('apl1.email_validasi', 0)
+            ->join('asesmen', 'asesmen.id_asesmen = apl1.id_asesmen', 'left')
+            ->join('users as admin_users', 'admin_users.id = apl1.validasi_admin', 'left')
+            ->join('skema', 'skema.id_skema = asesmen.id_skema', 'left')
+            ->select('apl1.id_apl1, apl1.validasi_apl1, apl1.nama_siswa, apl1.email, apl1.email_validasi as email_validasi_apl1, apl1.updated_at as tanggal_validasi, skema.nama_skema, skema.id_skema, admin_users.fullname as validator_apl1')
+            ->get()
+            ->getResultArray();
+    }
+
+    public function getEmailValidasiByDate($date)
+    {
+
+        return $this->db->table('apl1')
+            ->whereIn('validasi_apl1', ['validated', 'unvalid'])
+            ->where('DATE(apl1.updated_at)', $date)
+            ->where('apl1.email_validasi', 0)
+            ->join('asesmen', 'asesmen.id_asesmen = apl1.id_asesmen', 'left')
+            ->join('users as admin_users', 'admin_users.id = apl1.validasi_admin', 'left')
+            ->join('skema', 'skema.id_skema = asesmen.id_skema', 'left')
+            ->select('apl1.id_apl1, apl1.validasi_apl1, apl1.nama_siswa, apl1.email, apl1.email_validasi as email_validasi_apl1, apl1.updated_at as tanggal_validasi, skema.nama_skema, skema.id_skema, admin_users.fullname as validator_apl1')
+            ->get()
+            ->getResultArray();
+    }
+
+    public function getbyttdAsesi($ttd)
+    {
+
+        return $this->db->table('apl1')
+            ->where('tanda_tangan_asesi', $ttd)
+            ->join('users', 'users.id=apl1.validasi_admin', 'left')
+            ->select('apl1.nama_siswa, apl1.created_at, apl1.tanda_tangan_asesi, users.tanda_tangan as tanda_tangan_validator, users.fullname')
             ->Get()->getRowArray();
     }
 
-
-    public function getDataByIdSiswa($id_siswa)
+    public function getbyttdAdmin($ttd)
     {
-        return $this->where('id_siswa', $id_siswa)->findAll();
+
+        return $this->db->table('apl1')
+            ->where('users.tanda_tangan', $ttd)
+            ->join('users', 'users.id=apl1.validasi_admin', 'left')
+            ->select('users.tanda_tangan as tanda_tangan_validator, users.fullname as nama_validator, apl1.created_at')
+            ->Get()->getRowArray();
     }
 
     public function getUnvalidatedData()
     {
-        return $this->where('validasi_apl1', 'N')->findAll();
+        return $this->db->table('apl1')
+            ->where('validasi_apl1', 'unvalid')
+            ->join('asesmen', 'asesmen.id_asesmen=apl1.id_asesmen', 'left')
+            ->join('skema', 'skema.id_skema=asesmen.id_skema', 'left')
+            ->orderBy('created_at', 'DESC')
+            ->select('apl1.id_apl1,apl1.nama_siswa, apl1.validasi_apl1, apl1.email, apl1.pas_foto ,  apl1.tanda_tangan_asesi,  apl1.bukti_pendidikan,  apl1.ktp,  apl1.raport,  apl1.sertifikat_pkl,skema.nama_skema, skema.id_skema as skema_id')
+            ->Get()->getResultArray();
     }
+
+    public function getPendingData()
+    {
+        return $this->db->table('apl1')
+            ->where('validasi_apl1', 'pending')
+            ->join('asesmen', 'asesmen.id_asesmen=apl1.id_asesmen', 'left')
+            ->join('skema', 'skema.id_skema=asesmen.id_skema', 'left')
+            ->orderBy('created_at', 'DESC')
+            ->select('apl1.id_apl1,apl1.nama_siswa, apl1.validasi_apl1, apl1.email, apl1.pas_foto ,  apl1.tanda_tangan_asesi,  apl1.bukti_pendidikan,  apl1.ktp,  apl1.raport,  apl1.sertifikat_pkl,skema.nama_skema, skema.id_skema as skema_id')
+            ->Get()->getResultArray();
+    }
+
 
     public function getValidatedData()
     {
-        return $this->where('validasi_apl1', 'Y')->findAll();
+        return $this->db->table('apl1')
+            ->where('validasi_apl1', 'validated')
+            ->join('asesmen', 'asesmen.id_asesmen=apl1.id_asesmen', 'left')
+            ->join('skema', 'skema.id_skema=asesmen.id_skema', 'left')
+            ->orderBy('created_at', 'DESC')
+            ->select('apl1.id_apl1,apl1.nama_siswa, apl1.validasi_apl1, apl1.email, apl1.pas_foto ,  apl1.tanda_tangan_asesi,  apl1.bukti_pendidikan,  apl1.ktp,  apl1.raport,  apl1.sertifikat_pkl,skema.nama_skema, skema.id_skema as skema_id')
+            ->Get()->getResultArray();
+    }
+
+    public function getMonitoring()
+    {
+        return $this->db->table('apl1')
+            ->join('apl2', 'apl2.id_apl1=apl1.id_apl1', 'left')
+            ->join('asesmen', 'asesmen.id_asesmen=apl1.id_asesmen', 'left')
+            ->join('tuk', 'asesmen.id_tuk=tuk.id_tuk', 'left')
+            ->join('users as admin_users', 'admin_users.id=apl1.validasi_admin', 'left')
+            ->join('users as asesor_users', 'asesor_users.id=apl2.validator', 'left')
+            ->join('skema', 'skema.id_skema=asesmen.id_skema', 'left')
+            ->join('set_tanggal', 'set_tanggal.id_tanggal=asesmen.id_tanggal', 'left')
+            ->select('apl1.id_apl1,skema.nama_skema, apl1.nama_siswa, apl1.validasi_apl1 as status_apl1, apl1.pas_foto, apl1.ktp, apl1.bukti_pendidikan, apl1.tanda_tangan_asesi, apl1.raport, apl1.sertifikat_pkl, admin_users.fullname as validator_apl1, apl1.email_validasi as email_apl1, apl2.id_apl2, apl2.validasi_apl2 as status_apl2, apl2.email_validasi as email_apl2, asesor_users.fullname as validator_apl2')
+            ->get()
+            ->getResultArray();
     }
 }

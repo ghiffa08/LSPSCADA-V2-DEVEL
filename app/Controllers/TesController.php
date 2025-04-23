@@ -6,36 +6,108 @@ use App\Controllers\BaseController;
 use CodeIgniter\HTTP\ResponseInterface;
 use TCPDF;
 
+
 class TesController extends BaseController
 {
   public function index()
   {
-    $to = 'haikalcode08@gmail.com';
-    $subject = 'Pendaftaran Uji Kompetensi Keahlian';
 
-    // HTML message
-    $message = view('email/email_validasi_apl1', [
-      'name' => 'haikal'
-    ]);
+    $listAPL1Validated = $this->apl1->getEmailValidasi();
 
-    $email = \Config\Services::email();
-    $email->setTo($to);
-    $email->setFrom('haikal1080p@gmail.com', 'LSP SMK NEGERI 2 KUNINGAN');
+    $subject = 'Validasi Data Pendaftaran Uji Kompetensi Keahlian';
 
-    $email->setSubject($subject);
-    $email->setMessage($message);
+    foreach ($listAPL1Validated as $row) {
 
-    // Set mail type to HTML
-    $email->setMailType('html');
+      $to = $row['email'];
 
-    if ($email->send()) {
-      echo 'Email successfully sent';
-    } else {
-      $data = $email->printDebugger(['headers']);
-      print_r($data);
+      $nama_asesi = $row['nama_siswa'];
+
+      $id_apl1 = $row['id_apl1'];
+
+      $skema = $row['nama_skema'];
+
+      if ($row['validasi_apl1'] == "validated") {
+        $message = view('email/email_validated_apl1', [
+          'skema' => $skema,
+          'name' => $nama_asesi,
+          'id' => $id_apl1
+        ]);
+      } else {
+        $message = view('email/email_unvalidated_apl1', [
+          'skema' => $skema,
+          'name' => $nama_asesi,
+          'id' => $id_apl1,
+          'alasan_penolakan' => '',
+          'email_kontak' => 'lspp1smkn2kuningan@gmail.com',
+          'telepon_kontak' => '0812345678'
+        ]);
+      }
+
+      $email = \Config\Services::email();
+      $email->setTo($to);
+      $email->setFrom('lspp1smkn2kuningan@gmail.com', 'LSP - P1 SMK NEGERI 2 KUNINGAN');
+
+      $email->setSubject($subject);
+      $email->setMessage($message);
+
+      // Set mail type to HTML
+      $email->setMailType('html');
+
+      if ($email->send()) {
+        echo 'Email successfully sent';
+      } else {
+        $data = $email->printDebugger(['headers']);
+        print_r($data);
+      }
     }
   }
 
+
+  // {
+
+  //   $to = 'haikal1080p@gmail.com';
+  //   $subject = 'Validasi Asesmen Mandiri';
+
+  //   $nama_asesi = 'Haikal Jibran Al-Ghiffarry';
+
+  //   $id_apl2 = 'FR-APL-02-03a85b65';
+
+  //   $skema = 'AKUNTANSI KEUANGAN LEMBAGA';
+
+  //   // HTML message
+  //   $message = view('email/email_validated_apl2', [
+  //     'skema' => $skema,
+  //     'name' => $nama_asesi,
+  //     'id' => 'FR-APL-01-4629d15d',
+  //     'id_asesmen' => 'FR-APL-02-03a85b65'
+  //   ]);
+
+  //   $email = \Config\Services::email();
+  //   $email->setTo($to);
+  //   $email->setFrom('lspp1smkn2kuningan@gmail.com', 'LSP - P1 SMK NEGERI 2 KUNINGAN');
+
+  //   $email->setSubject($subject);
+  //   $email->setMessage($message);
+
+  //   // Set mail type to HTML
+  //   $email->setMailType('html');
+
+  //   // $email->attach($pdfFilePath);
+
+  //   if ($email->send()) {
+  //     echo 'Email successfully sent';
+  //   } else {
+  //     $data = $email->printDebugger(['headers']);
+  //     print_r($data);
+  //   }
+  // }
+
+  // {
+
+  //   return view('tes', [
+  //     'siteTitle' => 'Scan'
+  //   ]);
+  // }
 
   // public function index()
   // {
