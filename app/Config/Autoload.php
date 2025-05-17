@@ -97,5 +97,19 @@ class Autoload extends AutoloadConfig
      *
      * @var list<string>
      */
-   public $helpers = ['form', 'captcha', 'pdf_format', 'tcpdf_helper'];
+    public $helpers = [
+        'email',
+        'form',
+        'captcha',
+        'pdf_format',
+        'tcpdf',
+        'QrCode',
+        'datatables',
+        'filepond',
+        'str',
+        'application',
+        'documents',
+        'observasi',
+        'excel_import'
+    ];
 }

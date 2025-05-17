@@ -8,11 +8,49 @@ class APL1Model extends Model
 {
     protected $table            = 'apl1';
     protected $primaryKey       = 'id_apl1';
-    protected $useAutoIncrement = true;
+    protected $useAutoIncrement = false;
     protected $returnType       = 'array';
-    protected $useSoftDeletes   = false;
-    protected $protectFields    = false;
-    protected $allowedFields    = [];
+    protected $useSoftDeletes   = true;
+    protected $protectFields    = true;
+    // protected $allowedFields    = [
+    //     'id_apl1',
+    //     'email',
+    //     'nama_siswa',
+    //     'nik',
+    //     'tempat_lahir',
+    //     'tanggal_lahir',
+    //     'jenis_kelamin',
+    //     'pendidikan_terakhir',
+    //     'nama_sekolah',
+    //     'jurusan',
+    //     'kebangsaan',
+    //     'provinsi',
+    //     'kabupaten',
+    //     'kecamatan',
+    //     'kelurahan',
+    //     'rt',
+    //     'rw',
+    //     'kode_pos',
+    //     'telpon_rumah',
+    //     'no_hp',
+    //     'pekerjaan',
+    //     'nama_lembaga',
+    //     'alamat_perusahaan',
+    //     'jabatan',
+    //     'email_perusahaan',
+    //     'no_telp_perusahaan',
+    //     'id_asesmen',
+    //     'pas_foto',
+    //     'ktp',
+    //     'bukti_pendidikan',
+    //     'tanda_tangan_asesi',
+    //     'raport',
+    //     'sertifikat_pkl',
+    //     'validasi_apl1',
+    //     'created_at',
+    //     'updated_at',
+    //     'deleted_at'
+    // ];
 
     protected bool $allowEmptyInserts = false;
     protected bool $updateOnlyChanged = true;
@@ -167,5 +205,74 @@ class APL1Model extends Model
             ->select('apl1.id_apl1,skema.nama_skema, apl1.nama_siswa, apl1.validasi_apl1 as status_apl1, apl1.pas_foto, apl1.ktp, apl1.bukti_pendidikan, apl1.tanda_tangan_asesi, apl1.raport, apl1.sertifikat_pkl, admin_users.fullname as validator_apl1, apl1.email_validasi as email_apl1, apl2.id_apl2, apl2.validasi_apl2 as status_apl2, apl2.email_validasi as email_apl2, asesor_users.fullname as validator_apl2')
             ->get()
             ->getResultArray();
+    }
+
+
+    /**
+     * Get application by ID
+     *
+     * @param string $id
+     * @return array|null
+     */
+    public function getApplicationById(string $id): ?array
+    {
+        return $this->find($id);
+    }
+
+    /**
+     * Get application by email
+     *
+     * @param string $email
+     * @return array|null
+     */
+    public function getApplicationByEmail(string $email): ?array
+    {
+        return $this->where('email', $email)->first();
+    }
+
+    /**
+     * Get application by NIK
+     *
+     * @param string $nik
+     * @return array|null
+     */
+    public function getApplicationByNik(string $nik): ?array
+    {
+        return $this->where('nik', $nik)->first();
+    }
+
+    /**
+     * Get pending applications
+     *
+     * @return array
+     */
+    public function getPendingApplications(): array
+    {
+        return $this->where('validasi_apl1', 'pending')
+            ->orderBy('created_at', 'DESC')
+            ->findAll();
+    }
+
+    /**
+     * Update application status
+     *
+     * @param string $id
+     * @param string $status
+     * @return bool
+     */
+    public function updateStatus(string $id, string $status): bool
+    {
+        return $this->update($id, ['validasi_apl1' => $status]);
+    }
+
+    /**
+     * Count applications by status
+     *
+     * @param string $status
+     * @return int
+     */
+    public function countByStatus(string $status): int
+    {
+        return $this->where('validasi_apl1', $status)->countAllResults();
     }
 }

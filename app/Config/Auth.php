@@ -15,7 +15,7 @@ class Auth extends \Myth\Auth\Config\Auth
      *
      * @var string
      */
-    public $defaultUserGroup = 'asesor';
+    public $defaultUserGroup = 'Asesi';
 
     /**
      * --------------------------------------------------------------------
@@ -102,6 +102,7 @@ class Auth extends \Myth\Auth\Config\Auth
     public $validFields = [
         'email',
         'username',
+        'tanda_tangan',
     ];
 
     /**
@@ -122,7 +123,7 @@ class Auth extends \Myth\Auth\Config\Auth
      *
      * @var string[]
      */
-    public $personalFields = ['fullname', 'no_telp'];
+    public $personalFields = ['fullname', 'no_telp', 'tanda_tangan'];
 
     /**
      * --------------------------------------------------------------------
@@ -173,7 +174,7 @@ class Auth extends \Myth\Auth\Config\Auth
      *
      * @var bool
      */
-    public $allowRegistration = false;
+    public $allowRegistration = true;
 
     /**
      * --------------------------------------------------------------------
@@ -185,8 +186,8 @@ class Auth extends \Myth\Auth\Config\Auth
      *
      * @var string|null Name of the ActivatorInterface class
      */
-    // public $requireActivation = 'Myth\Auth\Authentication\Activators\EmailActivator';
-    public $requireActivation = null;
+    public $requireActivation = 'Myth\Auth\Authentication\Activators\EmailActivator';
+    // public $requireActivation = null;
 
     /**
      * --------------------------------------------------------------------
@@ -198,8 +199,8 @@ class Auth extends \Myth\Auth\Config\Auth
      *
      * @var string|null Name of the ResetterInterface class
      */
-    // public $activeResetter = 'Myth\Auth\Authentication\Resetters\EmailResetter';
-    public $activeResetter = null;
+    public $activeResetter = 'Myth\Auth\Authentication\Resetters\EmailResetter';
+    // public $activeResetter = null;
 
     /**
      * --------------------------------------------------------------------

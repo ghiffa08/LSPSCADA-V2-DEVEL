@@ -1,86 +1,30 @@
-<!DOCTYPE html>
-<html lang="id">
+ <div class="email-greeting">
+     Hello!
+ </div>
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aktivasi Email</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            margin: 0;
-            padding: 0;
-            background-color: #f9f9f9;
-        }
+ <div class="email-body">
+     <p>Thank you for creating an account on our website. We're excited to have you join our community!</p>
 
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #fff;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
+     <p>To complete your registration and activate your account, please click the button below:</p>
 
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
+     <div style="text-align: center;">
+         <a href="<?= $activation_url ?>" class="btn">Activate My Account</a>
+     </div>
 
-        .content {
-            text-align: center;
-            margin-bottom: 30px;
-        }
+     <p>If the button above doesn't work, you can also copy and paste the following URL into your browser:</p>
 
-        .footer {
-            text-align: center;
-            font-size: 14px;
-            color: #666;
-        }
+     <div class="info-box">
+         <p style="word-break: break-all; margin: 0;"><?= $activation_url ?></p>
+     </div>
 
-        /* Tombol Responsif */
-        .button {
-            display: inline-block;
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: #fff;
-            text-decoration: none;
-            border-radius: 5px;
-            transition: background-color 0.3s ease;
-        }
+     <div class="security-note">
+         <strong>Security Notice:</strong> If you did not create an account on our website, you can safely ignore this email. No action is required on your part.
+     </div>
 
-        .button:hover {
-            background-color: #0056b3;
-        }
+     <p>This activation link will expire in 24 hours for security reasons. If your link expires, you can request a new one by visiting our website.</p>
 
-        /* Responsif */
-        @media screen and (max-width: 600px) {
-            .container {
-                max-width: 100%;
-                border-radius: 0;
-            }
-        }
-    </style>
-</head>
+     <p>Thank you for your time!</p>
 
-<body>
-    <div class="container">
-        <div class="header">
-            <h2>Aktivasi Akun</h2>
-        </div>
-        <div class="content">
-            <p>Ini adalah email aktivasi untuk akun Anda di <a href="<?= site_url('/dashboard') ?>">Sertifikasi LSP SMKN 2 Kuningan</a>.</p>
-            <p>Untuk mengaktifkan akun Anda, klik tombol di bawah ini:</p>
-            <p><a href="<?= url_to('activate-account') . '?token=' . $hash ?>" class="button">Aktifkan Akun</a></p>
-            <p>Jika Anda tidak mendaftar di situs ini, Anda dapat mengabaikan email ini dengan aman.</p>
-        </div>
-        <div class="footer">
-            <p>Email ini dikirimkan secara otomatis. Jangan membalas email ini.</p>
-            <p>&copy; <?= date('Y') ?> Sertifikasi LSP SMKN 2 Kuningan. Hak cipta dilindungi undang-undang.</p>
-        </div>
-    </div>
-</body>
-
-</html>
+     <p>Best regards,</p>
+     <p><strong>The Support Team</strong></p>
+ </div>

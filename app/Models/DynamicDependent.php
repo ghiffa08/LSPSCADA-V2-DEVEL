@@ -11,17 +11,17 @@ class DynamicDependent extends Model
         return $this->db->table('wilayah_provinsi')->Get()->getResultArray();
     }
 
-    public function AllKabupaten($id_provinsi)
+    public function getAllKabupaten($id_provinsi)
     {
         return $this->db->table('wilayah_kabupaten')->where('provinsi_id', $id_provinsi)->Get()->getResultArray();
     }
 
-    public function AllKecamatan($id_kabupaten)
+    public function getAllKecamatan($id_kabupaten)
     {
         return $this->db->table('wilayah_kecamatan')->where('kabupaten_id', $id_kabupaten)->Get()->getResultArray();
     }
 
-    public function AllDesa($id_kecamatan)
+    public function getAllDesa($id_kecamatan)
     {
         return $this->db->table('wilayah_desa')->where('kecamatan_id', $id_kecamatan)->Get()->getResultArray();
     }

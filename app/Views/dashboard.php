@@ -10,7 +10,7 @@ if (empty(user()->tanda_tangan)) {
         <div class="col-12 mb-4">
             <div class="hero bg-primary text-white">
                 <div class="hero-inner">
-                    <h2>Selamat Datang di LSP SCADA APP, <?= user()->username ?>!</h2>
+                    <h2>Selamat Datang di LSP SCADA APP, <?= user()->fullname ?>!</h2>
                     <p class="lead">Lengkapi Data Diri anda untuk menyelesaikan registrasi.</p>
                     <div class="mt-4">
                         <a href="<?= site_url('profile/' . user()->id); ?>" class="btn btn-outline-white btn-lg btn-icon icon-left"><i class="far fa-user"></i>Mohon Lengkapi Data Diri</a>

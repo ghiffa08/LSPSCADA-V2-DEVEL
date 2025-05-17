@@ -3,9 +3,13 @@
 namespace App\Models;
 
 use CodeIgniter\Model;
+use App\Traits\DataTableTrait;
 
 class TUKModel extends Model
 {
+
+    use DataTableTrait;
+
     protected $table            = 'tuk';
     protected $primaryKey       = 'id_tuk';
     protected $useAutoIncrement = true;
@@ -27,9 +31,22 @@ class TUKModel extends Model
     protected $updatedField  = 'updated_at';
     protected $deletedField  = 'deleted_at';
 
-    // Validation
-    protected $validationRules      = [];
-    protected $validationMessages   = [];
+    // Validation rules
+    protected $validationRules = [
+        'nama_tuk' => 'required|max_length[255]',
+        'jenis_tuk' => 'required|in_list[Sewaktu, Tempat Kerja, Mandiri]',
+    ];
+
+    protected $validationMessages = [
+        'nama_tuk' => [
+            'required'   => 'Nama tuk wajib diisi.',
+            'max_length' => 'Nama tuk maksimal 255 karakter.'
+        ],
+        'jenis_tuk' => [
+            'required' => 'Jenis tuk wajib dipilih.',
+            'in_list'  => 'Jenis tuk harus salah satu dari: KKNI, Okupasi, Klaster.'
+        ]
+    ];
     protected $skipValidation       = false;
     protected $cleanValidationRules = true;
 
@@ -43,6 +60,44 @@ class TUKModel extends Model
     protected $afterFind      = [];
     protected $beforeDelete   = [];
     protected $afterDelete    = [];
+
+    // Fields that should be searched when using DataTable
+    protected $dataTableSearchFields = ['tuk.nama_tuk', 'tuk.jenis_tuk'];
+
+    /**
+     * Apply joins for DataTable query
+     *
+     * @param object $builder Query builder instance
+     * @return object
+     */
+    protected function applyDataTableJoins($builder)
+    {
+        return $builder;
+    }
+
+    /**
+     * Apply custom select fields for DataTable query
+     *
+     * @param object $builder Query builder instance
+     * @return object
+     */
+    protected function applyDataTableSelects($builder)
+    {
+        return $builder->select('tuk.*');
+    }
+
+    /**
+     * Transform DataTable results if needed
+     *
+     * @param array $data Result data
+     * @return array
+     */
+    protected function transformDataTableResults($data)
+    {
+        // You can transform data here if needed
+        // For example, format dates, calculate values, etc.
+        return $data;
+    }
 
     public function deleteTUK($id)
     {

@@ -11,10 +11,10 @@ class MonitoringController extends BaseController
     {
         $data = [
             'siteTitle' => 'Monitoring Peserta',
-            'listMonitoring' => $this->apl1->getMonitoring()
+            'listMonitoring' => $this->apl1Model->getMonitoring()
         ];
 
         // dd($data);
-        return view('dashboard/monitoring', $data);
+        return view('admin/monitoring', $data);
     }
 }

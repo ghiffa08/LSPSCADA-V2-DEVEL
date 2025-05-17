@@ -6,6 +6,19 @@ use CodeIgniter\Config\BaseConfig;
 
 class App extends BaseConfig
 {
+
+    /**
+     * Application Name
+     */
+    public string $appName;
+
+    public function __construct()
+    {
+        parent::__construct();
+
+        $this->appName = env('app_name', 'MyApplication');
+    }
+
     /**
      * --------------------------------------------------------------------------
      * Base Site URL
@@ -18,8 +31,8 @@ class App extends BaseConfig
      */
 
     // public string $baseURL = 'https://1db7-202-46-68-178.ngrok-free.app/Scada_LSPAPP/public/';
-    // public string $baseURL = 'http://localhost:8080/';
-    public string $baseURL = 'http://lsp.apps.smkn2-kng.sch.id/';
+    public string $baseURL = 'http://localhost:8080/';
+    // public string $baseURL = 'http://lsp.apps.smkn2-kng.sch.id/';
     // public string $baseURL = 'http://localhost/SCADA_LSPAPP/public/';
 
     /**
@@ -44,7 +57,7 @@ class App extends BaseConfig
      * something else. If you have configured your web server to remove this file
      * from your site URIs, set this variable to an empty string.
      */
-    public string $indexPage = 'index.php';
+    public string $indexPage = '';
 
     /**
      * --------------------------------------------------------------------------

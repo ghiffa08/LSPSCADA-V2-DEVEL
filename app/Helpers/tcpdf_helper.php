@@ -6,7 +6,7 @@ require_once APPPATH . '../vendor/tecnickcom/tcpdf/tcpdf.php';
 if (!function_exists('initTCPDF')) {
     function initTCPDF($title = 'Dokumen PDF')
     {
-        $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, 'A4', true, 'UTF-8', false);
+        $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
 
         $pdf->SetCreator(PDF_CREATOR);
         $pdf->SetAuthor('LSP SMK NEGERI 2 Kuningan');
@@ -26,7 +26,11 @@ if (!function_exists('initTCPDF')) {
             $pdf->setLanguageArray($l);
         }
 
-        $pdf->SetFont('helvetica', '', 10);
+        // $pdf->SetFont('helvetica', '', 10);
+        // $pdf->SetFont('dejavusans', '', 10);
+        $pdf->AddFont('notosanssymbols2', '', 'notosanssymbols2.php');
+        $pdf->SetFont('notosanssymbols2', '', 10);
+
 
         return $pdf;
     }

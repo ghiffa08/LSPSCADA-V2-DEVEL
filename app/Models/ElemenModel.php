@@ -3,66 +3,155 @@
 namespace App\Models;
 
 use CodeIgniter\Model;
+use App\Traits\DataTableTrait;
 
 class ElemenModel extends Model
 {
+    use DataTableTrait;
+
     protected $table            = 'elemen';
     protected $primaryKey       = 'id_elemen';
     protected $useAutoIncrement = true;
     protected $returnType       = 'array';
     protected $useSoftDeletes   = false;
-    protected $protectFields    = false;
-    protected $allowedFields    = [];
+    protected $protectFields    = true;
 
-    protected bool $allowEmptyInserts = false;
-    protected bool $updateOnlyChanged = true;
+    protected $allowedFields = [
+        'id_elemen',
+        'id_skema',
+        'id_unit',
+        'kode_elemen',
+        'nama_elemen'
+    ];
 
-    protected array $casts = [];
-    protected array $castHandlers = [];
+    // protected $useTimestamps = false;
 
-    // Dates
-    protected $useTimestamps = false;
-    protected $dateFormat    = 'datetime';
-    protected $createdField  = 'created_at';
-    protected $updatedField  = 'updated_at';
-    protected $deletedField  = 'deleted_at';
+    protected $validationRules = [
+        'id_skema'     => 'required|integer',
+        'id_unit'      => 'required|integer',
+        'kode_elemen'  => 'required|max_length[10]',
+        'nama_elemen'  => 'required|max_length[255]',
+    ];
 
-    // Validation
-    protected $validationRules      = [];
-    protected $validationMessages   = [];
-    protected $skipValidation       = false;
-    protected $cleanValidationRules = true;
+    protected $validationMessages = [
+        'id_skema' => [
+            'required' => 'ID Skema wajib diisi.',
+            'integer'  => 'ID Skema harus berupa angka.'
+        ],
+        'id_unit' => [
+            'required' => 'ID Unit wajib diisi.',
+            'integer'  => 'ID Unit harus berupa angka.'
+        ],
+        'kode_elemen' => [
+            'required'     => 'Kode Elemen wajib diisi.',
+            'max_length'   => 'Kode Elemen tidak boleh lebih dari 10 karakter.'
+        ],
+        'nama_elemen' => [
+            'required'     => 'Nama Elemen wajib diisi.',
+            'max_length'   => 'Nama Elemen tidak boleh lebih dari 255 karakter.'
+        ],
+    ];
 
-    // Callbacks
-    protected $allowCallbacks = true;
-    protected $beforeInsert   = [];
-    protected $afterInsert    = [];
-    protected $beforeUpdate   = [];
-    protected $afterUpdate    = [];
-    protected $beforeFind     = [];
-    protected $afterFind      = [];
-    protected $beforeDelete   = [];
-    protected $afterDelete    = [];
 
-    public function AllElemen()
+    // Fields that should be searched when using DataTable
+    protected $dataTableSearchFields = ['elemen.kode_elemen', 'elemen.nama_elemen'];
+
+    /**
+     * Apply joins for DataTable query
+     *
+     * @param object $builder Query builder instance
+     * @return object
+     */
+    protected function applyDataTableJoins($builder)
     {
-        $Elemen = new ElemenModel();
-        $Elemen->select('elemen.*, u.nama_unit'); // Menggunakan alias 'u' untuk tabel unit
-        $Elemen->join('unit as u', 'u.id_unit = elemen.id_unit', 'left'); // Menggunakan alias 'u' untuk tabel unit
-        return $Elemen->findAll();
+        return $builder->join('skema', 'skema.id_skema = elemen.id_skema')
+            ->join('unit', 'unit.id_unit = elemen.id_unit')
+            ->where('unit.status', 'Y')
+            ->where('skema.status', 'Y')
+            ->orderBy('skema.nama_skema, unit.kode_unit');
     }
 
-    public function getElemen($id_unit)
+    /**
+     * Apply custom select fields for DataTable query
+     *
+     * @param object $builder Query builder instance
+     * @return object
+     */
+    protected function applyDataTableSelects($builder)
     {
-        return $this->db->table('elemen')
-            ->where('id_unit', $id_unit)
+        return $builder->select('elemen.*, skema.nama_skema, unit.nama_unit');
+    }
+
+    /**
+     * Transform DataTable results if needed
+     *
+     * @param array $data Result data
+     * @return array
+     */
+    protected function transformDataTableResults($data)
+    {
+        // You can transform data here if needed
+        // For example, format dates, calculate values, etc.
+        return $data;
+    }
+
+    /**
+     * Mendapatkan semua elemen dengan nama unit
+     */
+    public function getAllElements(): array
+    {
+        return $this->select('elemen.*, unit.nama_unit')
+            ->join('unit', 'unit.id_unit = elemen.id_unit', 'left')
+            ->findAll();
+    }
+
+    /**
+     * Mendapatkan elemen berdasarkan ID unit
+     */
+    public function getElementsByUnit(int $id_unit): array
+    {
+        return $this->where('id_unit', $id_unit)
+            ->orderBy('nama_elemen')
+            ->findAll();
+    }
+
+    /**
+     * Mendapatkan elemen (opsional: berdasarkan ID unit)
+     * (Diubah dari getActiveElements karena tidak ada status)
+     */
+    public function getElements(int $id_unit = null): array
+    {
+        $builder = $this->builder();
+
+        if ($id_unit !== null) {
+            $builder->where('id_unit', $id_unit);
+        }
+
+        return $builder->orderBy('nama_elemen')
             ->get()
             ->getResultArray();
     }
 
-    public function deleteElemen($id)
+    /**
+     * Menghapus elemen
+     */
+    public function deleteElement(int $id_elemen): bool
     {
-        $query = $this->db->table('elemen')->delete(array('id_elemen' => $id));
-        return $query;
+        try {
+            return $this->delete($id_elemen);
+        } catch (\Exception $e) {
+            log_message('error', 'Gagal menghapus elemen: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Memeriksa apakah elemen valid
+     * (Diubah dari isValidElement karena tidak ada status)
+     */
+    public function elementExists(int $id_elemen): bool
+    {
+        return $this->where('id_elemen', $id_elemen)
+            ->countAllResults() > 0;
     }
 }

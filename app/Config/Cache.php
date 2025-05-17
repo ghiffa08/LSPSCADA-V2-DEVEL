@@ -44,7 +44,7 @@ class Cache extends BaseConfig
      *
      * @deprecated Use the driver-specific variant under $file
      */
-    public string $storePath = WRITEPATH . 'cache/';
+    public string $storePath = WRITEPATH . 'cache';
 
     /**
      * --------------------------------------------------------------------------
@@ -54,7 +54,7 @@ class Cache extends BaseConfig
      * This string is added to all cache item names to help avoid collisions
      * if you run multiple applications with the same cache engine.
      */
-    public string $prefix = '';
+    public string $prefix = 'ci4_';
 
     /**
      * --------------------------------------------------------------------------
@@ -68,6 +68,19 @@ class Cache extends BaseConfig
      * the hard-coded value in a future release.
      */
     public int $ttl = 60;
+
+    /**
+     * --------------------------------------------------------------------------
+     * Location Data TTL
+     * --------------------------------------------------------------------------
+     *
+     * Specific TTL for location dropdown data which changes less frequently.
+     * Set to 1 day (86400 seconds) by default.
+     *
+     * @var int
+     */
+    public $locationTtl = 86400; // 24 hours
+
 
     /**
      * --------------------------------------------------------------------------
@@ -123,7 +136,7 @@ class Cache extends BaseConfig
      *
      * @var array<string, int|string|null>
      */
-    public array $redis = [
+    public $redis = [
         'host'     => '127.0.0.1',
         'password' => null,
         'port'     => 6379,

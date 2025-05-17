@@ -9,8 +9,8 @@
     <ul class="navbar-nav navbar-right">
 
         <li class="dropdown"><a href="#" data-toggle="dropdown" class="nav-link dropdown-toggle nav-link-lg nav-link-user">
-                <img alt="image" src="<?= base_url('stisla/assets/img/avatar/avatar-1.png') ?>" class="rounded-circle mr-1">
-                <div class="d-sm-none d-lg-inline-block">Hi, <?= user()->fullname; ?></div>
+                <figure class="avatar avatar-sm mr-2 bg-info text-white" data-initial="<?= getInitials(user()->fullname); ?>"></figure>
+                <div class="d-sm-none d-lg-inline-block">Hallo, <?= user()->fullname; ?></div>
             </a>
             <div class="dropdown-menu dropdown-menu-right">
                 <div class="dropdown-title">Logged in 5 min ago</div>

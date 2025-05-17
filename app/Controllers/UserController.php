@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use Config\Database;
 use App\Controllers\BaseController;
 use CodeIgniter\HTTP\ResponseInterface;
 
@@ -36,7 +37,7 @@ class UserController extends BaseController
         $data['siteTitle'] = 'Profil Pengguna';
         $data['user'] = $query->getRow();
 
-        return view('dashboard/profile', $data);
+        return view('admin/profile', $data);
     }
 
     public function simpanUser()
@@ -60,95 +61,96 @@ class UserController extends BaseController
         ];
 
         // Lakukan simpan user dengan data di atas
-        $this->userMyth->withGroup($this->request->getVar('role'))->save($data);
+        $this->authUserModel->withGroup($this->request->getVar('role'))->save($data);
 
         session()->setFlashdata('pesan', 'User berhasil disimpan');
         return redirect()->to('/list-user');
     }
 
-
-    // Update Profile
-    // public function updateUser()
-    // {
-
-    //     // $rules = [
-    //     //     'username' => 'required|is_unique[users.username]',
-    //     //     // tambahkan aturan validasi lainnya sesuai kebutuhan
-    //     // ];
-
-    //     $rules = [
-    //         'username' => [
-    //             'rules' => 'required|is_unique[users.username]',
-    //             'errors' => [
-    //                 'required' => 'Kolom username harus diisi.',
-    //                 'is_unique' => 'Username sudah digunakan, silakan pilih username lain.'
-    //                 // tambahkan pesan kesalahan untuk aturan validasi lainnya sesuai kebutuhan
-    //             ],
-    //         ],
-    //         // tambahkan aturan validasi lainnya sesuai kebutuhan
-    //     ];
-
-    //     if (!$this->validate($rules)) {
-    //         return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
-    //     }
-
-    //     $data = [
-    //         'id' => $this->request->getVar('id'),
-    //         'email' => $this->request->getVar('email'),
-    //         'username' => $this->request->getVar('username'),
-    //         'fullname' => $this->request->getVar('fullname'),
-    //         'no_telp' => $this->request->getVar('phone_number'),
-    //         'user_image' => $this->request->getVar('user_image'),
-    //     ];
-
-    //     $this->user->update($this->request->getVar('id'), $data);
-    //     session()->setFlashdata('pesan', 'User berhasil diupdate');
-    //     return redirect()->to('profile/' . user()->id);
-    //     // return redirect()->to('/');
-    // }
-
     public function updateUser()
     {
-
         $rules = [
-            'tanda_tangan' => [
-                'label' => 'Tanda Tangan',
-                'rules' => 'uploaded[tanda_tangan]|max_size[tanda_tangan,2048]|mime_in[tanda_tangan,image/jpg,image/jpeg,image/png]',
-                'errors' => [
-                    'uploaded' => 'Harus upload {field} *',
-                    'max_size' => 'File maksimal 2MB *',
-                    'mime_in' => 'File harus berupa gambar / foto'
-                ],
-            ],
-            // tambahkan aturan validasi lainnya sesuai kebutuhan
+            'username' => 'required',
+            'fullname' => 'required',
+            'no_telp'  => 'permit_empty',
         ];
 
         if (!$this->validate($rules)) {
             return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
         }
 
-        $tanda_tangan = $this->request->getFile('tanda_tangan');
-        $nama_tanda_tangan = $tanda_tangan->getRandomName();
-        $tanda_tangan->move('html/upload/tanda tangan', $nama_tanda_tangan);
+        $userId = $this->request->getVar('id');
+        $user   = $this->authUserModel->find($userId);
 
         $data = [
             'username' => $this->request->getVar('username'),
             'fullname' => $this->request->getVar('fullname'),
-            'no_telp' => $this->request->getVar('no_telp'),
-            'user_image' => $this->request->getVar('user_image'),
-            'tanda_tangan' => $nama_tanda_tangan,
+            'no_telp'  => $this->request->getVar('no_telp'),
         ];
 
-        $this->usermodel->update($this->request->getVar('id'), $data);
-        session()->setFlashdata('pesan', 'User berhasil diupdate');
-        return redirect()->to('profile/' . user()->id);
+        $signatureDir = WRITEPATH . 'uploads/user/signatures/';
+        if (!is_dir($signatureDir)) {
+            mkdir($signatureDir, 0755, true);
+        }
+
+        $newSignatureName = null;
+        $signatureData    = $this->request->getVar('tanda_tangan');
+
+        $db = Database::connect();
+        $db->transBegin();
+
+        // Tangani jika tanda tangan berupa base64 dari canvas
+        if (!empty($signatureData) && strpos($signatureData, 'data:image') === 0) {
+            list(, $encodedData) = explode(',', $signatureData);
+            $decodedData         = base64_decode($encodedData);
+            $newSignatureName    = uniqid('sig_') . '.png';
+            $savePath            = $signatureDir . $newSignatureName;
+
+            if (!file_put_contents($savePath, $decodedData)) {
+                $db->transRollback();
+                return redirect()->back()->withInput()->with('error', 'Gagal menyimpan tanda tangan.');
+            }
+        } else {
+            // Tangani jika tanda tangan berupa upload file
+            $file = $this->request->getFile('tanda_tangan');
+            if ($file && $file->isValid() && !$file->hasMoved()) {
+                $newSignatureName = $file->getRandomName();
+                if (!$file->move($signatureDir, $newSignatureName)) {
+                    $db->transRollback();
+                    return redirect()->back()->withInput()->with('error', 'Gagal mengupload tanda tangan.');
+                }
+            }
+        }
+
+        // Jika ada tanda tangan baru, hapus tanda tangan lama
+        if ($newSignatureName) {
+            if (!empty($user['tanda_tangan'])) {
+                $oldSignaturePath = $signatureDir . $user['tanda_tangan'];
+                if (file_exists($oldSignaturePath)) {
+                    unlink($oldSignaturePath);
+                }
+            }
+            $data['tanda_tangan'] = $newSignatureName;
+        }
+
+        // Update ke database
+        if ($this->authUserModel->update($userId, $data)) {
+            $db->transCommit();
+            session()->setFlashdata('pesan', 'Data berhasil diupdate.');
+            return redirect()->to('profile/' . $userId);
+        } else {
+            $db->transRollback();
+            return redirect()->back()->withInput()->with('error', 'Gagal mengupdate data.');
+        }
     }
+
+
 
 
     public function delete_user()
     {
         $id = $this->request->getPost('id');
-        $this->usermodel->deleteUser($id);
+        $this->authUserModel->deleteUser($id);
         session()->setFlashdata('message', 'Group berhasil dihapus!');
         return redirect()->to('/groups-setting');
     }

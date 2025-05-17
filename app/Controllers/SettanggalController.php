@@ -10,11 +10,11 @@ class SettanggalController extends BaseController
     public function index()
     {
         $data = [
-            'listSettanggal' => $this->settanggal->findAll(),
+            'listSettanggal' => $this->settanggalModel->findAll(),
             'siteTitle' => 'Set Tanggal',
         ];
 
-        return view('dashboard/settanggal', $data);
+        return view('admin/settanggal', $data);
     }
 
     public function store()
@@ -59,7 +59,7 @@ class SettanggalController extends BaseController
 
         $this->settanggal->save($data);
         session()->setFlashdata('pesan', 'Tanggal Asesi berhasil di set!');
-        return redirect()->to('/settanggal');
+        return redirect()->to('/master/tanggal');
     }
 
     public function update()
@@ -104,7 +104,7 @@ class SettanggalController extends BaseController
 
         $this->settanggal->update($this->request->getVar('edit_id'), $data);
         session()->setFlashdata('pesan', 'Tanggal Berhasil diupdate!');
-        return redirect()->to('/settanggal');
+        return redirect()->to('/master/tanggal');
     }
 
     public function delete()
@@ -112,6 +112,6 @@ class SettanggalController extends BaseController
         $id = $this->request->getVar('id');
         $this->settanggal->deleteSettanggal($id);
         session()->setFlashdata('pesan', 'Tanggal Asesi berhasil dihapus!');
-        return redirect()->to('/settanggal');;
+        return redirect()->to('/master/tanggal');;
     }
 }

@@ -22,17 +22,17 @@ class AKController extends BaseController
     {
         $data = [
             'siteTitle' => 'Persetujuan Asesmen Dan Kerahasiaan',
-            'listAk' => $this->apl2->AllpersetujuanAsesmen(),
+            'listAk' => $this->apl2Model->AllpersetujuanAsesmen(),
         ];
         // dd($data);
-        return view('dashboard/kelola_ak1', $data);
+        return view('admin/kelola_ak1', $data);
     }
 
     public function pdf($id)
     {
         // PDF PERSETJUAN ASESMEN
 
-        $dataAPL1 = $this->apl2->persetujuanAsesmen($id);
+        $dataAPL1 = $this->apl2Model->persetujuanAsesmen($id);
 
         $jenis_sertifikasi = '';
 
