@@ -72,6 +72,7 @@ class Observasi extends DataTableController
     }
 
     /**
+   
      * Load observation data via AJAX
      *
      * @return \CodeIgniter\HTTP\Response

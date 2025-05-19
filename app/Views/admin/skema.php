@@ -166,6 +166,5 @@
     });
 </script>
 <!-- End SKEMA JS -->
-
 <?= $this->endSection() ?>
 <!-- End Script Section -->

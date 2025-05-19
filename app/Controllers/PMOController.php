@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Services\PDFService;
+use App\Services\FormatterService;
 use App\Controllers\BaseController;
 use CodeIgniter\HTTP\ResponseInterface;
 
