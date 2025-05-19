@@ -51,8 +51,8 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
     $routes->group('pdf', function ($routes) {
         $routes->get('pmo', 'PMOController::pdf');
         $routes->get('feedback', 'FeedbackController::pdf');
-        $routes->get('observasi/(:num)/(:any)', 'CeklistObservasiController::pdf/$1/$2');
-        $routes->get('apl1/(:any)', 'APL1Controller::pdf/$1');
+        $routes->get('observasi/(:num)', 'CeklistObservasiController::pdf/$1');
+        $routes->get('apl1/(:num)', 'APL1Controller::pdf/$1');
         $routes->get('rekaman', 'RekamanAsesmenController::pdf');
         $routes->get('laporan', 'LaporanAsesmenController::pdf');
     });

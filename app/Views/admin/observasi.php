@@ -47,14 +47,15 @@
 </div>
 <?= $this->endSection(); ?>
 
+
 <?= $this->section('js') ?>
 <?= $this->include('admin/scripts/DataEntityManager') ?>
 <script>
     /**
-     * Implementation example for Skema Management
+     * Implementation example for Observasi Management
      */
     $(document).ready(function() {
-        // Initialize Skema Manager using the reusable DataEntityManager
+        // Initialize Observasi Manager using the reusable DataEntityManager
         const ObservasiManager = DataEntityManager;
 
         ObservasiManager.init({
@@ -129,7 +130,6 @@
                 }
             ],
 
-
             // Column formatters
             renderFormatters: {},
 
@@ -139,11 +139,101 @@
             // Additional options for DataTable
             additionalOptions: {
                 responsive: true
+            },
+
+            // Configure action buttons
+            actions: {
+                edit: {
+                    enabled: true,
+                    title: 'Edit',
+                    icon: 'fa fa-edit',
+                    btnClass: 'btn-info btn-sm mr-1'
+                },
+                delete: {
+                    enabled: true,
+                    title: 'Hapus',
+                    icon: 'fa fa-trash',
+                    btnClass: 'btn-danger btn-sm mr-1'
+                },
+                // Add custom print button
+                print: {
+                    enabled: true,
+                    title: 'Print',
+                    icon: 'fa fa-print',
+                    btnClass: 'btn-primary btn-sm',
+                    callback: function(id, rowData) {
+                        // Print action implementation
+                        printObservasi(id, rowData);
+                    }
+                }
+            },
+
+            // Custom callbacks
+            callbacks: {
+                // Optional: Use this if you want to completely customize the action buttons rendering
+                // renderActionButtons: function(data, type, row) {
+                //     const id = row.id_observasi;
+                //     return `
+                //         <button type="button" class="btn btn-info btn-sm mr-1" data-id="${id}" data-action="edit" title="Edit">
+                //             <i class="fa fa-edit"></i> Edit
+                //         </button>
+                //         <button type="button" class="btn btn-danger btn-sm mr-1" data-id="${id}" data-action="delete" title="Hapus">
+                //             <i class="fa fa-trash"></i> Hapus
+                //         </button>
+                //         <button type="button" class="btn btn-primary btn-sm" data-id="${id}" data-action="print" title="Print">
+                //             <i class="fa fa-print"></i> Print
+                //         </button>
+                //     `;
+                // }
             }
         });
 
         // Make updateFileLabel globally accessible
         window.updateFileLabel = ObservasiManager.updateFileLabel;
+
+        /**
+         * Handle Print Observasi
+         * @param {number} id - ID of the observasi to print
+         * @param {object} rowData - The data of the selected row
+         */
+        function printObservasi(id, rowData) {
+            // Show loading notification
+            Swal.fire({
+                title: 'Mempersiapkan Dokumen',
+                text: 'Mohon tunggu...',
+                allowOutsideClick: false,
+                showConfirmButton: false,
+                willOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            // Generate print URL
+            const printUrl = `${window.location.origin}/pdf/observasi/${id}`;
+
+            // Open print URL in new window
+            const printWindow = window.open(printUrl, '_blank');
+
+            if (printWindow) {
+                // Close loading notification once window is opened
+                Swal.close();
+
+                // Optional: Add event listener to detect if print window is closed
+                const checkWindowClosed = setInterval(function() {
+                    if (printWindow.closed) {
+                        clearInterval(checkWindowClosed);
+                        // Optional: Do something after print window is closed
+                    }
+                }, 1000);
+            } else {
+                // If popup was blocked
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Popup Diblokir',
+                    text: 'Mohon izinkan popup untuk mencetak dokumen observasi.'
+                });
+            }
+        }
     });
 </script>
 <?= $this->endSection(); ?>

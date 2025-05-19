@@ -1,6 +1,6 @@
 <script>
     /**
-     * Data Entity Manager Module with Dependent Dropdown Support
+     * Data Entity Manager Module with Dependent Dropdown Support and Customizable Actions
      * 
      * A reusable and configurable module for handling various entity data management including:
      * - Data table initialization and configuration
@@ -8,9 +8,10 @@
      * - Form handling with validation
      * - Excel import functionality
      * - Dynamic dependent dropdowns
+     * - Customizable action buttons
      * 
      * @author Claude
-     * @version 1.1.0
+     * @version 1.2.0
      */
     const DataEntityManager = (function() {
         'use strict';
@@ -44,7 +45,33 @@
             customFilters: null,
             additionalOptions: {},
             defaultOrder: [1, 'asc'],
-            dependentDropdowns: {}, // New configuration for dependent dropdowns
+            dependentDropdowns: {}, // Configuration for dependent dropdowns
+            // New configuration for action buttons
+            actions: {
+                edit: {
+                    enabled: true,
+                    title: 'Edit',
+                    icon: 'fa fa-edit',
+                    btnClass: 'btn-info btn-sm mr-1',
+                    callback: null // Can be overridden to provide custom edit action
+                },
+                delete: {
+                    enabled: true,
+                    title: 'Hapus',
+                    icon: 'fa fa-trash',
+                    btnClass: 'btn-danger btn-sm',
+                    callback: null // Can be overridden to provide custom delete action
+                },
+                // Custom actions can be added here in the init config
+                // Example:
+                // view: {
+                //     enabled: true,
+                //     title: 'View',
+                //     icon: 'fa fa-eye',
+                //     btnClass: 'btn-primary btn-sm mr-1',
+                //     callback: function(id, rowData) { /* Custom view logic */ }
+                // }
+            },
             callbacks: {
                 beforeSave: null,
                 afterSave: null,
@@ -53,7 +80,8 @@
                 beforeEdit: null,
                 afterEdit: null,
                 onImportSuccess: null,
-                onDropdownChange: null // New callback for dropdown changes
+                onDropdownChange: null,
+                renderActionButtons: null // New callback to completely customize action buttons rendering
             }
         };
 
@@ -279,15 +307,7 @@
 
             // Add index and action columns
             const indexedColumns = DataTableHelper.addIndexColumn(processedColumns);
-            const columnsWithActions = DataTableHelper.addActionColumn(indexedColumns, {
-                idField: config.primaryKey,
-                edit: {
-                    title: 'Edit'
-                },
-                delete: {
-                    title: 'Hapus'
-                }
-            });
+            const columnsWithActions = addCustomActionColumn(indexedColumns);
 
             // Additional options
             const options = {
@@ -321,6 +341,55 @@
                 columnsWithActions,
                 options
             );
+        }
+
+        /**
+         * Add custom action column with configurable buttons
+         * @param {Array} columns - Array of column definitions
+         * @returns {Array} - Columns with action column added
+         */
+        function addCustomActionColumn(columns) {
+            // Add action column if there are any enabled actions
+            const hasActions = Object.values(config.actions).some(action => action.enabled);
+
+            if (hasActions) {
+                columns.push({
+                    data: null,
+                    title: 'Aksi',
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-center',
+                    render: function(data, type, row) {
+                        // If custom render callback is provided, use it
+                        if (typeof config.callbacks.renderActionButtons === 'function') {
+                            return config.callbacks.renderActionButtons(data, type, row);
+                        }
+
+                        // Otherwise, use default rendering based on config.actions
+                        let actionButtons = '';
+
+                        // Loop through all defined actions
+                        Object.keys(config.actions).forEach(actionKey => {
+                            const action = config.actions[actionKey];
+
+                            // Only render enabled actions
+                            if (action.enabled) {
+                                const id = row[config.primaryKey];
+                                const icon = action.icon ? `<i class="${action.icon}"></i> ` : '';
+                                const buttonClass = action.btnClass || 'btn-secondary btn-sm';
+
+                                actionButtons += `<button type="button" class="btn ${buttonClass} btn-${actionKey}" 
+                                data-id="${id}" data-action="${actionKey}" 
+                                title="${action.title}">${icon}${action.showTitle !== false ? action.title : ''}</button> `;
+                            }
+                        });
+
+                        return actionButtons;
+                    }
+                });
+            }
+
+            return columns;
         }
 
         /**
@@ -492,19 +561,26 @@
          * Bind event handlers for buttons and other elements
          */
         function bindEvents() {
-            // Edit button click handler
-            $(document).on('click', '.btn-edit', function() {
+            // Event delegation for all action buttons
+            $(document).on('click', '[data-action]', function() {
                 const id = $(this).data('id');
-                if (id) {
-                    editEntity(id);
-                }
-            });
+                const action = $(this).data('action');
+                const actionConfig = config.actions[action];
 
-            // Delete button click handler
-            $(document).on('click', '.btn-delete', function() {
-                const id = $(this).data('id');
-                if (id) {
-                    deleteEntity(id);
+                if (id && actionConfig) {
+                    // If custom callback is provided, use it
+                    if (typeof actionConfig.callback === 'function') {
+                        // Get row data for the callback
+                        const rowData = getRowDataById(id);
+                        actionConfig.callback(id, rowData);
+                    } else {
+                        // Use default handlers for standard actions
+                        if (action === 'edit') {
+                            editEntity(id);
+                        } else if (action === 'delete') {
+                            deleteEntity(id);
+                        }
+                    }
                 }
             });
 
@@ -514,6 +590,20 @@
                     reloadTable();
                 });
             }
+        }
+
+        /**
+         * Get row data by ID from the DataTable
+         * @param {string|number} id - The ID to look for
+         * @returns {Object|null} - The row data or null if not found
+         */
+        function getRowDataById(id) {
+            if (!dataTable) return null;
+
+            const rowData = dataTable.rows().data().toArray()
+                .find(row => row[config.primaryKey] == id);
+
+            return rowData || null;
         }
 
         /**

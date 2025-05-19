@@ -179,6 +179,89 @@ class ObservasiModel extends Model
         return $builder->get()->getResultArray();
     }
 
+    /**
+     * Get observation schema structure by observation ID
+     *
+     * @param int $id_observasi Observation ID
+     * @return array
+     */
+    public function getStrukturById(int $id_observasi): array
+    {
+        // First get the schema ID from the observation
+        $observasiBuilder = $this->db->table('observasi');
+        $observasiBuilder->select('pengajuan_asesmen.id_asesmen');
+        $observasiBuilder->join('pengajuan_asesmen', 'pengajuan_asesmen.id_apl1 = observasi.id_apl1');
+        $observasiBuilder->where('observasi.id_observasi', $id_observasi);
+
+        $observasiResult = $observasiBuilder->get()->getRowArray();
+
+        if (!$observasiResult) {
+            return [];
+        }
+
+        $id_asesmen = $observasiResult['id_asesmen'];
+
+        // Now get the schema ID from asesmen
+        $asesmenBuilder = $this->db->table('asesmen');
+        $asesmenBuilder->select('id_skema');
+        $asesmenBuilder->where('id_asesmen', $id_asesmen);
+
+        $asesmenResult = $asesmenBuilder->get()->getRowArray();
+
+        if (!$asesmenResult) {
+            return [];
+        }
+
+        $id_skema = $asesmenResult['id_skema'];
+
+        // Now use the schema ID to get the structure
+        $builder = $this->db->table('skema');
+
+        $builder->select([
+            'skema.id_skema',
+            'skema.kode_skema',
+            'skema.nama_skema',
+            'skema.jenis_skema',
+            'unit.id_unit',
+            'unit.kode_unit',
+            'unit.nama_unit',
+            'elemen.id_elemen',
+            'elemen.kode_elemen',
+            'elemen.nama_elemen',
+            'kuk.id_kuk',
+            'kuk.kode_kuk',
+            'kuk.nama_kuk AS kriteria_unjuk_kerja',
+            'kelompok_kerja.id_kelompok',
+            'kelompok_kerja.nama_kelompok',
+            'observasi.id_observasi' // Include observation ID for reference
+        ]);
+
+        // Optimize join order to start with smallest tables and filter early
+        $builder->join('kelompok_kerja', 'kelompok_kerja.id_skema = skema.id_skema', 'inner');
+        $builder->join('kelompok_unit', 'kelompok_unit.id_kelompok = kelompok_kerja.id_kelompok', 'inner');
+        $builder->join('unit', 'unit.id_unit = kelompok_unit.id_unit AND unit.id_skema = skema.id_skema', 'inner');
+
+        // Join with observasi to filter by id_observasi
+        $builder->join('observasi', 'observasi.id_observasi = ' . $id_observasi, 'inner');
+        $builder->join('pengajuan_asesmen', 'pengajuan_asesmen.id_apl1 = observasi.id_apl1', 'inner');
+        $builder->join('asesmen', 'asesmen.id_asesmen = pengajuan_asesmen.id_asesmen AND asesmen.id_skema = skema.id_skema', 'inner');
+
+        // Apply filtering
+        $builder->where('skema.id_skema', $id_skema);
+        $builder->where('skema.status', 'Y');
+        $builder->where('unit.status', 'Y');
+
+        // Now join larger tables after filtering
+        $builder->join('elemen', 'elemen.id_unit = unit.id_unit AND elemen.id_skema = skema.id_skema', 'left');
+        $builder->join('kuk', 'kuk.id_elemen = elemen.id_elemen AND kuk.id_unit = unit.id_unit AND kuk.id_skema = skema.id_skema', 'left');
+
+        $builder->orderBy('unit.kode_unit', 'ASC');
+        $builder->orderBy('elemen.kode_elemen', 'ASC');
+        $builder->orderBy('kuk.kode_kuk', 'ASC');
+
+        return $builder->get()->getResultArray();
+    }
+
 
     /**
      * Get observation metadata including assessee signature only
@@ -233,6 +316,57 @@ class ObservasiModel extends Model
     }
 
     /**
+     * Get observation metadata including assessee signature by observation ID
+     *
+     * @param int $id_observasi Observation ID
+     * @return array|null
+     */
+    public function getById(int $id): ?array
+    {
+        $builder = $this->db->table('observasi');
+
+        $builder->select([
+            'observasi.id_observasi',
+            'observasi.tanggal_observasi',
+            'observasi.id_asesi',
+            'observasi.id_asesor',
+            'asesor.fullname AS nama_asesor',
+            'asesor.tanda_tangan AS ttd_asesor',
+            'asesi_user.fullname AS nama_asesi',
+            'asesi_user.tanda_tangan AS ttd_asesi',
+            'tuk.nama_tuk',
+            'skema.nama_skema',
+            'skema.kode_skema'
+        ]);
+
+        // Join tables
+        $builder->join('asesi', 'asesi.id_asesi = observasi.id_asesi');
+        $builder->join('users as asesi_user', 'asesi_user.id = asesi.user_id');
+        $builder->join('pengajuan_asesmen', 'pengajuan_asesmen.id_apl1 = observasi.id_apl1');
+        $builder->join('asesmen', 'asesmen.id_asesmen = pengajuan_asesmen.id_asesmen');
+        $builder->join('tuk', 'tuk.id_tuk = asesmen.id_tuk');
+        $builder->join('skema', 'skema.id_skema = asesmen.id_skema');
+        $builder->join('users as asesor', 'asesor.id = observasi.id_asesor');
+
+        // Filter by observation ID
+        $builder->where('observasi.id_observasi', $id);
+
+        $result = $builder->get()->getRowArray();
+
+        // Convert binary signatures to base64
+        if ($result) {
+            if (!empty($result['ttd_asesi'])) {
+                $result['ttd_asesi_base64'] = 'data:image/png;base64,' . base64_encode($result['ttd_asesi']);
+            }
+            if (!empty($result['ttd_asesor'])) {
+                $result['ttd_asesor_base64'] = 'data:image/png;base64,' . base64_encode($result['ttd_asesor']);
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Get existing observation data for a specific assessee
      *
      * @param int $id_asesi Assessee ID
@@ -257,6 +391,89 @@ class ObservasiModel extends Model
         }
 
         return $formatted;
+    }
+
+    /**
+     * Get existing observation data for a specific observation
+     *
+     * @param int $id_observasi Observation ID
+     * @return array
+     */
+    public function getExistingById(int $id_observasi): array
+    {
+        $builder = $this->db->table('detail_observasi');
+        $builder->select('detail_observasi.id_kuk, detail_observasi.kompeten, detail_observasi.keterangan');
+        $builder->where('detail_observasi.id_observasi', $id_observasi);
+
+        $result = $builder->get()->getResultArray();
+
+        // Format data as associative array with id_kuk as key
+        $formatted = [];
+        foreach ($result as $row) {
+            $formatted[$row['id_kuk']] = [
+                'kompeten' => $row['kompeten'],
+                'keterangan' => $row['keterangan']
+            ];
+        }
+
+        return $formatted;
+    }
+
+    /**
+     * Get work groups with units for a scheme based on observation ID
+     * 
+     * @param int $id_observasi Observation ID
+     * @return array
+     */
+    public function getWorkGroupsWithUnitsById(int $id_observasi): array
+    {
+        // First get the schema ID related to this observation
+        $observasiQuery = $this->db->table('observasi')
+            ->select('asesmen.id_skema')
+            ->join('pengajuan_asesmen', 'pengajuan_asesmen.id_apl1 = observasi.id_apl1', 'inner')
+            ->join('asesmen', 'asesmen.id_asesmen = pengajuan_asesmen.id_asesmen', 'inner')
+            ->where('observasi.id_observasi', $id_observasi)
+            ->get()
+            ->getRowArray();
+
+        if (!$observasiQuery) {
+            return [];
+        }
+
+        $id_skema = $observasiQuery['id_skema'];
+
+        // Now get the work groups with units for this schema
+        $builder = $this->db->table('kelompok_kerja as kk');
+        $builder->select('
+        kk.id_kelompok,
+        kk.nama_kelompok,
+        u.kode_unit,
+        u.nama_unit as judul_unit
+    ')
+            ->join('kelompok_unit as ku', 'ku.id_kelompok = kk.id_kelompok')
+            ->join('unit as u', 'u.id_unit = ku.id_unit')
+            ->where('kk.id_skema', $id_skema)
+            ->orderBy('kk.nama_kelompok', 'ASC')
+            ->orderBy('u.kode_unit', 'ASC');
+
+        $result = $builder->get()->getResultArray();
+
+        $groupedData = [];
+        foreach ($result as $row) {
+            $groupName = $row['nama_kelompok'];
+
+            if (!isset($groupedData[$groupName])) {
+                $groupedData[$groupName] = [];
+            }
+
+            $groupedData[$groupName][] = [
+                'nama_kelompok' => $groupName,
+                'kode_unit'     => $row['kode_unit'],
+                'judul_unit'    => $row['judul_unit']
+            ];
+        }
+
+        return $groupedData;
     }
 
     /**
