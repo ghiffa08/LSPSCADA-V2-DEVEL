@@ -68,7 +68,7 @@
 
     <div style="clear:both; height:10px;"></div>
 
-    <!-- Signature Section -->
+    <!-- Signature Sections -->
     <table border="1" cellpadding="6" cellspacing="0" width="100%">
         <tr>
             <td width="30%">Nama</td>
