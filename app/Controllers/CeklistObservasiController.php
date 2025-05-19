@@ -67,7 +67,7 @@ class CeklistObservasiController extends ResourceController
         try {
             // Reuse the same data preparation method as loadObservasi
             $data = $this->getObservasiData($id_observasi);
-
+git 
             // Generate QR codes
             if (!empty($data['observasi']['ttd_asesi'])) {
                 $data['qr_asesi'] = $this->qrCodeService->generate(
