@@ -83,7 +83,7 @@ class CeklistObservasiController extends ResourceController
                 );
             }
 
-            // Generate PDF with the prepared data
+            // Generate PDF with the prepared data Observasi
             $this->generatePdf($data);
         } catch (\Exception $e) {
             log_message('error', 'Error generating PDF: ' . $e->getMessage());
