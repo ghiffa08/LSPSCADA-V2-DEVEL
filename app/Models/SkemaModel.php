@@ -9,6 +9,9 @@ class SkemaModel extends Model
 {
     use DataTableTrait;
 
+    // Database table and primary key
+    protected $DBGroup          = 'default';
+
     protected $table            = 'skema';
     protected $primaryKey       = 'id_skema';
     protected $useAutoIncrement = true;
@@ -57,7 +60,7 @@ class SkemaModel extends Model
     ];
 
     // Fields that should be searched when using DataTable
-    protected $dataTableSearchFields = ['skema.kode_skema', 'skema.nama_skema'];
+    protected array $dataTableSearchFields = ['skema.kode_skema', 'skema.nama_skema'];
 
     /**
      * Apply joins for DataTable query
@@ -65,7 +68,7 @@ class SkemaModel extends Model
      * @param object $builder Query builder instance
      * @return object
      */
-    protected function applyDataTableJoins($builder)
+    protected function applyDataTableJoins(object $builder): object
     {
         return $builder;
     }
@@ -76,7 +79,7 @@ class SkemaModel extends Model
      * @param object $builder Query builder instance
      * @return object
      */
-    protected function applyDataTableSelects($builder)
+    protected function applyDataTableSelects(object $builder): object
     {
         return $builder->select('skema.*');
     }
@@ -87,7 +90,7 @@ class SkemaModel extends Model
      * @param array $data Result data
      * @return array
      */
-    protected function transformDataTableResults($data)
+    protected function transformDataTableResults(array $data): array
     {
         // You can transform data here if needed
         // For example, format dates, calculate values, etc.
@@ -186,8 +189,7 @@ class SkemaModel extends Model
      */
     public function deleteScheme(int $id_skema): bool
     {
-        $db = \Config\Database::connect();
-        $db->transStart();
+        $this->db->transStart();
 
         try {
             // Delete related data first
@@ -206,10 +208,10 @@ class SkemaModel extends Model
             // Delete the scheme
             $this->where('id_skema', $id_skema)->delete();
 
-            $db->transComplete();
-            return $db->transStatus();
+            $this->db->transComplete();
+            return $this->db->transStatus();
         } catch (\Exception $e) {
-            $db->transRollback();
+            $this->db->transRollback();
             log_message('error', 'Failed to delete scheme: ' . $e->getMessage());
             return false;
         }

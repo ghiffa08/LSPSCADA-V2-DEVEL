@@ -117,7 +117,7 @@ class AsesmenModel extends Model
             ->join('skema', 'skema.id_skema=asesmen.id_skema', 'left')
             ->join('tuk', 'tuk.id_tuk=asesmen.id_tuk', 'left')
             ->join('set_tanggal', 'set_tanggal.id_tanggal=asesmen.id_tanggal', 'left')
-            ->select('asesmen.id_asesmen, asesmen.id_skema, asesmen.id_tuk, asesmen.id_tanggal, asesmen.tujuan, skema.nama_skema, skema.jenis_skema, tuk.nama_tuk, DATE_FORMAT(set_tanggal.tanggal, "%d/%m/%Y") AS tanggal')
+            ->select('asesmen.id_asesmen, asesmen.id_skema, asesmen.id_tuk, asesmen.id_tanggal, asesmen.tujuan, skema.nama_skema,skema.kode_skema, skema.jenis_skema, tuk.nama_tuk, DATE_FORMAT(set_tanggal.tanggal, "%d/%m/%Y") AS tanggal')
             ->Get()->getResultArray();
     }
 

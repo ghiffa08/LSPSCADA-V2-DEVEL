@@ -9,6 +9,8 @@ use CodeIgniter\Session\Session;
 use Myth\Auth\Config\Auth as AuthConfig;
 use Myth\Auth\Entities\User;
 use Myth\Auth\Models\UserModel;
+use App\Models\DashboardModel;
+use App\Models\GroupUserModel;
 
 class AsesorController extends BaseController
 {
@@ -25,6 +27,9 @@ class AsesorController extends BaseController
      */
     protected $session;
 
+    protected $dashboardModel;
+    protected $group_users;
+
     public function __construct()
     {
         // Most services in this controller require
@@ -33,6 +38,8 @@ class AsesorController extends BaseController
 
         $this->config = config('Auth');
         $this->auth   = service('authentication');
+        $this->dashboardModel = new DashboardModel();
+        $this->group_users = new GroupUserModel();
     }
 
     public function index()
@@ -203,7 +210,7 @@ class AsesorController extends BaseController
         ];
 
         // Lakukan simpan user dengan data di atas
-        $this->usermodel->update($this->request->getVar('edit_id'), $data);
+        $this->userModel->update($this->request->getVar('edit_id'), $data);
 
         session()->setFlashdata('pesan', 'User berhasil diupdate');
         return redirect()->to('/asesor');
@@ -212,8 +219,27 @@ class AsesorController extends BaseController
     public function delete()
     {
         $id = $this->request->getVar('id');
-        $this->usermodel->deleteUser($id);
+        $this->userModel->deleteUser($id);
         session()->setFlashdata('pesan', 'Asesor berhasil dihapus!');
         return redirect()->to('/asesor');
+    }
+
+    public function dashboard()
+    {
+        $assessorId = user()->id;
+
+        $data = [
+            'siteTitle' => 'Dashboard Asesor',
+            // 'totalAPL1Pending' => $this->dashboardModel->getAsesorTotalAPL1Pending(),
+            // 'totalAPL2Pending' => $this->dashboardModel->getAsesorTotalAPL2Pending($assessorId),
+            // 'totalAPL2Validated' => $this->dashboardModel->getAsesorTotalAPL2Validated($assessorId),
+            // 'totalObservasi' => $this->dashboardModel->getAsesorTotalObservasi($assessorId),
+            // 'totalPersetujuanAsesmen' => $this->dashboardModel->getAsesorTotalPersetujuanAsesmen($assessorId),
+            // 'recentActivities' => $this->dashboardModel->getAsesorRecentActivities($assessorId, 5),
+            // 'monthlyStats' => $this->dashboardModel->getAsesorMonthlyStats($assessorId),
+            // 'upcomingAssessments' => $this->dashboardModel->getAsesorUpcomingAssessments($assessorId, 5),
+        ];
+
+        return view('asesor/dashboard', $data);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use CodeIgniter\Model;
 use Config\Database;
 use App\Services\PDFService;
 use App\Services\QRCodeService;
@@ -13,13 +14,13 @@ class CeklistObservasiController extends ResourceController
 
     use ResponseTrait;
 
-    protected $qrCodeService;
-    protected $id_asesor;
-    protected $nama_asesor;
-    protected $asesmenModel;
-    protected $skemaModel;
-    protected $observasiModel;
-    protected $pdfService;
+    protected QRCodeService $qrCodeService;
+    protected int $id_asesor;
+    protected string $nama_asesor;
+    protected object $asesmenModel;
+    protected object $skemaModel;
+    protected object $observasiModel;
+    protected PDFService $pdfService;
 
 
     public function __construct()

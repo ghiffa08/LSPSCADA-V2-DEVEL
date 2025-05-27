@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta content="width=device-width, initial-scale=1, maximum-scale=1, shrink-to-fit=no" name="viewport">
     <meta name="csrf-token" content="<?= csrf_token() ?>">
-    <title><?= esc($siteTitle) ?> &mdash; <?= esc(env("app_name")) ?></title>
+    <title><?= esc((!empty($siteTitle) ? $siteTitle : 'Page')) ?> &mdash; <?= esc(env("app_name")) ?></title>
     <link rel="shortcut icon" href="<?= base_url('assets/images/logolsp.png') ?>" type="image/x-icon">
 
     <!-- CSS Files -->

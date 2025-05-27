@@ -1,6 +1,4 @@
-<!DOCTYPE html>
-<html>
-
+<!DOCTYPE html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,7 +6,7 @@
     <style>
         /* TCPDF compatible styles */
         body {
-            font-family: helvetica;
+            font-family: helvetica, serif;
             font-size: 10pt;
             margin: 0;
             padding: 0;

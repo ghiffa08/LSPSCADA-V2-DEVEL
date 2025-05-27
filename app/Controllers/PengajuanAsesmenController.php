@@ -40,7 +40,7 @@ class PengajuanAsesmenController extends BaseController
             'siteTitle' => 'Pendaftaran Uji Kompetensi',
             'siteSubtitle' => 'Pada bagian ini, masukan data pribadi, data pendidikan formal, data pekerjaan Anda pada saat ini, serta dokumen pendukung.',
             'provinsi' => $this->dynamicDependentModel->AllProvinsi(),
-            'listSkema' => $this->skemaModel->AllSkema(),
+            'listSkema' => $this->skemaModel->getActiveSchemes(),
             'listAsesmen' => $this->asesmenModel->getAllAsesmen(),
         ];
 

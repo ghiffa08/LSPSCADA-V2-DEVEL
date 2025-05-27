@@ -2,10 +2,12 @@
 
 namespace App\Controllers\Api;
 
+use Config\Database;
 use Config\Services;
 use App\Models\KUKModel;
 use CodeIgniter\HTTP\ResponseInterface;
 use App\Controllers\DataTableController;
+use Exception;
 
 class KUK extends DataTableController
 {
@@ -87,7 +89,7 @@ class KUK extends DataTableController
         $KukModel = $this->kukModel;
 
         // Start transaction
-        $db = \Config\Database::connect();
+        $db = Database::connect();
         $db->transStart();
 
         try {
@@ -106,7 +108,7 @@ class KUK extends DataTableController
                     'message' => 'Failed to delete Elemen'
                 ], 400);
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $db->transRollback();
 
             return $this->dataService->response([

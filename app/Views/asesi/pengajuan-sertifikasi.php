@@ -521,6 +521,137 @@
 
 <?= $this->section("js"); ?>
 
+<!-- Add this CSS to your JS section to ensure it's loaded -->
+<style>
+    /* Stepper Styling */
+    .stepper {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 40px;
+        overflow-x: auto;
+    }
+
+    .stepper-item {
+        flex: 1;
+        position: relative;
+        text-align: center;
+        cursor: pointer;
+        min-width: 120px;
+        padding: 0 10px;
+        transition: all 0.3s ease;
+    }
+
+    .stepper-item:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        top: 20px;
+        right: -50%;
+        width: 100%;
+        height: 2px;
+        background: #e9ecef;
+        z-index: 0;
+    }
+
+    .step-counter {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: #e9ecef;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 0 auto 10px;
+        position: relative;
+        z-index: 1;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+    }
+
+    .stepper-item .step-label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+
+    .stepper-item .step-desc {
+        display: block;
+        font-size: 12px;
+        color: #6c757d;
+    }
+
+    .stepper-item.active .step-counter {
+        background-color: #6777ef;
+        color: white;
+        box-shadow: 0 3px 10px rgba(103, 119, 239, 0.5);
+    }
+
+    .stepper-item.completed .step-counter {
+        background-color: #47c363;
+        color: white;
+    }
+
+    .stepper-item.completed::after {
+        background-color: #47c363;
+    }
+
+    .stepper-item.active::after {
+        background-color: #6777ef;
+    }
+
+    .step-content {
+        display: none;
+        animation: fadeIn 0.5s ease forwards;
+    }
+
+    .step-content.active {
+        display: block;
+    }
+
+    .step-navigation {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 30px;
+    }
+
+    .step-title {
+        border-left: 4px solid #6777ef;
+        padding-left: 15px;
+    }
+
+    @keyframes fadeIn {
+        0% {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .stepper {
+            flex-wrap: nowrap;
+            padding-bottom: 10px;
+        }
+
+        .stepper-item {
+            min-width: 100px;
+            font-size: 12px;
+        }
+
+        .stepper-item .step-desc {
+            display: none;
+        }
+    }
+
+    /* Custom file input styling to match Stisla */
+    .custom-file-label::after {
+        background-color: #6777ef;
+        color: white;
+    }
+</style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {

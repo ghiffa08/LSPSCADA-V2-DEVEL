@@ -10,12 +10,16 @@ class Dashboard extends BaseController
 
     public function index()
     {
+        // Redirect assessors to their specific dashboard
+        if (in_groups('Asesor')) {
+            return redirect()->to('/asesor/dashboard');
+        }
 
         $data = [
             'siteTitle' => 'Dashboard',
-            'totalAdmin' => $this->dashboard->total_admin(),
-            'totalAsesor' => $this->dashboard->total_asesor(),
-            'totalAsesi' => $this->dashboard->total_asesi(),
+            'totalAdmin' => $this->dashboardModel->total_admin(),
+            'totalAsesor' => $this->dashboardModel->total_asesor(),
+            'totalAsesi' => $this->dashboardModel->total_asesi(),
 
         ];
 

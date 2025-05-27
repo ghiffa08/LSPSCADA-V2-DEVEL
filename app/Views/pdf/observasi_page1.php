@@ -200,6 +200,8 @@
                     </tr>
                 <?php endforeach; ?>
             </table>
+            <p class="small-text">*Cara penulisan KUK menggunakan kalimat aktif (Contoh: <i>Dilakukan menjadi Melakukan</i>)</p>
+
         <?php endforeach; ?>
     <?php endforeach; ?>
     <div style="clear:both; height:10px;"></div>

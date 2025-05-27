@@ -43,9 +43,8 @@
                 <li><a class="nav-link" href="<?= site_url('/persetujuan-asesmen') ?>"><i class="fas fa-pencil-ruler"></i> <span>Persetujuan Asesmen</span></a></li>
                 <li><a class="nav-link" href="<?= site_url('/monitoring-asesi') ?>"><i class="fas fa-pencil-ruler"></i> <span>Monitoring</span></a></li>
 
-            <?php }  ?>
-
-            <?php if (in_groups('Asesor')) { ?>
+            <?php }  ?> <?php if (in_groups('Asesor')) { ?>
+                <li><a class="nav-link" href="<?= site_url('/asesor/dashboard') ?>"><i class="fas fa-tachometer-alt"></i> <span>Dashboard Asesor</span></a></li>
                 <li><a class="nav-link" href="<?= site_url('/kelola_apl2') ?>"><i class="fas fa-pencil-ruler"></i> <span>Kelola FR.APL.02</span></a></li>
                 <li><a class="nav-link" href="<?= site_url('/kelola_apl2/validasi') ?>"><i class="fas fa-pencil-ruler"></i> <span>Validasi FR.APL.02</span></a></li>
                 <li><a class="nav-link" href="<?= site_url('/persetujuan-asesmen') ?>"><i class="fas fa-pencil-ruler"></i> <span>Persetujuan Asesmen</span></a></li>

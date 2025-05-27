@@ -5,7 +5,7 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h4>Tabel <?= $siteTitle ?></h4>
+                <h4>Tabel <?= $siteTitle ?? 'page' ?></h4>
                 <div class="card-header-action">
                     <div class="btn-group">
                         <button class="btn btn-primary" data-toggle="modal" data-target="#addElemenModal">

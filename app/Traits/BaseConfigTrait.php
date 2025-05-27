@@ -2,6 +2,9 @@
 
 namespace App\Traits;
 
+use App\Models\FeedbackAsesiModel;
+use App\Models\KomponenFeedbackModel;
+use App\Models\KomponenUmpanBalikModel;
 use Config\Services;
 
 // Model imports (grouped by domain)
@@ -57,6 +60,10 @@ trait BaseConfigTrait
     protected $unitModel;
     protected $elemenModel;
     protected $kukModel;
+
+    protected $feedbackAsesiModel;
+
+    protected $KomponenfeedbackModel;
     protected $tukModel;
 
     // Application Forms
@@ -109,6 +116,8 @@ trait BaseConfigTrait
         $this->elemenModel = new ElemenModel();
         $this->kukModel = new KUKModel();
         $this->tukModel = new TUKModel();
+        $this->KomponenfeedbackModel = new KomponenFeedbackModel();
+        $this->feedbackAsesiModel = new FeedbackAsesiModel();
 
         // Application Forms
         $this->apl1Model = new APL1Model();

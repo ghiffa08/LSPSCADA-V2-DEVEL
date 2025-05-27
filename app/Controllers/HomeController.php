@@ -31,9 +31,8 @@ class HomeController extends BaseController
     {
 
         $data = [
-            // 'listSkema' => $this->skemaModel->AllSkema(),
             'provinsi' => $this->dynamicDependentModel->AllProvinsi(),
-            'listSkema' => $this->skemaModel->AllSkema(),
+            'listSkema' => $this->skemaModel->getActiveSchemes(),
             'listSettanggal' => $this->settanggalModel->findAll(),
             'listTUK' => $this->tukModel->findAll(),
             'siteTitle' => 'LSP - P1 SMKN 2 KUNINGAN',

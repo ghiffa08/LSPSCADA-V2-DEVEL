@@ -56,6 +56,31 @@ class AsesiModel extends Model
     protected $skipValidation       = false;
 
     /**
+     * Get all asesi data with user information
+     *
+     * @param int|null $limit
+     * @param int|null $offset
+     * @param bool $withUser
+     * @return array
+     */
+    public function getAllAsesi(int $limit = null, int $offset = null, bool $withUser = false)
+    {
+        if ($withUser) {
+            $query = $this->select('asesi.*, users.username, users.fullname as user_fullname')
+                ->join('users', 'users.id = asesi.user_id', 'left')
+                ->orderBy('asesi.created_at', 'DESC');
+        } else {
+            $query = $this->orderBy('created_at', 'DESC');
+        }
+
+        if ($limit !== null) {
+            $query->limit($limit, $offset);
+        }
+
+        return $query->findAll();
+    }
+
+    /**
      * Get asesi by ID
      *
      * @param string $id

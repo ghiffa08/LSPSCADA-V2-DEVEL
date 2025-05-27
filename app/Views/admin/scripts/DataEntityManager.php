@@ -1,902 +1,378 @@
 <script>
-    /**
-     * Data Entity Manager Module with Dependent Dropdown Support and Customizable Actions
-     * 
-     * A reusable and configurable module for handling various entity data management including:
-     * - Data table initialization and configuration
-     * - CRUD operations (Create, Read, Update, Delete)
-     * - Form handling with validation
-     * - Excel import functionality
-     * - Dynamic dependent dropdowns
-     * - Customizable action buttons
-     * 
-     * @author Claude
-     * @version 1.2.0
-     */
-    const DataEntityManager = (function() {
-        'use strict';
+/**
+ * DataEntityManager - Reusable JavaScript module for CRUD operations
+ * 
+ * This module provides standard functionality for:
+ * - DataTable integration
+ * - Form handling (create, edit, delete)
+ * - AJAX operations with proper error handling
+ * - Import/export functionality
+ */
+const DataEntityManager = (function() {
+    'use strict';
 
-        // Module configuration - will be overridden by init params
-        let config = {
-            baseUrl: '',
-            entityName: '',
-            primaryKey: '',
-            selectors: {
-                modal: '',
-                form: '',
-                table: '',
-                importForm: '',
-                importModal: '',
-                importBtn: '',
-                filterInput: '',
-                select2Elements: '',
-                modalTitle: ''
-            },
-            endpoints: {
-                save: '',
-                getById: '',
-                delete: '',
-                dataTable: '',
-                import: ''
-            },
-            formFields: {},
-            columns: [],
-            renderFormatters: {},
-            customFilters: null,
-            additionalOptions: {},
-            defaultOrder: [1, 'asc'],
-            dependentDropdowns: {}, // Configuration for dependent dropdowns
-            // New configuration for action buttons
-            actions: {
-                edit: {
-                    enabled: true,
-                    title: 'Edit',
-                    icon: 'fa fa-edit',
-                    btnClass: 'btn-info btn-sm mr-1',
-                    callback: null // Can be overridden to provide custom edit action
+    // Private properties
+    let config = {
+        // Default configuration, will be overridden by init()
+        entityName: 'Data',
+        primaryKey: 'id',
+        baseUrl: '<?= base_url() ?>',
+        dependentDropdowns: {},
+        selectors: {
+            modal: '#entityModal',
+            form: '#entityForm',
+            table: '#dataTable',
+            importForm: '#importForm',
+            importModal: '#importModal',
+            importBtn: '#importBtn',
+            filterInput: '#filterInput',
+            select2Elements: '.select2',
+            modalTitle: '.modal-title'
+        },
+        endpoints: {
+            save: 'save',
+            getById: 'getById/',
+            delete: 'delete/',
+            dataTable: 'get-data-table',
+            import: 'import',
+            updateOrder: 'updateOrder'
+        },
+        formFields: {},
+        columns: [],
+        defaultOrder: [1, 'asc'],
+        additionalOptions: {},
+        initCallback: null,
+    };
+
+    // Public methods
+    return {
+        // Initialize with configuration
+        init: function(userConfig = {}) {
+            // Merge user configuration with defaults
+            config = { ...config, ...userConfig };
+            
+            // Store selectors for public access
+            this.selectors = config.selectors;
+            this.endpoints = config.endpoints;
+            this.baseUrl = config.baseUrl;
+            this.entityName = config.entityName;
+            
+            // Initialize DataTable
+            this.initDataTable();
+            
+            // Initialize form submission handler
+            this.initFormHandler();
+            
+            // Initialize import functionality if available
+            if ($(config.selectors.importForm).length) {
+                this.initImportHandler();
+            }
+            
+            // Run callback if provided
+            if (typeof config.initCallback === 'function') {
+                config.initCallback(this);
+            }
+        },
+        
+        // Initialize DataTable with the specified columns
+        initDataTable: function() {
+            const self = this;
+            const tableConfig = {
+                processing: true,
+                serverSide: true,
+                ajax: {
+                    url: `${config.baseUrl}/${config.endpoints.dataTable}`,
+                    type: 'POST'
                 },
-                delete: {
-                    enabled: true,
-                    title: 'Hapus',
-                    icon: 'fa fa-trash',
-                    btnClass: 'btn-danger btn-sm',
-                    callback: null // Can be overridden to provide custom delete action
-                },
-                // Custom actions can be added here in the init config
-                // Example:
-                // view: {
-                //     enabled: true,
-                //     title: 'View',
-                //     icon: 'fa fa-eye',
-                //     btnClass: 'btn-primary btn-sm mr-1',
-                //     callback: function(id, rowData) { /* Custom view logic */ }
-                // }
-            },
-            callbacks: {
-                beforeSave: null,
-                afterSave: null,
-                beforeDelete: null,
-                afterDelete: null,
-                beforeEdit: null,
-                afterEdit: null,
-                onImportSuccess: null,
-                onDropdownChange: null,
-                renderActionButtons: null // New callback to completely customize action buttons rendering
-            }
-        };
-
-        // Data table instance
-        let dataTable;
-        // Current edit data (used for dependent dropdowns during edit)
-        let editData = null;
-
-        /**
-         * Initialize the module with custom configuration
-         * @param {Object} customConfig - Custom configuration to override defaults
-         */
-        function init(customConfig) {
-            // Merge custom config with default config
-            config = mergeConfig(config, customConfig);
-
-            // Ensure baseUrl is set
-            config.baseUrl = config.baseUrl || '<?= base_url(); ?>' || '';
-
-            initDataTable();
-            initFormHandling();
-
-            // Initialize Select2 if selector is provided
-            if (config.selectors.select2Elements) {
-                initSelect2();
-            }
-
-            // Initialize dependent dropdowns if configured
-            if (Object.keys(config.dependentDropdowns).length > 0) {
-                initDependentDropdowns();
-            }
-
-            // Initialize file inputs if import functionality is enabled
-            if (config.selectors.importForm) {
-                initFileInputs();
-                initImportHandler();
-            }
-
-            bindEvents();
-        }
-
-        /**
-         * Initialize dependent dropdowns based on configuration
-         */
-        function initDependentDropdowns() {
-            // Iterate through each dependent dropdown configuration
-            Object.keys(config.dependentDropdowns).forEach(parentKey => {
-                const dropdownConfig = config.dependentDropdowns[parentKey];
-
-                // Add change event listener to parent dropdown
-                $(dropdownConfig.parentSelector).on('change', function() {
-                    const parentValue = $(this).val();
-                    const childSelector = dropdownConfig.childSelector;
-
-                    // Reset child dropdowns in the chain
-                    resetChildDropdowns(dropdownConfig);
-
-                    if (parentValue) {
-                        // Show loading state
-                        $(childSelector).prop('disabled', true);
-                        $(childSelector).html(`<option value="">Loading...</option>`).trigger('change');
-
-                        // Make AJAX call to get dependent data
-                        $.ajax({
-                            url: `${config.baseUrl}/${dropdownConfig.endpoint}`,
-                            type: 'POST',
-                            data: {
-                                [dropdownConfig.paramName]: parentValue
-                            },
-                            dataType: 'html',
-                            success: function(response) {
-                                $(childSelector).html(response).prop('disabled', false);
-
-                                // If editing and we have stored data for this child
-                                if (editData && editData[dropdownConfig.valueField]) {
-                                    $(childSelector).val(editData[dropdownConfig.valueField]).trigger('change');
-                                }
-
-                                // Execute callback if provided
-                                if (typeof config.callbacks.onDropdownChange === 'function') {
-                                    config.callbacks.onDropdownChange(parentKey, parentValue, childSelector);
-                                }
-                            },
-                            error: function(xhr, status, error) {
-                                console.error(`Error loading ${childSelector}:`, error);
-                                $(childSelector).html(`<option value="">Error loading data</option>`)
-                                    .prop('disabled', true)
-                                    .trigger('change');
-
-                                showNotification('error', 'Gagal', `Gagal memuat data dependen`);
-                            }
-                        });
-                    }
-                });
-            });
-        }
-
-        /**
-         * Reset child dropdowns and their dependents in the chain
-         */
-        function resetChildDropdowns(dropdownConfig) {
-            const childSelector = dropdownConfig.childSelector;
-
-            // Reset current child
-            $(childSelector).html(`<option value="">${dropdownConfig.placeholder || 'Pilih...'}</option>`)
-                .prop('disabled', true)
-                .trigger('change');
-
-            // If this child has its own dependents, reset them too
-            if (dropdownConfig.childConfig) {
-                resetChildDropdowns(dropdownConfig.childConfig);
-            }
-        }
-
-        /**
-         * Load data for a dependent dropdown
-         * @param {string} parentKey - Key of the parent dropdown in config
-         * @param {string} parentValue - Selected value of the parent dropdown
-         * @param {function} callback - Optional callback to execute after loading
-         */
-        function loadDependentDropdown(parentKey, parentValue, callback) {
-            if (!config.dependentDropdowns[parentKey]) return;
-
-            const dropdownConfig = config.dependentDropdowns[parentKey];
-            const childSelector = dropdownConfig.childSelector;
-
-            if (!parentValue) {
-                resetChildDropdowns(dropdownConfig);
-                return;
-            }
-
-            // Show loading state
-            $(childSelector).prop('disabled', true);
-            $(childSelector).html(`<option value="">Loading...</option>`).trigger('change');
-
-            $.ajax({
-                url: `${config.baseUrl}/${dropdownConfig.endpoint}`,
-                type: 'POST',
-                data: {
-                    [dropdownConfig.paramName]: parentValue
-                },
-                dataType: 'html',
-                success: function(response) {
-                    $(childSelector).html(response).prop('disabled', false);
-
-                    // If editing and we have stored data for this child
-                    if (editData && editData[dropdownConfig.valueField]) {
-                        $(childSelector).val(editData[dropdownConfig.valueField]).trigger('change');
-                    }
-
-                    // Execute callback if provided
-                    if (typeof callback === 'function') {
-                        callback();
-                    }
-
-                    // Execute global dropdown change callback if provided
-                    if (typeof config.callbacks.onDropdownChange === 'function') {
-                        config.callbacks.onDropdownChange(parentKey, parentValue, childSelector);
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error(`Error loading ${childSelector}:`, error);
-                    $(childSelector).html(`<option value="">Error loading data</option>`)
-                        .prop('disabled', true)
-                        .trigger('change');
-
-                    showNotification('error', 'Gagal', `Gagal memuat data dependen`);
-                }
-            });
-        }
-
-        /**
-         * Deep merge two objects
-         * @param {Object} target - Target object
-         * @param {Object} source - Source object to merge
-         * @returns {Object} - Merged object
-         */
-        function mergeConfig(target, source) {
-            const output = Object.assign({}, target);
-
-            if (isObject(target) && isObject(source)) {
-                Object.keys(source).forEach(key => {
-                    if (isObject(source[key])) {
-                        if (!(key in target)) {
-                            Object.assign(output, {
-                                [key]: source[key]
-                            });
-                        } else {
-                            output[key] = mergeConfig(target[key], source[key]);
+                columns: [
+                    // Add index column
+                    {
+                        data: null,
+                        orderable: false,
+                        searchable: false,
+                        render: function(data, type, row, meta) {
+                            return meta.row + meta.settings._iDisplayStart + 1;
                         }
-                    } else {
-                        Object.assign(output, {
-                            [key]: source[key]
-                        });
+                    },
+                    // Add user-defined columns
+                    ...config.columns,
+                    // Add action column
+                    {
+                        data: null,
+                        orderable: false,
+                        searchable: false,
+                        render: function(data, type, row) {
+                            return `
+                                <button class="btn btn-sm btn-info btn-edit" data-id="${row[config.primaryKey]}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger btn-delete" data-id="${row[config.primaryKey]}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            `;
+                        }
                     }
-                });
-            }
-
-            return output;
-        }
-
-        /**
-         * Check if value is an object
-         * @param {*} item - Item to check
-         * @returns {boolean} - True if item is an object
-         */
-        function isObject(item) {
-            return (item && typeof item === 'object' && !Array.isArray(item));
-        }
-
-        /**
-         * Initialize DataTable with server-side processing
-         */
-        function initDataTable() {
-            // Process columns with formatters
-            const processedColumns = config.columns.map(column => {
-                // If there's a formatter for this column, apply it
-                if (column.data in config.renderFormatters) {
-                    column.render = config.renderFormatters[column.data];
-                }
-                return column;
-            });
-
-            // Add index and action columns
-            const indexedColumns = DataTableHelper.addIndexColumn(processedColumns);
-            const columnsWithActions = addCustomActionColumn(indexedColumns);
-
-            // Additional options
-            const options = {
-                order: [
-                    config.defaultOrder
                 ],
-                responsive: true,
-                filters: function() {
-                    const filters = {};
-
-                    // Add custom filter if filterInput selector is provided
-                    if (config.selectors.filterInput) {
-                        filters.custom_filter = $(config.selectors.filterInput).val();
-                    }
-
-                    // Apply additional custom filters if provided
-                    if (typeof config.customFilters === 'function') {
-                        Object.assign(filters, config.customFilters());
-                    }
-
-                    return filters;
-                },
+                order: [config.defaultOrder],
                 ...config.additionalOptions
             };
-
-            // Initialize DataTable
-            const tableSelector = config.selectors.table.substring(1); // Remove # from selector
-            dataTable = DataTableHelper.initServerSideTable(
-                tableSelector,
-                `${config.baseUrl}/${config.endpoints.dataTable}`,
-                columnsWithActions,
-                options
-            );
-        }
-
-        /**
-         * Add custom action column with configurable buttons
-         * @param {Array} columns - Array of column definitions
-         * @returns {Array} - Columns with action column added
-         */
-        function addCustomActionColumn(columns) {
-            // Add action column if there are any enabled actions
-            const hasActions = Object.values(config.actions).some(action => action.enabled);
-
-            if (hasActions) {
-                columns.push({
-                    data: null,
-                    title: 'Aksi',
-                    orderable: false,
-                    searchable: false,
-                    className: 'text-center',
-                    render: function(data, type, row) {
-                        // If custom render callback is provided, use it
-                        if (typeof config.callbacks.renderActionButtons === 'function') {
-                            return config.callbacks.renderActionButtons(data, type, row);
-                        }
-
-                        // Otherwise, use default rendering based on config.actions
-                        let actionButtons = '';
-
-                        // Loop through all defined actions
-                        Object.keys(config.actions).forEach(actionKey => {
-                            const action = config.actions[actionKey];
-
-                            // Only render enabled actions
-                            if (action.enabled) {
-                                const id = row[config.primaryKey];
-                                const icon = action.icon ? `<i class="${action.icon}"></i> ` : '';
-                                const buttonClass = action.btnClass || 'btn-secondary btn-sm';
-
-                                actionButtons += `<button type="button" class="btn ${buttonClass} btn-${actionKey}" 
-                                data-id="${id}" data-action="${actionKey}" 
-                                title="${action.title}">${icon}${action.showTitle !== false ? action.title : ''}</button> `;
-                            }
-                        });
-
-                        return actionButtons;
-                    }
+            
+            $(config.selectors.table).DataTable(tableConfig);
+            
+            // Handle edit and delete button clicks
+            $(document).on('click', '.btn-edit', function() {
+                const id = $(this).data('id');
+                self.handleEdit(id);
+            });
+            
+            $(document).on('click', '.btn-delete', function() {
+                const id = $(this).data('id');
+                self.handleDelete(id);
+            });
+            
+            // Handle filter if available
+            if ($(config.selectors.filterInput).length) {
+                $(config.selectors.filterInput).on('keyup', function() {
+                    $(config.selectors.table).DataTable().search(this.value).draw();
                 });
             }
-
-            return columns;
-        }
-
-        /**
-         * Initialize form handling for create/edit operations
-         */
-        function initFormHandling() {
-            // Clear form when modal is hidden
-            $(config.selectors.modal).on('hidden.bs.modal', function() {
-                resetForm(config.selectors.form);
-                editData = null; // Clear edit data
-            });
-
-            // Handle form submission
+        },
+        
+        // Initialize form submission handler
+        initFormHandler: function() {
+            const self = this;
+            
             $(config.selectors.form).on('submit', function(e) {
                 e.preventDefault();
-
+                
                 const form = $(this);
-                const submitBtn = form.find('button[type="submit"]');
-                let formData = form.serialize();
-                const url = `${config.baseUrl}/${config.endpoints.save}`;
-
-                // Run before save callback if provided
-                if (typeof config.callbacks.beforeSave === 'function') {
-                    const processedData = config.callbacks.beforeSave(formData, form);
-                    // If callback returns false, stop submission
-                    if (processedData === false) return;
-
-                    // If callback returns modified data, use it
-                    if (processedData) {
-                        formData = processedData;
-                    }
-                }
-
-                // Disable submit button during AJAX
-                toggleSubmitButton(submitBtn, true);
-
-                // Clear previous error messages
+                const submitBtn = form.find('[type="submit"]');
+                const originalBtnText = submitBtn.html();
+                
+                // Disable submit button and show loading
+                submitBtn.html('<i class="fas fa-spinner fa-spin"></i> Memproses...').attr('disabled', true);
+                
+                // Clear previous validation errors
                 form.find('.is-invalid').removeClass('is-invalid');
-
+                form.find('.invalid-feedback').text('');
+                
+                // Submit form via AJAX
                 $.ajax({
-                    url: url,
+                    url: form.attr('action') || `${config.baseUrl}/${config.endpoints.save}`,
                     type: 'POST',
-                    data: formData,
+                    data: form.serialize(),
                     dataType: 'json',
                     success: function(response) {
                         if (response.status) {
-                            showNotification('success', 'Berhasil', response.message);
+                            // Show success message
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Berhasil',
+                                text: response.message || `${config.entityName} berhasil disimpan`,
+                                timer: 1500,
+                                showConfirmButton: false
+                            });
+                            
+                            // Close modal
                             $(config.selectors.modal).modal('hide');
-                            resetForm(config.selectors.form);
-                            reloadTable();
-
-                            // Run after save callback if provided
-                            if (typeof config.callbacks.afterSave === 'function') {
-                                config.callbacks.afterSave(response, form);
-                            }
+                            
+                            // Reload table
+                            self.reloadTable();
                         } else {
+                            // Show validation errors
                             if (response.errors) {
-                                showValidationErrors(form, response.errors);
+                                Object.keys(response.errors).forEach(field => {
+                                    const inputField = form.find(`[name="${field}"]`);
+                                    const feedbackField = inputField.siblings('.invalid-feedback');
+                                    
+                                    inputField.addClass('is-invalid');
+                                    if (feedbackField.length) {
+                                        feedbackField.text(response.errors[field]);
+                                    }
+                                });
                             } else {
-                                showNotification('error', 'Gagal', response.message);
+                                // Show general error message
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Gagal',
+                                    text: response.message || 'Terjadi kesalahan saat menyimpan data'
+                                });
                             }
                         }
                     },
-                    error: function(xhr) {
-                        let errorMessage = 'Terjadi kesalahan pada server';
-                        if (xhr.responseJSON && xhr.responseJSON.message) {
-                            errorMessage = xhr.responseJSON.message;
-                        }
-                        showNotification('error', 'Gagal', errorMessage);
+                    error: function(xhr, status, error) {
+                        // Show error message
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Terjadi kesalahan saat menyimpan data'
+                        });
+                        console.error(xhr.responseText);
                     },
                     complete: function() {
-                        toggleSubmitButton(submitBtn, false);
+                        // Re-enable submit button
+                        submitBtn.html(originalBtnText).attr('disabled', false);
                     }
                 });
             });
-        }
-
-        /**
-         * Initialize Select2 components
-         */
-        function initSelect2() {
-            $(config.selectors.select2Elements).select2({
-                width: '100%',
-                placeholder: `Pilih ${config.entityName.toLowerCase()}`,
-                dropdownParent: $(config.selectors.modal)
-            });
-        }
-
-        /**
-         * Initialize file input styling
-         */
-        function initFileInputs() {
-            $('.custom-file-input').on('change', function() {
-                let fileName = $(this).val().split('\\').pop();
-                $(this).next('.custom-file-label').addClass("selected").html(fileName);
-            });
-        }
-
-        /**
-         * Initialize Excel import handler
-         */
-        function initImportHandler() {
+        },
+        
+        // Initialize import handler
+        initImportHandler: function() {
+            const self = this;
+            
             $(config.selectors.importForm).on('submit', function(e) {
                 e.preventDefault();
-
+                
                 const form = $(this);
-                const url = `${config.baseUrl}/${config.endpoints.import}`;
-                const formData = new FormData(this);
-                const importBtn = $(config.selectors.importBtn);
-
-                // Show loading state
-                toggleSubmitButton(importBtn, true, '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Importing...');
-
+                const submitBtn = $(config.selectors.importBtn);
+                const originalBtnText = submitBtn.html();
+                
+                // Validate file input
+                const fileInput = form.find('input[type="file"]');
+                if (!fileInput[0].files.length) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'Pilih file terlebih dahulu'
+                    });
+                    return;
+                }
+                
+                // Disable submit button and show loading
+                submitBtn.html('<i class="fas fa-spinner fa-spin"></i> Importing...').attr('disabled', true);
+                
+                // Submit form via AJAX
                 $.ajax({
-                    url: url,
+                    url: `${config.baseUrl}/${config.endpoints.import}`,
                     type: 'POST',
-                    data: formData,
+                    data: new FormData(form[0]),
                     processData: false,
                     contentType: false,
                     dataType: 'json',
                     success: function(response) {
-                        handleImportResponse(response);
+                        if (response.status) {
+                            // Show success message
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Berhasil',
+                                text: response.message || `${config.entityName} berhasil diimport`,
+                                timer: 1500,
+                                showConfirmButton: false
+                            });
+                            
+                            // Close modal
+                            $(config.selectors.importModal).modal('hide');
+                            
+                            // Reload table
+                            self.reloadTable();
+                            
+                            // Reset form
+                            form[0].reset();
+                        } else {
+                            // Show error message
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Gagal',
+                                text: response.message || 'Terjadi kesalahan saat import data'
+                            });
+                        }
                     },
                     error: function(xhr, status, error) {
-                        showNotification('error', 'Kesalahan Sistem', 'Terjadi kesalahan saat mengimpor data: ' + error);
+                        // Show error message
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Terjadi kesalahan saat import data'
+                        });
+                        console.error(xhr.responseText);
                     },
                     complete: function() {
-                        toggleSubmitButton(importBtn, false, 'Import Data');
+                        // Re-enable submit button
+                        submitBtn.html(originalBtnText).attr('disabled', false);
                     }
                 });
             });
-        }
-
-        /**
-         * Handle import response based on status
-         */
-        function handleImportResponse(response) {
-            if (response.status === 'success') {
-                showNotification('success', 'Impor Berhasil', response.message, function() {
-                    $(config.selectors.importModal).modal('hide');
-                    reloadTable();
-
-                    // Run import success callback if provided
-                    if (typeof config.callbacks.onImportSuccess === 'function') {
-                        config.callbacks.onImportSuccess(response);
-                    }
-                });
-            } else if (response.status === 'partial') {
-                let message = `<p>${response.message}</p>`;
-                if (response.failed_rows) {
-                    message += '<details><summary>Lihat Baris yang Gagal</summary><pre>' +
-                        JSON.stringify(response.failed_rows, null, 2) + '</pre></details>';
-                }
-
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Impor Sebagian',
-                    html: message
-                }).then(() => {
-                    $(config.selectors.importModal).modal('hide');
-                    reloadTable();
-                });
-            } else {
-                showNotification('error', 'Impor Gagal', response.message);
-            }
-        }
-
-        /**
-         * Bind event handlers for buttons and other elements
-         */
-        function bindEvents() {
-            // Event delegation for all action buttons
-            $(document).on('click', '[data-action]', function() {
-                const id = $(this).data('id');
-                const action = $(this).data('action');
-                const actionConfig = config.actions[action];
-
-                if (id && actionConfig) {
-                    // If custom callback is provided, use it
-                    if (typeof actionConfig.callback === 'function') {
-                        // Get row data for the callback
-                        const rowData = getRowDataById(id);
-                        actionConfig.callback(id, rowData);
-                    } else {
-                        // Use default handlers for standard actions
-                        if (action === 'edit') {
-                            editEntity(id);
-                        } else if (action === 'delete') {
-                            deleteEntity(id);
-                        }
-                    }
-                }
-            });
-
-            // Filter change handler
-            if (config.selectors.filterInput) {
-                $(config.selectors.filterInput).on('change', function() {
-                    reloadTable();
-                });
-            }
-        }
-
-        /**
-         * Get row data by ID from the DataTable
-         * @param {string|number} id - The ID to look for
-         * @returns {Object|null} - The row data or null if not found
-         */
-        function getRowDataById(id) {
-            if (!dataTable) return null;
-
-            const rowData = dataTable.rows().data().toArray()
-                .find(row => row[config.primaryKey] == id);
-
-            return rowData || null;
-        }
-
-        /**
-         * Open edit modal for entity
-         */
-        function editEntity(id) {
-            // Run before edit callback if provided
-            if (typeof config.callbacks.beforeEdit === 'function') {
-                const result = config.callbacks.beforeEdit(id);
-                // If callback returns false, stop edit process
-                if (result === false) return;
-            }
-
-            // First, reset the form to ensure a clean state
-            resetForm(config.selectors.form);
-
-            // Show modal
-            $(config.selectors.modal).modal('show');
-
-            // Change modal title
-            $(config.selectors.modal).find(config.selectors.modalTitle).text(`Edit ${config.entityName}`);
-
-            // Show loading in form fields while data loads
-            const form = $(config.selectors.form);
-            form.find('input, textarea, select').prop('disabled', true);
-            form.append('<div id="form-loading" class="text-center py-2"><i class="fas fa-spinner fa-spin"></i> Loading data...</div>');
-
-            // Store current edit data (will be used for dependent dropdowns)
-            editData = null;
-
-            // Fetch entity data
-            $.ajax({
-                url: `${config.baseUrl}/${config.endpoints.getById}${id}`,
-                type: 'GET',
-                dataType: 'json',
-                success: function(response) {
-                    // Remove loading indicator
-                    $('#form-loading').remove();
-                    form.find('input, textarea, select').prop('disabled', false);
-
-                    if (response.status) {
-                        const entityData = response.data;
-                        editData = entityData; // Store for dependent dropdowns
-
-                        // Add hidden ID field
-                        const idFieldSelector = `[name="${config.primaryKey}"]`;
-                        const idField = form.find(idFieldSelector);
-                        if (idField.length) {
-                            idField.val(entityData[config.primaryKey]);
-                        } else {
-                            form.append(`<input type="hidden" name="${config.primaryKey}" value="${entityData[config.primaryKey]}">`);
-                        }
-
-                        // Fill form data dynamically based on formFields configuration
-                        Object.keys(config.formFields).forEach(key => {
-                            const fieldSelector = config.formFields[key];
-                            const fieldName = fieldSelector.match(/\[name="([^"]+)"\]/)[1];
-                            const field = form.find(fieldSelector);
-
-                            if (field.length) {
-                                const value = entityData[fieldName];
-
-                                // Handle different field types
-                                if (field.is(':radio')) {
-                                    // For radio buttons
-                                    form.find(`${fieldSelector}[value="${value}"]`).prop('checked', true);
-                                } else if (field.is('select')) {
-                                    // For select elements, possibly with Select2
-                                    field.val(value).trigger('change');
-
-                                    // If this is a parent dropdown in a dependent relationship,
-                                    // we need to load its children with the current value
-                                    Object.keys(config.dependentDropdowns).forEach(parentKey => {
-                                        const dropdownConfig = config.dependentDropdowns[parentKey];
-                                        if (fieldSelector === dropdownConfig.parentSelector) {
-                                            loadDependentDropdown(parentKey, value, function() {
-                                                // After loading child, check if we need to load further dependents
-                                                if (dropdownConfig.childConfig && entityData[dropdownConfig.childConfig.valueField]) {
-                                                    const childValue = entityData[dropdownConfig.childConfig.valueField];
-                                                    const childElement = $(dropdownConfig.childSelector).val(childValue).trigger('change');
-
-                                                    // If this child has its own dependents, load them
-                                                    if (dropdownConfig.childConfig.childConfig) {
-                                                        loadDependentDropdown(
-                                                            Object.keys(config.dependentDropdowns).find(
-                                                                k => config.dependentDropdowns[k].parentSelector === dropdownConfig.childSelector
-                                                            ),
-                                                            childValue
-                                                        );
-                                                    }
-                                                }
-                                            });
-                                        }
-                                    });
-                                } else {
-                                    // For normal inputs
-                                    field.val(value);
-                                }
-                            }
-                        });
-
-                        // Run after edit callback if provided
-                        if (typeof config.callbacks.afterEdit === 'function') {
-                            config.callbacks.afterEdit(entityData, form);
-                        }
-                    } else {
-                        showNotification('error', 'Gagal', response.message || `Gagal mengambil data ${config.entityName.toLowerCase()}`);
-                        $(config.selectors.modal).modal('hide');
-                    }
-                },
-                error: function(xhr) {
-                    // Remove loading indicator
-                    $('#form-loading').remove();
-                    form.find('input, textarea, select').prop('disabled', false);
-
-                    let errorMessage = `Gagal mengambil data ${config.entityName.toLowerCase()}`;
-                    if (xhr.responseJSON && xhr.responseJSON.message) {
-                        errorMessage = xhr.responseJSON.message;
-                    }
-                    showNotification('error', 'Gagal', errorMessage);
-                    $(config.selectors.modal).modal('hide');
-                }
-            });
-        }
-
-        /**
-         * Delete entity with confirmation
-         */
-        function deleteEntity(id) {
-            // Run before delete callback if provided
-            if (typeof config.callbacks.beforeDelete === 'function') {
-                const result = config.callbacks.beforeDelete(id);
-                // If callback returns false, stop delete process
-                if (result === false) return;
-            }
-
+        },
+        
+        // Handle delete button click
+        handleDelete: function(id) {
+            const self = this;
+            
             Swal.fire({
-                title: 'Konfirmasi Hapus',
-                text: "Apakah Anda yakin ingin menghapus data ini?",
+                title: `Hapus ${config.entityName}?`,
+                text: 'Data yang dihapus tidak dapat dikembalikan',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Ya, Hapus!',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Ya, Hapus',
                 cancelButtonText: 'Batal'
             }).then((result) => {
                 if (result.isConfirmed) {
+                    // Send delete request
                     $.ajax({
                         url: `${config.baseUrl}/${config.endpoints.delete}${id}`,
-                        type: 'GET',
+                        type: 'DELETE',
                         dataType: 'json',
                         success: function(response) {
                             if (response.status) {
-                                showNotification('success', 'Berhasil', response.message);
-                                reloadTable();
-
-                                // Run after delete callback if provided
-                                if (typeof config.callbacks.afterDelete === 'function') {
-                                    config.callbacks.afterDelete(id, response);
-                                }
+                                // Show success message
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Berhasil',
+                                    text: response.message || `${config.entityName} berhasil dihapus`,
+                                    timer: 1500,
+                                    showConfirmButton: false
+                                });
+                                
+                                // Reload table
+                                self.reloadTable();
                             } else {
-                                showNotification('error', 'Gagal', response.message);
+                                // Show error message
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Gagal',
+                                    text: response.message || 'Terjadi kesalahan saat menghapus data'
+                                });
                             }
                         },
-                        error: function() {
-                            showNotification('error', 'Gagal', 'Terjadi kesalahan pada server');
+                        error: function(xhr, status, error) {
+                            // Show error message
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: 'Terjadi kesalahan saat menghapus data'
+                            });
+                            console.error(xhr.responseText);
                         }
                     });
                 }
             });
+        },
+        
+        // Handle edit button click
+        handleEdit: function(id) {
+            // This will be overridden by the implementation in the view
+            console.log(`Edit ${id}`);
+        },
+        
+        // Reload DataTable
+        reloadTable: function() {
+            $(config.selectors.table).DataTable().ajax.reload();
+        },
+        
+        // Reset form to initial state
+        resetForm: function() {
+            // This function is intentionally left empty 
+            // Because we're using a custom resetKomponenForm function in the view
+            console.log('Using custom form reset implementation');
+        },
+        
+        // Custom method for debugging
+        debug: function() {
+            console.log('Config:', config);
         }
-
-        /**
-         * Reset form to initial state
-         */
-        function resetForm(formSelector) {
-            const form = $(formSelector);
-
-            // Reset form
-            form[0].reset();
-
-            // Reset select2 if selector is available
-            if (config.selectors.select2Elements) {
-                form.find(config.selectors.select2Elements).val('').trigger('change');
-            }
-
-            // Reset dependent dropdowns
-            if (Object.keys(config.dependentDropdowns).length > 0) {
-                Object.keys(config.dependentDropdowns).forEach(parentKey => {
-                    const dropdownConfig = config.dependentDropdowns[parentKey];
-                    resetChildDropdowns(dropdownConfig);
-
-                    // Reset parent dropdown
-                    $(dropdownConfig.parentSelector).val('').trigger('change');
-                });
-            }
-
-            // Clear validation errors
-            form.find('.is-invalid').removeClass('is-invalid');
-            form.find('.invalid-feedback').text('');
-
-            // Reset primary key if editing
-            form.find(`[name="${config.primaryKey}"]`).remove();
-
-            // Reset form action
-            form.attr('action', `${config.baseUrl}/${config.endpoints.save}`);
-
-            // Reset modal title
-            $(config.selectors.modal).find(config.selectors.modalTitle).text(`Tambah ${config.entityName}`);
-
-            // Remove any loading indicators if present
-            $('#form-loading').remove();
-            form.find('input, textarea, select').prop('disabled', false);
-        }
-
-        /**
-         * Show validation errors on form
-         */
-        function showValidationErrors(form, errors) {
-            $.each(errors, function(field, message) {
-                const input = form.find(`[name="${field}"]`);
-                if (input.length) {
-                    input.addClass('is-invalid');
-                    const errorDiv = input.next('.invalid-feedback');
-                    if (errorDiv.length) {
-                        errorDiv.text(message);
-                    } else {
-                        input.after(`<div class="invalid-feedback">${message}</div>`);
-                    }
-                }
-            });
-        }
-
-        /**
-         * Toggle submit button state
-         */
-        function toggleSubmitButton(button, isDisabled, text) {
-            button.prop('disabled', isDisabled);
-            if (text) {
-                button.html(text);
-            } else {
-                button.html(isDisabled ? '<i class="fas fa-spinner fa-spin"></i> Menyimpan...' : 'Simpan');
-            }
-        }
-
-        /**
-         * Show notification using SweetAlert2
-         */
-        function showNotification(icon, title, text, callback) {
-            const options = {
-                icon: icon,
-                title: title,
-                text: text
-            };
-
-            if (icon === 'success') {
-                options.timer = 2000;
-                options.showConfirmButton = false;
-            }
-
-            Swal.fire(options).then(() => {
-                if (typeof callback === 'function') {
-                    callback();
-                }
-            });
-        }
-
-        /**
-         * Reload DataTable
-         */
-        function reloadTable() {
-            if (dataTable) {
-                DataTableHelper.reloadTable(dataTable);
-            }
-        }
-
-        /**
-         * Update file input label with selected filename
-         */
-        function updateFileLabel(input) {
-            const fileName = input.files[0] ? input.files[0].name : 'Pilih file Excel';
-            $(input).next('.custom-file-label').html(fileName);
-        }
-
-        // Public API
-        return {
-            init,
-            reloadTable,
-            updateFileLabel,
-            editEntity,
-            deleteEntity,
-            resetForm,
-            loadDependentDropdown
-        };
-    })();
+    };
+})();
 </script>

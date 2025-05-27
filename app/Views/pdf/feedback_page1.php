@@ -1,12 +1,11 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-    <title>Ceklis Observasi - <?= esc($skema['nama_skema'] ?? '-') ?></title>
+    <title>Umpan Balik Asesi - <?= esc($observasi['nama_skema'] ?? '-') ?></title>
     <style>
         /* TCPDF compatible styles */
         body {
-            font-family: helvetica;
+            font-family: helvetica, serif;
             font-size: 10pt;
             margin: 0;
             padding: 0;
@@ -18,8 +17,7 @@
             margin-bottom: 10px;
         }
 
-        th,
-        td {
+        th, td {
             border: 1px solid #000;
             padding: 4px;
             vertical-align: top;
@@ -28,7 +26,6 @@
         .header {
             font-weight: bold;
             font-size: 10pt;
-            /* text-align: center; */
             margin-bottom: 10px;
         }
 
@@ -36,30 +33,25 @@
             text-align: center;
         }
 
-        .bold {
-            font-weight: bold;
-        }
-
-        .grey-bg {
-            background-color: #E0E0E0;
-        }
-
-        .light-grey-bg {
-            background-color: #F0F0F0;
-        }
-
         ul {
             margin: 5px 0 15px 0;
             padding-left: 20px;
         }
 
-        .signature-cell {
-            height: 60px;
-        }
-
         .small-text {
             font-size: 10px;
             margin-top: 4px;
+        }
+
+        /* Symbol for checkboxes */
+        .checkbox-checked {
+            font-family: dejavusans, serif;
+            font-size: 10pt;
+        }
+
+        .checkbox-unchecked {
+            font-family: dejavusans, serif;
+            font-size: 10pt;
         }
     </style>
 </head>
@@ -69,7 +61,7 @@
     <div class="header">FR.AK.03. UMPAN BALIK DAN CATATAN ASESMEN</div>
 
     <!-- Info Table -->
-    <table cellpadding="4">
+    <table>
         <tr>
             <td rowspan="2" width="25%">Skema Sertifikasi<br>(KKNI/Okupasi/Klaster)</td>
             <td width="10%">Judul</td>
@@ -100,18 +92,18 @@
             <td rowspan="2" width="25%">Tanggal Asesmen</td>
             <td width="10%">Mulai</td>
             <td width="5%">:</td>
-            <td width="60%"><?= esc($observasi['nama_skema'] ?? '-') ?></td>
+            <td width="60%"><?= isset($observasi['tanggal_mulai']) ? date('d/m/Y', strtotime($observasi['tanggal_mulai'])) : '-' ?></td>
         </tr>
         <tr>
             <td>Selesai</td>
             <td>:</td>
-            <td><?= esc($observasi['kode_skema'] ?? '-') ?></td>
+            <td><?= isset($observasi['tanggal_selesai']) ? date('d/m/Y', strtotime($observasi['tanggal_selesai'])) : '-' ?></td>
         </tr>
     </table>
 
     <p class="small-text">Umpan balik dari Asesi (diisi oleh Asesi setelah pengambilan keputusan):</p>
 
-    <table cellpadding="4" border="1" cellspacing="0" width="100%">
+    <table cellpadding="4" cellspacing="0" width="100%">
         <!-- Header Row -->
         <thead>
             <tr>
@@ -125,34 +117,64 @@
             </tr>
         </thead>
         <tbody>
-            <!-- Question 1 -->
+            <!-- Feedback Details -->
+            <?php foreach ($details as $index => $detail): ?>
             <tr>
-                <td width="5%" class="center">1.</td>
-                <td style="width:50%;" colspan="3">Saya mendapatkan penjelasan yang cukup memadai mengenai proses asesmen/uji kompetensi</td>
-                <td width="10%" class="center"><span style="font-family: dejavusans;">☐</span></td>
-                <td width="10%" class="center"><span style="font-family: dejavusans;">☐</span></td>
-                <td width="25%" class="center"></td>
+                <td width="5%" class="center"><?= $index + 1 ?>.</td>
+                <td style="width:50%;"><?= esc($detail['pernyataan']) ?></td>
+                <td width="10%" class="center">
+                    <?php if ($detail['jawaban'] === 'Ya'): ?>
+                    <span class="checkbox-checked">☑</span>
+                    <?php else: ?>
+                    <span class="checkbox-unchecked">☐</span>
+                    <?php endif; ?>
+                </td>
+                <td width="10%" class="center">
+                    <?php if ($detail['jawaban'] === 'Tidak'): ?>
+                    <span class="checkbox-checked">☑</span>
+                    <?php else: ?>
+                    <span class="checkbox-unchecked">☐</span>
+                    <?php endif; ?>
+                </td>
+                <td width="25%"><?= esc($detail['komentar']) ?></td>
             </tr>
+            <?php endforeach; ?>
+
+            <!-- Catatan Lainnya -->
             <tr>
-                <td width="5%" class="center">2.</td>
-                <td style="width:50%;" colspan="3">Saya diberikan kesempatan untuk mempelajari standar kompetensi yang akan diujikan dan menilai diri sendiri terhadap pencapaiannya</td>
-                <td width="10%" class="center"><span style="font-family: dejavusans;">☐</span></td>
-                <td width="10%" class="center"><span style="font-family: dejavusans;">☐</span></td>
-                <td width="25%" class="center"></td>
-            </tr>
-            <tr>
-                <td width="5%" class="center">3.</td>
-                <td style="width:50%;" colspan="3">Asesor memberikan kesempatan untuk mendiskusikan/menegosiasikan metoda, instrumen dan sumber asesmen serta jadwal asesmen</td>
-                <td width="10%" class="center"><span style="font-family: dejavusans;">☐</span></td>
-                <td width="10%" class="center"><span style="font-family: dejavusans;">☐</span></td>
-                <td width="25%" class="center"></td>
-            </tr>
-            <tr>
-                <td colspan="7" style="height: 50px;">Catatan/komentar lainnya (apabila ada) :</td>
+                <td colspan="5" style="padding: 10px;">
+                    <strong>Catatan/komentar lainnya (apabila ada):</strong><br>
+                    <?= !empty($catatan_lain) ? esc($catatan_lain) : '- Tidak ada catatan tambahan -' ?>
+                </td>
             </tr>
         </tbody>
     </table>
 
-</body>
+    <!-- Signatures -->
+    <table border="0" cellpadding="4" cellspacing="0" style="margin-top: 20px; border: none;">
+        <tr>
+            <td width="50%" style="border: none; text-align: center; vertical-align: top;">
+                <p>Tanggal: <?= isset($observasi['tanggal_selesai']) ? date('d/m/Y', strtotime($observasi['tanggal_selesai'])) : '..................' ?></p>
+                <p>Tanda tangan Asesi:</p>
+                <?php if (!empty($observasi['ttd_asesi_base64'])): ?>
+                <img src="<?= $observasi['ttd_asesi_base64'] ?>" style="height: 60px;"><br>
+                <?php else: ?>
+                <div style="height: 60px; border-bottom: 1px dotted #000;"></div>
+                <?php endif; ?>
+                <p><strong><?= esc($observasi['nama_asesi'] ?? '..........................................') ?></strong></p>
+            </td>
+            <td width="50%" style="border: none; text-align: center; vertical-align: top;">
+                <p>Tanggal: <?= isset($observasi['tanggal_selesai']) ? date('d/m/Y', strtotime($observasi['tanggal_selesai'])) : '..................' ?></p>
+                <p>Tanda tangan Asesor:</p>
+                <?php if (!empty($observasi['ttd_asesor_base64'])): ?>
+                <img src="<?= $observasi['ttd_asesor_base64'] ?>" style="height: 60px;"><br>
+                <?php else: ?>
+                <div style="height: 60px; border-bottom: 1px dotted #000;"></div>
+                <?php endif; ?>
+                <p><strong><?= esc($observasi['nama_asesor'] ?? '..........................................') ?></strong></p>
+            </td>
+        </tr>
+    </table>
 
+</body>
 </html>

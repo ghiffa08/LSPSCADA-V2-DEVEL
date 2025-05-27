@@ -1,5 +1,6 @@
   <!-- General JS Scripts -->
   <script src="<?= base_url('assets/stisla/node_modules/jquery/dist/jquery.min.js') ?>"></script>
+  <script src="<?= base_url('assets/stisla/node_modules/jquery-ui-dist/jquery-ui.min.js'); ?>"></script>
   <script src="<?= base_url('assets/stisla/node_modules/popper.js/dist/umd/popper.min.js') ?>"></script>
   <script src="<?= base_url('assets/stisla/node_modules/bootstrap/dist/js/bootstrap.min.js') ?>"></script>
   <script src="<?= base_url('assets/stisla/node_modules/jquery.nicescroll/dist/jquery.nicescroll.min.js') ?>"></script>

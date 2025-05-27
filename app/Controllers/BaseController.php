@@ -3,6 +3,9 @@
 namespace App\Controllers;
 
 use App\Models\AKModel;
+use App\Models\FeedbackAsesiModel;
+use App\Models\KomponenFeedbackModel;
+use App\Models\KomponenUmpanBalikModel;
 use App\Models\KUKModel;
 use App\Models\TUKModel;
 use App\Models\APL1Model;
@@ -91,6 +94,10 @@ abstract class BaseController extends Controller
     protected $observasiModel;
     protected $dynamicDependentModel;
 
+    protected $feedbackAsesiModel;
+
+    protected $KomponenfeedbackModel;
+
     protected  $importService;
 
     /**
@@ -126,6 +133,8 @@ abstract class BaseController extends Controller
         $this->elemenModel = new ElemenModel();
         $this->kukModel = new KUKModel();
         $this->tukModel = new TUKModel();
+        $this->KomponenfeedbackModel = new KomponenFeedbackModel();
+        $this->feedbackAsesiModel = new FeedbackAsesiModel();
 
         // Application Forms
         $this->apl1Model = new APL1Model();

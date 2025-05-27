@@ -10,7 +10,7 @@ use Myth\Auth\Models\UserModel;
 
 class AuthController extends Controller
 {
-    protected $auth;
+    protected ?object $auth;
 
     /**
      * @var AuthConfig
@@ -29,7 +29,7 @@ class AuthController extends Controller
         $this->session = service('session');
 
         $this->config = config('Auth');
-        $this->auth   = service('authentication');
+        $this->auth = service('authentication');
     }
 
     //--------------------------------------------------------------------
@@ -129,7 +129,7 @@ class AuthController extends Controller
         if (!$this->config->allowRegistration) {
             return redirect()->back()->withInput()->with('error', lang('Auth.registerDisabled'));
         }
-
+        // Check if the activator is set
         return $this->_render($this->config->views['register'], ['config' => $this->config]);
     }
 

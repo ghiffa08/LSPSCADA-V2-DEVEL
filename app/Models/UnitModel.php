@@ -41,7 +41,7 @@ class UnitModel extends Model
     ];
 
     // Fields that should be searched when using DataTable
-    protected $dataTableSearchFields = ['unit.nama_unit', 'unit.keterangan'];
+    protected array $dataTableSearchFields = ['unit.nama_unit', 'unit.keterangan'];
 
     /**
      * Apply joins for DataTable query
@@ -49,7 +49,7 @@ class UnitModel extends Model
      * @param object $builder Query builder instance
      * @return object
      */
-    protected function applyDataTableJoins($builder)
+    protected function applyDataTableJoins(object $builder): object
     {
         return $builder->join('skema', 'skema.id_skema = unit.id_skema')
             ->where('unit.status', 'Y')
@@ -63,7 +63,7 @@ class UnitModel extends Model
      * @param object $builder Query builder instance
      * @return object
      */
-    protected function applyDataTableSelects($builder)
+    protected function applyDataTableSelects(object $builder): object
     {
         return $builder->select('unit.*, skema.nama_skema');
     }
@@ -74,7 +74,7 @@ class UnitModel extends Model
      * @param array $data Result data
      * @return array
      */
-    protected function transformDataTableResults($data)
+    protected function transformDataTableResults(array $data): array
     {
         // You can transform data here if needed
         // For example, format dates, calculate values, etc.
@@ -125,6 +125,8 @@ class UnitModel extends Model
 
     /**
      * Get units by scheme ID (only active)
+     * @param int $id_skema
+     * @return array
      */
     public function getUnitsByScheme(int $id_skema): array
     {
@@ -190,6 +192,8 @@ class UnitModel extends Model
 
     /**
      * Get unit details with scheme information
+     * @param int $id_unit
+     * @return array|null
      */
     public function getUnitWithScheme(int $id_unit): ?array
     {

@@ -54,7 +54,7 @@ class ElemenModel extends Model
 
 
     // Fields that should be searched when using DataTable
-    protected $dataTableSearchFields = ['elemen.kode_elemen', 'elemen.nama_elemen'];
+    protected array $dataTableSearchFields = ['elemen.kode_elemen', 'elemen.nama_elemen'];
 
     /**
      * Apply joins for DataTable query
@@ -62,7 +62,7 @@ class ElemenModel extends Model
      * @param object $builder Query builder instance
      * @return object
      */
-    protected function applyDataTableJoins($builder)
+    protected function applyDataTableJoins(object $builder): object
     {
         return $builder->join('skema', 'skema.id_skema = elemen.id_skema')
             ->join('unit', 'unit.id_unit = elemen.id_unit')
@@ -77,7 +77,7 @@ class ElemenModel extends Model
      * @param object $builder Query builder instance
      * @return object
      */
-    protected function applyDataTableSelects($builder)
+    protected function applyDataTableSelects(object $builder): object
     {
         return $builder->select('elemen.*, skema.nama_skema, unit.nama_unit');
     }
@@ -88,7 +88,7 @@ class ElemenModel extends Model
      * @param array $data Result data
      * @return array
      */
-    protected function transformDataTableResults($data)
+    protected function transformDataTableResults(array $data): array
     {
         // You can transform data here if needed
         // For example, format dates, calculate values, etc.
@@ -97,6 +97,7 @@ class ElemenModel extends Model
 
     /**
      * Mendapatkan semua elemen dengan nama unit
+     * @return array
      */
     public function getAllElements(): array
     {
@@ -107,6 +108,8 @@ class ElemenModel extends Model
 
     /**
      * Mendapatkan elemen berdasarkan ID unit
+     * @param int $id_unit
+     * @return array
      */
     public function getElementsByUnit(int $id_unit): array
     {
@@ -118,6 +121,8 @@ class ElemenModel extends Model
     /**
      * Mendapatkan elemen (opsional: berdasarkan ID unit)
      * (Diubah dari getActiveElements karena tidak ada status)
+     * @param int|null $id_unit
+     * @return array
      */
     public function getElements(int $id_unit = null): array
     {
@@ -133,21 +138,10 @@ class ElemenModel extends Model
     }
 
     /**
-     * Menghapus elemen
-     */
-    public function deleteElement(int $id_elemen): bool
-    {
-        try {
-            return $this->delete($id_elemen);
-        } catch (\Exception $e) {
-            log_message('error', 'Gagal menghapus elemen: ' . $e->getMessage());
-            return false;
-        }
-    }
-
-    /**
      * Memeriksa apakah elemen valid
      * (Diubah dari isValidElement karena tidak ada status)
+     * @param int $id_elemen
+     * @return bool
      */
     public function elementExists(int $id_elemen): bool
     {

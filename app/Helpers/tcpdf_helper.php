@@ -6,6 +6,7 @@ require_once APPPATH . '../vendor/tecnickcom/tcpdf/tcpdf.php';
 if (!function_exists('initTCPDF')) {
     function initTCPDF($title = 'Dokumen PDF')
     {
+        global $l;
         $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
 
         $pdf->SetCreator(PDF_CREATOR);
