@@ -29,6 +29,7 @@ class AsesorController extends BaseController
 
     protected $dashboardModel;
     protected $group_users;
+    protected $userModel;
 
     public function __construct()
     {
@@ -40,6 +41,7 @@ class AsesorController extends BaseController
         $this->auth   = service('authentication');
         $this->dashboardModel = new DashboardModel();
         $this->group_users = new GroupUserModel();
+        $this->userModel = new \App\Models\UserMythModel();
     }
 
     public function index()
@@ -226,20 +228,11 @@ class AsesorController extends BaseController
 
     public function dashboard()
     {
-        $assessorId = user()->id;
-
-        $data = [
-            'siteTitle' => 'Dashboard Asesor',
-            // 'totalAPL1Pending' => $this->dashboardModel->getAsesorTotalAPL1Pending(),
-            // 'totalAPL2Pending' => $this->dashboardModel->getAsesorTotalAPL2Pending($assessorId),
-            // 'totalAPL2Validated' => $this->dashboardModel->getAsesorTotalAPL2Validated($assessorId),
-            // 'totalObservasi' => $this->dashboardModel->getAsesorTotalObservasi($assessorId),
-            // 'totalPersetujuanAsesmen' => $this->dashboardModel->getAsesorTotalPersetujuanAsesmen($assessorId),
-            // 'recentActivities' => $this->dashboardModel->getAsesorRecentActivities($assessorId, 5),
-            // 'monthlyStats' => $this->dashboardModel->getAsesorMonthlyStats($assessorId),
-            // 'upcomingAssessments' => $this->dashboardModel->getAsesorUpcomingAssessments($assessorId, 5),
-        ];
-
-        return view('asesor/dashboard', $data);
+        // Dashboard utama untuk asesor
+        $userEntity = user();
+        if (!($userEntity instanceof \App\Entities\User ? $userEntity->isAsesor() : (new \App\Entities\User((array)$userEntity))->isAsesor())) {
+            return redirect()->to(site_url('/dashboard'));
+        }
+        return view('asesor/dashboard');
     }
 }

@@ -87,12 +87,11 @@ class RekamanAsesmenController extends ResourceController
             $id_apl1 = $this->request->getPost('id_apl1');
             $tanggal_asesmen = $this->request->getPost('tanggal_asesmen');
             $rekomendasi = $this->request->getPost('rekomendasi');
-            $catatan = $this->request->getPost('catatan');
-            $ttd_asesor = $this->request->getPost('ttd_asesor');
-            $ttd_asesi = $this->request->getPost('ttd_asesi');
+            $komentar = $this->request->getPost('komentar'); // Ubah dari 'catatan' ke 'komentar'
+            $tindak_lanjut = $this->request->getPost('tindak_lanjut');
 
             // Validate required fields
-            if (empty($id_apl1) || empty($tanggal_asesmen) || empty($rekomendasi)) {
+            if (empty($id_apl1) || empty($rekomendasi)) {
                 throw new \Exception('Data yang diperlukan tidak lengkap');
             }
 
@@ -105,32 +104,30 @@ class RekamanAsesmenController extends ResourceController
             if ($existing) {
                 // Update existing record
                 $rekamanData = [
-                    'tanggal_asesmen' => $tanggal_asesmen,
                     'rekomendasi' => $rekomendasi,
-                    'catatan' => $catatan,
-                    'ttd_asesor' => $ttd_asesor,
-                    'ttd_asesi' => $ttd_asesi,
-                    'id_asesor' => $this->id_asesor,
+                    'komentar' => $komentar,
+                    'tindak_lanjut' => $tindak_lanjut,
                     'updated_at' => date('Y-m-d H:i:s')
                 ];
 
-                $this->rekamanAsesmenModel->update($existing['id_rekaman_asesmen'], $rekamanData);
-                $id_rekaman_asesmen = $existing['id_rekaman_asesmen'];
+                $this->rekamanAsesmenModel->update($existing['id'], $rekamanData);
+                $id_rekaman = $existing['id'];
             } else {
                 // Create new record
                 $rekamanData = [
                     'id_apl1' => $id_apl1,
-                    'tanggal_asesmen' => $tanggal_asesmen,
                     'rekomendasi' => $rekomendasi,
-                    'catatan' => $catatan,
-                    'ttd_asesor' => $ttd_asesor,
-                    'ttd_asesi' => $ttd_asesi,
-                    'id_asesor' => $this->id_asesor,
+                    'komentar' => $komentar,
+                    'tindak_lanjut' => $tindak_lanjut,
                     'created_at' => date('Y-m-d H:i:s'),
                     'updated_at' => date('Y-m-d H:i:s')
                 ];
 
-                $id_rekaman_asesmen = $this->rekamanAsesmenModel->insert($rekamanData);
+                $insertResult = $this->rekamanAsesmenModel->insert($rekamanData);
+                if (!$insertResult) {
+                    throw new \Exception('Gagal menyimpan rekaman asesmen');
+                }
+                $id_rekaman = $this->rekamanAsesmenModel->getInsertID();
             }
 
             // Process competency assessments
@@ -138,22 +135,21 @@ class RekamanAsesmenController extends ResourceController
             if (!empty($kompetensi_data)) {
                 // Delete existing competency records for this assessment
                 $this->rekamanAsesmenKompetensiModel
-                    ->where('id_rekaman_asesmen', $id_rekaman_asesmen)
+                    ->where('id_rekaman', $id_rekaman)
                     ->delete();
 
                 // Insert new competency records
                 foreach ($kompetensi_data as $id_unit => $data) {
                     $kompetensiRecord = [
-                        'id_rekaman_asesmen' => $id_rekaman_asesmen,
+                        'id_rekaman' => $id_rekaman,
                         'id_unit' => $id_unit,
-                        'observasi' => isset($data['observasi']) ? 1 : 0,
-                        'portofolio' => isset($data['portofolio']) ? 1 : 0,
-                        'pihak_ketiga' => isset($data['pihak_ketiga']) ? 1 : 0,
-                        'lisan' => isset($data['lisan']) ? 1 : 0,
-                        'tertulis' => isset($data['tertulis']) ? 1 : 0,
-                        'proyek' => isset($data['proyek']) ? 1 : 0,
-                        'lainnya' => isset($data['lainnya']) ? 1 : 0,
-                        'keterangan' => $data['keterangan'] ?? '',
+                        'metode_observasi' => isset($data['observasi']) ? 1 : 0,
+                        'metode_portofolio' => isset($data['portofolio']) ? 1 : 0,
+                        'metode_pihak_ketiga' => isset($data['pihak_ketiga']) ? 1 : 0,
+                        'metode_lisan' => isset($data['lisan']) ? 1 : 0,
+                        'metode_tertulis' => isset($data['tertulis']) ? 1 : 0,
+                        'metode_proyek' => isset($data['proyek']) ? 1 : 0,
+                        'metode_lainnya' => isset($data['lainnya']) ? 1 : 0,
                         'created_at' => date('Y-m-d H:i:s'),
                         'updated_at' => date('Y-m-d H:i:s')
                     ];
@@ -167,7 +163,7 @@ class RekamanAsesmenController extends ResourceController
             return $this->respond([
                 'status' => 'success',
                 'message' => 'Rekaman asesmen berhasil disimpan',
-                'data' => ['id_rekaman_asesmen' => $id_rekaman_asesmen]
+                'data' => ['id_rekaman' => $id_rekaman]
             ]);
         } catch (\Exception $e) {
             $db->transRollback();
@@ -201,7 +197,7 @@ class RekamanAsesmenController extends ResourceController
             $pengajuan = $this->pengajuanAsesmenModel
                 ->select('pengajuan_asesmen.*, users.fullname as nama_asesi, users.username, users.email, skema.nama_skema, skema.kode_skema')
                 ->join('asesi', 'asesi.id_asesi = pengajuan_asesmen.id_asesi')
-                ->join('users', 'users.id = asesi.user_id')
+                ->join('users', 'users.id = asesi.id_user')
                 ->join('asesmen', 'asesmen.id_asesmen = pengajuan_asesmen.id_asesmen')
                 ->join('skema', 'skema.id_skema = asesmen.id_skema')
                 ->where('pengajuan_asesmen.id_asesi', $id_asesi)
@@ -226,20 +222,19 @@ class RekamanAsesmenController extends ResourceController
             $existingData = [];
             if ($existingRekaman) {
                 $kompetensiData = $this->rekamanAsesmenKompetensiModel
-                    ->where('id_rekaman_asesmen', $existingRekaman['id_rekaman_asesmen'])
+                    ->where('id_rekaman', $existingRekaman['id']) // Gunakan 'id'
                     ->findAll();
 
                 foreach ($kompetensiData as $item) {
                     $existingData[] = [
                         'id_unit' => $item['id_unit'],
-                        'observasi' => $item['observasi'],
-                        'portofolio' => $item['portofolio'],
-                        'pihak_ketiga' => $item['pihak_ketiga'],
-                        'tes_lisan' => $item['lisan'],
-                        'tes_tertulis' => $item['tertulis'],
-                        'proyek_kerja' => $item['proyek_kerja'],
-                        'lainnya' => $item['lainnya'],
-                        'keterangan' => $item['keterangan']
+                        'observasi' => $item['metode_observasi'],
+                        'portofolio' => $item['metode_portofolio'],
+                        'pihak_ketiga' => $item['metode_pihak_ketiga'],
+                        'tes_lisan' => $item['metode_lisan'],
+                        'tes_tertulis' => $item['metode_tertulis'],
+                        'proyek_kerja' => $item['metode_proyek'],
+                        'lainnya' => $item['metode_lainnya']
                     ];
                 }
             }
@@ -261,14 +256,14 @@ class RekamanAsesmenController extends ResourceController
     /**
      * Generate PDF for assessment record
      *
-     * @param int $id_rekaman_asesmen Assessment record ID
+     * @param int $id Assessment record ID
      * @return mixed
      */
-    public function pdf(int $id_rekaman_asesmen)
+    public function pdf(int $id)
     {
         try {
             // Get assessment record data
-            $data = $this->getRekamanAsesmenData($id_rekaman_asesmen);
+            $data = $this->getRekamanAsesmenData($id);
 
             // Generate QR codes for signatures
             if (!empty($data['rekaman']['ttd_asesi'])) {
@@ -316,13 +311,13 @@ class RekamanAsesmenController extends ResourceController
     /**
      * Get complete assessment record data
      *
-     * @param int $id_rekaman_asesmen Assessment record ID
+     * @param int $id_rekaman Assessment record ID
      * @return array All data needed for PDF generation
      */
-    private function getRekamanAsesmenData(int $id_rekaman_asesmen): array
+    private function getRekamanAsesmenData(int $id_rekaman): array
     {
         // Get main assessment record with related data
-        $rekaman = $this->rekamanAsesmenModel->getAssessmentRecordById($id_rekaman_asesmen);
+        $rekaman = $this->rekamanAsesmenModel->getAssessmentRecordById($id_rekaman);
 
         if (!$rekaman) {
             throw new \Exception('Data rekaman asesmen tidak ditemukan');
@@ -331,8 +326,8 @@ class RekamanAsesmenController extends ResourceController
         // Get competency assessment details
         $kompetensiDetails = $this->rekamanAsesmenKompetensiModel
             ->select('rekaman_asesmen_kompetensi.*, unit_kompetensi.kode_unit, unit_kompetensi.nama_unit')
-            ->join('unit_kompetensi', 'unit_kompetensi.id_unit = rekaman_asesmen_kompetensi.id_unit')
-            ->where('id_rekaman_asesmen', $id_rekaman_asesmen)
+            ->join('unit_kompetensi', 'unit_kompetensi.id = rekaman_asesmen_kompetensi.id_unit')
+            ->where('id_rekaman', $id_rekaman) // Gunakan 'id_rekaman'
             ->findAll();
 
         // Group competencies by unit
@@ -342,15 +337,14 @@ class RekamanAsesmenController extends ResourceController
                 'kode_unit' => $detail['kode_unit'],
                 'nama_unit' => $detail['nama_unit'],
                 'metode_asesmen' => [
-                    'observasi' => $detail['observasi'],
-                    'portofolio' => $detail['portofolio'],
-                    'pihak_ketiga' => $detail['pihak_ketiga'],
-                    'lisan' => $detail['lisan'],
-                    'tertulis' => $detail['tertulis'],
-                    'proyek' => $detail['proyek'],
-                    'lainnya' => $detail['lainnya']
-                ],
-                'keterangan' => $detail['keterangan']
+                    'observasi' => $detail['metode_observasi'],
+                    'portofolio' => $detail['metode_portofolio'],
+                    'pihak_ketiga' => $detail['metode_pihak_ketiga'],
+                    'lisan' => $detail['metode_lisan'],
+                    'tertulis' => $detail['metode_tertulis'],
+                    'proyek' => $detail['metode_proyek'],
+                    'lainnya' => $detail['metode_lainnya']
+                ]
             ];
         }
 
@@ -363,10 +357,10 @@ class RekamanAsesmenController extends ResourceController
     /**
      * Delete assessment record
      *
-     * @param int $id_rekaman_asesmen
+     * @param int $id_rekaman
      * @return ResponseInterface
      */
-    public function delete($id_rekaman_asesmen = null)
+    public function delete($id_rekaman = null)
     {
         if (!$this->request->isAJAX()) {
             return $this->failValidationErrors('Request tidak valid');
@@ -377,11 +371,11 @@ class RekamanAsesmenController extends ResourceController
             $db->transBegin();
 
             // Soft delete main record
-            $this->rekamanAsesmenModel->delete($id_rekaman_asesmen);
+            $this->rekamanAsesmenModel->delete($id_rekaman);
 
             // Delete related competency records
             $this->rekamanAsesmenKompetensiModel
-                ->where('id_rekaman_asesmen', $id_rekaman_asesmen)
+                ->where('id_rekaman', $id_rekaman)
                 ->delete();
 
             $db->transCommit();
@@ -397,7 +391,6 @@ class RekamanAsesmenController extends ResourceController
             return $this->fail('Gagal menghapus rekaman asesmen: ' . $e->getMessage());
         }
     }
-
 
     /**
      * Auto-save functionality for real-time saving
@@ -435,9 +428,9 @@ class RekamanAsesmenController extends ResourceController
                     'created_at' => date('Y-m-d H:i:s'),
                     'updated_at' => date('Y-m-d H:i:s')
                 ];
-                $id_rekaman_asesmen = $this->rekamanAsesmenModel->insert($rekamanData);
+                $id = $this->rekamanAsesmenModel->insert($rekamanData);
             } else {
-                $id_rekaman_asesmen = $rekaman['id_rekaman_asesmen'];
+                $id = $rekaman['id'];
             }
 
             // Save general fields
@@ -452,7 +445,7 @@ class RekamanAsesmenController extends ResourceController
             }
 
             if (count($updateData) > 1) { // More than just updated_at
-                $this->rekamanAsesmenModel->update($id_rekaman_asesmen, $updateData);
+                $this->rekamanAsesmenModel->update($id, $updateData);
             }
 
             // Process unit data
@@ -461,7 +454,7 @@ class RekamanAsesmenController extends ResourceController
                 foreach ($units as $id_unit => $unitData) {
                     // Get or create kompetensi record
                     $kompetensi = $this->rekamanAsesmenKompetensiModel
-                        ->where('id_rekaman_asesmen', $id_rekaman_asesmen)
+                        ->where('id', $id)
                         ->where('id_unit', $id_unit)
                         ->first();
 
@@ -475,12 +468,12 @@ class RekamanAsesmenController extends ResourceController
                     ];
 
                     if (!$kompetensi) {
-                        $kompetensiData['id_rekaman_asesmen'] = $id_rekaman_asesmen;
+                        $kompetensiData['id'] = $id;
                         $kompetensiData['id_unit'] = $id_unit;
                         $kompetensiData['created_at'] = date('Y-m-d H:i:s');
                         $this->rekamanAsesmenKompetensiModel->insert($kompetensiData);
                     } else {
-                        $this->rekamanAsesmenKompetensiModel->update($kompetensi['id_rekaman_asesmen_kompetensi'], $kompetensiData);
+                        $this->rekamanAsesmenKompetensiModel->update($kompetensi['id_kompetensi'], $kompetensiData);
                     }
                 }
             }
@@ -528,7 +521,7 @@ class RekamanAsesmenController extends ResourceController
             $asesiData = $this->pengajuanAsesmenModel
                 ->select('pengajuan_asesmen.id_apl1, pengajuan_asesmen.id_asesi, users.fullname as nama_asesi, users.username, users.email')
                 ->join('asesi', 'asesi.id_asesi = pengajuan_asesmen.id_asesi')
-                ->join('users', 'users.id = asesi.user_id')
+                ->join('users', 'users.id = asesi.id_user')
                 ->where('pengajuan_asesmen.id_asesmen', $id_asesmen)
                 ->where('pengajuan_asesmen.deleted_at', null)
                 ->findAll();
@@ -592,7 +585,7 @@ class RekamanAsesmenController extends ResourceController
 
                 $id_rekaman = $this->rekamanAsesmenModel->getInsertID();
             } else {
-                $id_rekaman = $rekaman['id']; // Gunakan 'id', bukan 'id_rekaman_asesmen'
+                $id_rekaman = $rekaman['id']; // Gunakan 'id', bukan 'id'
             }
 
             // Get or create kompetensi record
@@ -705,7 +698,6 @@ class RekamanAsesmenController extends ResourceController
             if (!$rekaman) {
                 $rekamanData = [
                     'id_apl1' => $id_apl1,
-                    // Hapus id_asesor karena tidak ada di tabel
                     'created_at' => date('Y-m-d H:i:s'),
                     'updated_at' => date('Y-m-d H:i:s')
                 ];
@@ -718,14 +710,14 @@ class RekamanAsesmenController extends ResourceController
 
                 $id_rekaman = $this->rekamanAsesmenModel->getInsertID();
             } else {
-                $id_rekaman = $rekaman['id']; // Gunakan 'id', bukan 'id_rekaman_asesmen'
+                $id_rekaman = $rekaman['id'];
             }
 
             // Update all units
             foreach ($units as $unit) {
                 $kompetensi = $this->rekamanAsesmenKompetensiModel
                     ->where('id_rekaman', $id_rekaman) // Gunakan 'id_rekaman'
-                    ->where('id_unit', $unit['id']) // Sesuaikan dengan field yang benar
+                    ->where('id_unit', $unit['id_unit']) // Sesuaikan dengan field yang benar
                     ->first();
 
                 // Gunakan nama field yang sesuai dengan tabel (dengan prefix metode_)
@@ -879,7 +871,7 @@ class RekamanAsesmenController extends ResourceController
                     'tanggal_asesmen' => $tanggal_asesmen,
                     'updated_at' => date('Y-m-d H:i:s')
                 ];
-                $this->rekamanAsesmenModel->update($rekaman['id_rekaman_asesmen'], $updateData);
+                $this->rekamanAsesmenModel->update($rekaman['id'], $updateData);
             }
 
             $db->transCommit();
@@ -932,20 +924,20 @@ class RekamanAsesmenController extends ResourceController
                     'created_at' => date('Y-m-d H:i:s'),
                     'updated_at' => date('Y-m-d H:i:s')
                 ];
-                $id_rekaman_asesmen = $this->rekamanAsesmenModel->insert($rekamanData);
+                $id = $this->rekamanAsesmenModel->insert($rekamanData);
             } else {
-                $id_rekaman_asesmen = $rekaman['id_rekaman_asesmen'];
+                $id = $rekaman['id'];
             }
 
             // Get or create kompetensi record
             $kompetensi = $this->rekamanAsesmenKompetensiModel
-                ->where('id_rekaman_asesmen', $id_rekaman_asesmen)
+                ->where('id', $id)
                 ->where('id_unit', $id_unit)
                 ->first();
 
             if (!$kompetensi) {
                 $kompetensiData = [
-                    'id_rekaman_asesmen' => $id_rekaman_asesmen,
+                    'id' => $id,
                     'id_unit' => $id_unit,
                     'keterangan' => $keterangan,
                     'created_at' => date('Y-m-d H:i:s'),
@@ -957,7 +949,7 @@ class RekamanAsesmenController extends ResourceController
                     'keterangan' => $keterangan,
                     'updated_at' => date('Y-m-d H:i:s')
                 ];
-                $this->rekamanAsesmenKompetensiModel->update($kompetensi['id_rekaman_asesmen_kompetensi'], $updateData);
+                $this->rekamanAsesmenKompetensiModel->update($kompetensi['id_kompetensi'], $updateData);
             }
 
             $db->transCommit();

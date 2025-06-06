@@ -2,112 +2,104 @@
 
 namespace App\Controllers;
 
-use Config\Database;
-use Config\Services;
-use CodeIgniter\I18n\Time;
-use App\Controllers\BaseController;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Controllers\BaseController;
+use App\Services\AsesiService;
+use App\Services\ValidationService;
+use App\Services\CustomResponseService;
+use App\DTOs\ApiResponseDTO;
+use CodeIgniter\I18n\Time;
+use Exception;
+use Config\Services;
 
 class AsesiController extends BaseController
 {
-    protected $db;
-    protected $user_id;
-    protected $validator;
+    private AsesiService $asesiService;
+    private ValidationService $validationService;
+    private CustomResponseService $responseService;
+    private $dependent;
+    private $usermodel;
+    private int $userId;
 
     public function __construct()
     {
-        $this->db = Database::connect();
-        $this->user_id = user()->id;
+        $this->asesiService = service('AsesiService');
+        $this->validationService = new ValidationService();
+        $this->responseService = service('CustomResponseService');
+        $this->dependent = new \App\Models\DynamicDependent();
+        $this->usermodel = new \App\Models\UserMythModel();
+        $this->userId = user()->id ?? 0;
     }
 
     public function index()
     {
-        $data = [
-            'siteTitle' => 'Dashboard',
-
-        ];
-
-        return view('asesi/dashboard', $data);
+        try {
+            // Example: get asesi by user id
+            $result = $this->asesiService->getAsesiByUserId($this->userId);
+            if (!$result->success) {
+                return $this->responseService->error($result->message, $result->code, $result->errors);
+            }
+            $data = [
+                'siteTitle' => 'Dashboard',
+                'asesi' => $result->data
+            ];
+            return view('asesi/dashboard', $data);
+        } catch (Exception $e) {
+            log_message('error', 'Error loading asesi dashboard: ' . $e->getMessage());
+            return $this->responseService->error('Terjadi kesalahan saat memuat dashboard');
+        }
     }
 
     public function profile()
     {
-        $data = [
-            'siteTitle' => 'Profile Asesi',
-            'siteSubtitle' => 'Pada bagian ini, masukan data pribadi, data pendidikan formal, data pekerjaan Anda pada saat ini, serta dokumen pendukung.',
-            'provinsi' => $this->dependent->AllProvinsi(),
-            'asesi' => $this->asesiModel->getWithUserByUserId($this->user_id),
-        ];
-
-        return view('asesi/profile', $data);
+        try {
+            $result = $this->asesiService->getAsesiByUserId($this->userId);
+            if (!$result->success) {
+                return $this->responseService->error($result->message, $result->code, $result->errors);
+            }
+            $data = [
+                'siteTitle' => 'Profile Asesi',
+                'siteSubtitle' => 'Pada bagian ini, masukan data pribadi, data pendidikan formal, data pekerjaan Anda pada saat ini, serta dokumen pendukung.',
+                'provinsi' => $this->dependent->AllProvinsi(),
+                'asesi' => $result->data,
+            ];
+            return view('asesi/profile', $data);
+        } catch (Exception $e) {
+            log_message('error', 'Error loading asesi profile: ' . $e->getMessage());
+            return $this->responseService->error('Terjadi kesalahan saat memuat profile');
+        }
     }
-
 
     public function save()
     {
-        // Check if this is an update (ID exists) or new entry
-        $id = $this->request->getVar('id_asesi');
-        $isUpdate = !empty($id);
-
-        // Validate form input data
-        if (!$this->validateFormData($isUpdate)) {
-            return $this->failedResponse('warning', 'Periksa kembali, terdapat beberapa kesalahan yang perlu diperbaiki.');
-        }
-
         try {
-            // Begin transaction
-            $this->db->transBegin();
-
-            $userId = $this->request->getVar('user_id') ?? $this->user_id;
-
-            // First, handle user data updates (including signature)
-            $this->updateUserData($userId);
-
-            // For new entries, generate a unique ID
-            if (!$isUpdate) {
-                $id = generate_application_id('ASI', 'asesi', 'id_asesi');
+            // Validate form input data
+            $validationResult = $this->validationService->validateAsesi($this->request->getPost());
+            if (!$validationResult->success) {
+                return $this->responseService->validationError($validationResult->errors);
             }
-
-            // Prepare data for update/insert
-            $data = $this->prepareAsesiData($id, $userId);
-
-            // Update or insert based on whether ID exists
+            // Check if this is an update (ID exists) or new entry
+            $id = $this->request->getVar('id_asesi');
+            $isUpdate = !empty($id);
+            $data = $this->request->getPost();
+            $data['user_id'] = $data['user_id'] ?? $this->userId;
             if ($isUpdate) {
-                // Update existing data
-                if (!$this->asesiModel->update($id, $data)) {
-                    throw new \Exception('Gagal mengupdate data asesi.');
-                }
+                $result = $this->asesiService->updateAsesi($id, $data);
             } else {
-                // Insert new data
-                if (!$this->asesiModel->insert($data)) {
-                    throw new \Exception('Gagal menyimpan data asesi.');
-                }
-
-                // Here you would handle additional inserts for related tables
-                // like APL1, etc. (based on your original code)
+                $result = $this->asesiService->createAsesi($data);
             }
-
-            // Commit transaction
-            $this->db->transCommit();
-
-            // Success response
-            $message = $isUpdate ?
-                'Data asesi berhasil diupdate.' :
-                'Pengajuan Uji Kompetensi berhasil terkirim, Silahkan Cek Email untuk info lebih lanjut!';
-
-            session()->setFlashdata('pesan', $message);
-            return redirect()->to($isUpdate ? '/profile' : '/dashboard');
-        } catch (\Exception $e) {
-            // Rollback transaction on error
-            $this->db->transRollback();
-            log_message('error', 'Error during ' . ($isUpdate ? 'update' : 'submission') . ': ' . $e->getMessage());
-
-            session()->setFlashdata('error', 'Terjadi kesalahan: ' . $e->getMessage());
-            return redirect()->back()->withInput();
+            if ($result->success) {
+                session()->setFlashdata('pesan', $isUpdate ? 'Data berhasil diperbarui!' : 'Data berhasil disimpan!');
+                return $this->responseService->success($result->data, $result->message);
+            } else {
+                return $this->responseService->error($result->message, $result->code, $result->errors);
+            }
+        } catch (Exception $e) {
+            log_message('error', 'Error saving asesi data: ' . $e->getMessage());
+            session()->setFlashdata('error', 'Terjadi kesalahan saat menyimpan data: ' . $e->getMessage());
+            return $this->responseService->error('Terjadi kesalahan saat menyimpan data', 500, ['error' => $e->getMessage()]);
         }
     }
-
-
 
     /**
      * Update user data including signature handling
@@ -119,8 +111,7 @@ class AsesiController extends BaseController
     private function updateUserData(int $userId): bool
     {
         $userData = [
-            // 'username' => $this->request->getVar('username'),
-            'fullname' => $this->request->getVar('fullname'),
+            'nama_lengkap' => $this->request->getVar('fullname'),
             'no_telp'  => $this->request->getVar('no_telp'),
         ];
 
@@ -408,5 +399,15 @@ class AsesiController extends BaseController
         $errors = $this->validator ? $this->validator->getErrors() : [];
 
         return redirect()->back()->withInput()->with('errors', $errors);
+    }
+
+    public function dashboard()
+    {
+        // Dashboard utama untuk asesi
+        $userEntity = user();
+        if (!($userEntity instanceof \App\Entities\User ? $userEntity->isAsesi() : (new \App\Entities\User((array)$userEntity))->isAsesi())) {
+            return redirect()->to(site_url('/dashboard'));
+        }
+        return view('asesi/dashboard');
     }
 }

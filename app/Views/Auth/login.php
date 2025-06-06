@@ -62,7 +62,7 @@
 							<div class="text-center mt-2 mb-3">
 								<div class="text-job text-muted">OR</div>
 							</div>
-							<a href="" target="_blank" class="btn btn-block btn-social btn-google">
+							<a href="<?= site_url('auth/google') ?>" class="btn btn-block btn-social btn-google">
 								<span class="fab fa-google"></span> Google
 							</a>
 							<!-- $link -->

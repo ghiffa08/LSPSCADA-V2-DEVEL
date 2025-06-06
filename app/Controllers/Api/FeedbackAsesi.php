@@ -4,17 +4,20 @@ namespace App\Controllers\Api;
 
 use Config\Services;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Services\FeedbackService;
 
 class FeedbackAsesi extends DataTableController
 {
     private int $id_user;
+    protected $feedbackService;
 
     public function __construct()
     {
         parent::__construct();
 
         $this->model = $this->feedbackAsesiModel;
-        $this->id_user =  123;
+        $this->id_user = user()->id ?? 0;
+        $this->feedbackService = service('feedback');
 
         // Define custom column mapping for complex ordering
         $this->columnMap = [
@@ -41,8 +44,8 @@ class FeedbackAsesi extends DataTableController
         }
 
         try {
-            $komponenModel = model('KomponenFeedbackModel');
-            $komponen = $komponenModel->getAllKomponen();
+            // Use feedback service to get komponen data
+            $komponen = $this->feedbackService->getAllKomponen();
 
             return $this->respond([
                 'success' => true,
@@ -74,17 +77,10 @@ class FeedbackAsesi extends DataTableController
                 return $this->fail('ID Asesi dan ID Skema diperlukan', 400);
             }
 
-            // Check if feedback already exists
-            $feedback = $this->feedbackAsesiModel->where([
-                'id_asesi' => $id_asesi,
-                'id_skema' => $id_skema,
-            ])->first();
+            // Use feedback service to check for existing feedback
+            $result = $this->feedbackService->checkExistingFeedback($id_asesi, $id_skema);
 
-            return $this->respond([
-                'success' => true,
-                'exists' => !empty($feedback),
-                'id_feedback' => $feedback ? $feedback['id_feedback'] : null
-            ]);
+            return $this->respond($result);
         } catch (\Exception $e) {
             log_message('error', 'Error checking existing feedback: ' . $e->getMessage());
             return $this->fail('Gagal memeriksa data: ' . $e->getMessage());
@@ -150,35 +146,13 @@ class FeedbackAsesi extends DataTableController
         }
 
         try {
-            // Get master feedback data
-            $feedback = $this->feedbackAsesiModel->find($id_feedback);
-
-            if (!$feedback) {
-                return $this->fail('Data feedback tidak ditemukan', 404);
-            }
-
-            // Get komponen umpan balik
-            $komponenModel = model('KomponenFeedbackModel');
-            $komponen = $komponenModel->getAllKomponen();
-
-            // Get existing feedback details if available
-            $detailFeedback = $this->feedbackAsesiModel->getFeedbackDetailsByIdWithKomponen($id_feedback);
-
-            // Format detail data for easier access in frontend
-            $existingData = [];
-            foreach ($detailFeedback as $detail) {
-                $existingData[$detail['id_komponen']] = [
-                    'jawaban' => $detail['jawaban'],
-                    'komentar' => $detail['komentar'],
-                    'pernyataan' => $detail['pernyataan']
-                ];
-            }
-
+            // Use feedback service to get feedback data
+            $data = $this->feedbackService->getFeedbackData($id_feedback);
             return $this->respond([
                 'success' => true,
-                'feedback' => $feedback,
-                'komponen' => $komponen,
-                'existing_data' => $existingData
+                'feedback' => $data['feedback'],
+                'komponen' => $this->feedbackService->getAllKomponen(),
+                'existing_data' => $data['existing_data']
             ]);
         } catch (\Exception $e) {
             log_message('error', 'Error loading feedback data: ' . $e->getMessage());
@@ -229,8 +203,8 @@ class FeedbackAsesi extends DataTableController
                 'komentar' => $komentar
             ];
 
-            // Process the data
-            $result = $this->feedbackAsesiModel->saveFeedbackData($masterData, $detailData);
+            // Process the data using the feedback service
+            $result = $this->feedbackService->saveFeedbackData($masterData, $detailData);
 
             // Handle success response
             return $this->handleSuccessResponse('Data umpan balik berhasil disimpan', $isAjax, $result);

@@ -13,6 +13,7 @@
         "php": "^8.1",
         "codeigniter4/framework": "^4.0",
         "endroid/qr-code": "^5.0",
+        "google/apiclient": "^2.18",
         "myth/auth": "^1.2",
         "phpdevsr/recaptcha-codeigniter4": "^2.1",
         "phpoffice/phpspreadsheet": "^2.0",

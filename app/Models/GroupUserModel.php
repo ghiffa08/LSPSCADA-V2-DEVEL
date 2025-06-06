@@ -47,7 +47,6 @@ class GroupUserModel extends Model
     // JOIN
     public function getGroupUsers()
     {
-
         return $this->db->table('auth_groups_users')
             ->join('auth_groups', 'auth_groups.id=auth_groups_users.group_id', 'left')
             ->join('users', 'users.id=auth_groups_users.user_id', 'left')
@@ -57,7 +56,6 @@ class GroupUserModel extends Model
 
     public function getAsesors()
     {
-
         return $this->db->table('auth_groups_users')
             ->join('auth_groups', 'auth_groups.id=auth_groups_users.group_id', 'left')
             ->join('users', 'users.id=auth_groups_users.user_id', 'left')
@@ -66,24 +64,37 @@ class GroupUserModel extends Model
             ->Get()->getResultArray();
     }
 
-    public function getPeserta()
+    public function getAsesi()
     {
-
         return $this->db->table('auth_groups_users')
             ->join('auth_groups', 'auth_groups.id=auth_groups_users.group_id', 'left')
             ->join('users', 'users.id=auth_groups_users.user_id', 'left')
-            ->where('auth_groups.name', 'Peserta')
+            ->where('auth_groups.name', 'Asesi')
             ->select('users.id as userid, users.username, users.email, users.no_telp, users.fullname, auth_groups.id as groupid, users.fullname as userfullname, auth_groups.name as groupname')
             ->Get()->getResultArray();
     }
     public function getAdmin()
     {
-
         return $this->db->table('auth_groups_users')
             ->join('auth_groups', 'auth_groups.id=auth_groups_users.group_id', 'left')
             ->join('users', 'users.id=auth_groups_users.user_id', 'left')
             ->where('auth_groups.name', 'Admin')
             ->select('users.id as userid, users.username, users.email, users.no_telp, users.fullname, auth_groups.id as groupid, users.fullname as userfullname, auth_groups.name as groupname')
             ->Get()->getResultArray();
+    }
+
+    /**
+     * Get all group names (roles) for a user by user_id
+     * @param int|string $userId
+     * @return array
+     */
+    public function getRolesByUserId($userId)
+    {
+        $result = $this->db->table('auth_groups_users')
+            ->join('auth_groups', 'auth_groups.id=auth_groups_users.group_id', 'left')
+            ->where('auth_groups_users.user_id', $userId)
+            ->select('auth_groups.name')
+            ->get()->getResultArray();
+        return array_map(fn($row) => $row['name'], $result);
     }
 }

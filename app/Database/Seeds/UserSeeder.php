@@ -18,6 +18,7 @@ class UserSeeder extends Seeder
             'username' => 'admin',
             'email' => 'admin@gmail.com',
             'password' => Password::hash('admin'),
+            'nama_lengkap' => 'Admin',
             'active' => 1,
         ]);
 
@@ -27,6 +28,7 @@ class UserSeeder extends Seeder
             'username' => 'asesor',
             'email' => 'asesor@gmail.com',
             'password' => Password::hash('asesor'),
+            'nama_lengkap' => 'Asesor',
             'active' => 1,
         ]);
 
@@ -36,6 +38,7 @@ class UserSeeder extends Seeder
             'username' => 'peserta',
             'email' => 'peserta@gmail.com',
             'password' => Password::hash('peserta'),
+            'nama_lengkap' => 'Peserta',
             'active' => 1,
         ]);
 

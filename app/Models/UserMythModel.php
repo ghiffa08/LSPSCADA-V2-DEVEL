@@ -14,11 +14,24 @@ class UserMythModel extends Model
 {
     protected $table          = 'users';
     protected $primaryKey     = 'id';
-    protected $returnType     = 'App\Entities\User';
-    protected $useSoftDeletes = true;
+    protected $returnType     = 'App\\Entities\\User';
+    protected $useSoftDeletes = false; // Nonaktifkan soft deletes
     protected $allowedFields  = [
-        'email', 'username', 'fullname', 'no_telp', 'password_hash', 'reset_hash', 'reset_at', 'reset_expires', 'activate_hash',
-        'status', 'status_message', 'active', 'force_pass_reset', 'permissions', 'deleted_at',
+        'email',
+        'username',
+        'nama_lengkap',
+        'no_telp',
+        'password_hash',
+        'reset_hash',
+        'reset_at',
+        'reset_expires',
+        'activate_hash',
+        'status',
+        'status_message',
+        'active',
+        'force_pass_reset',
+        'permissions',
+        'google_id'
     ];
     protected $useTimestamps   = true;
     protected $validationRules = [

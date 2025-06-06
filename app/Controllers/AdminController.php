@@ -21,6 +21,9 @@ class AdminController extends BaseController
      */
     protected $session;
 
+    protected $group_users;
+    protected $usermodel;
+
     public function __construct()
     {
         // Most services in this controller require
@@ -29,6 +32,9 @@ class AdminController extends BaseController
 
         $this->config = config('Auth');
         $this->auth   = service('authentication');
+
+        $this->group_users = new \App\Models\GroupUserModel();
+        $this->usermodel = new \App\Models\UserMythModel();
     }
 
     public function index()
@@ -208,7 +214,7 @@ class AdminController extends BaseController
         $data = [
             'email' => $this->request->getVar('edit_email'),
             'username' => $this->request->getVar('edit_username'),
-            'fullname' => $this->request->getVar('edit_fullname'),
+            'nama_lengkap' => $this->request->getVar('edit_fullname'),
             'no_telp' => $this->request->getVar('edit_no_hp'),
             'tanda_tangan' => $nama_tanda_tangan,
         ];
@@ -226,5 +232,18 @@ class AdminController extends BaseController
         $this->usermodel->deleteUser($id);
         session()->setFlashdata('pesan', 'Admin berhasil dihapus!');
         return redirect()->to('/admin');
+    }
+
+    public function dashboard()
+    {
+        // Dashboard utama untuk admin
+        $userEntity = user();
+        if (!($userEntity instanceof \App\Entities\User)) {
+            $userEntity = new \App\Entities\User((array)$userEntity);
+        }
+        if (!method_exists($userEntity, 'isAdmin') || !$userEntity->isAdmin()) {
+            return redirect()->to(site_url('/dashboard'));
+        }
+        return view('admin/dashboard');
     }
 }

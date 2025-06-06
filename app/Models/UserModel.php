@@ -13,10 +13,9 @@ class UserModel extends Model
     protected $useSoftDeletes   = false;
     protected $protectFields    = true;
     protected $allowedFields    =  [
-
         'email',
         'username',
-        'fullname',
+        'nama_lengkap',
         'user_image',
         'tanda_tangan',
         'no_telp',
@@ -30,7 +29,7 @@ class UserModel extends Model
         'active',
         'force_pass_reset',
         'permissions',
-        'deleted_at',
+        'google_id', // tambahkan agar UserModel bisa handle login Google
     ];
 
     protected bool $allowEmptyInserts = false;
@@ -44,7 +43,6 @@ class UserModel extends Model
     protected $dateFormat    = 'datetime';
     protected $createdField  = 'created_at';
     protected $updatedField  = 'updated_at';
-    protected $deletedField  = 'deleted_at';
 
     // Validation
     protected $validationRules      = [];

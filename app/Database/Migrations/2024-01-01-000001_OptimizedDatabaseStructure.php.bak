@@ -1,0 +1,174 @@
+<?php
+
+namespace App\Database\Migrations;
+
+use CodeIgniter\Database\Migration;
+
+class OptimizedDatabaseStructure extends Migration
+{
+    public function up()
+    {
+        // Drop the old apl1 table if it exists (already replaced by pengajuan_asesmen)
+        if ($this->db->tableExists('apl1')) {
+            $this->forge->dropTable('apl1', true);
+        }
+
+        // Optimize pengajuan_asesmen table structure
+        $this->forge->modifyColumn('pengajuan_asesmen', [
+            'status' => [
+                'type' => 'ENUM',
+                'constraint' => ['pending', 'validated', 'rejected', 'under_review'],
+                'default' => 'pending',
+                'null' => false
+            ]
+        ]);
+
+        // Add proper indexes for performance
+        $this->forge->addKey(['id_asesi', 'id_asesmen'], false, false, 'idx_asesi_asesmen');
+        $this->forge->addKey(['status'], false, false, 'idx_status');
+        $this->forge->addKey(['created_at'], false, false, 'idx_created_at');
+
+        // Create optimized assessment_results table for competency tracking
+        $this->forge->addField([
+            'id_result' => [
+                'type' => 'INT',
+                'constraint' => 11,
+                'auto_increment' => true
+            ],
+            'id_apl1' => [
+                'type' => 'VARCHAR',
+                'constraint' => 255,
+                'null' => false
+            ],
+            'id_asesi' => [
+                'type' => 'VARCHAR',
+                'constraint' => 50,
+                'null' => false
+            ],
+            'id_asesor' => [
+                'type' => 'INT',
+                'constraint' => 11,
+                'null' => false
+            ],
+            'id_skema' => [
+                'type' => 'INT',
+                'constraint' => 11,
+                'null' => false
+            ],
+            'total_elements' => [
+                'type' => 'INT',
+                'constraint' => 11,
+                'null' => false,
+                'default' => 0
+            ],
+            'competent_elements' => [
+                'type' => 'INT',
+                'constraint' => 11,
+                'null' => false,
+                'default' => 0
+            ],
+            'competency_percentage' => [
+                'type' => 'DECIMAL',
+                'constraint' => '5,2',
+                'null' => false,
+                'default' => 0.00
+            ],
+            'final_result' => [
+                'type' => 'ENUM',
+                'constraint' => ['kompeten', 'belum_kompeten', 'pending'],
+                'default' => 'pending',
+                'null' => false
+            ],
+            'assessment_date' => [
+                'type' => 'DATE',
+                'null' => true
+            ],
+            'notes' => [
+                'type' => 'TEXT',
+                'null' => true
+            ],
+            'created_at' => [
+                'type' => 'DATETIME',
+                'null' => true
+            ],
+            'updated_at' => [
+                'type' => 'DATETIME',
+                'null' => true
+            ]
+        ]);
+
+        $this->forge->addPrimaryKey('id_result');
+        $this->forge->addForeignKey('id_apl1', 'pengajuan_asesmen', 'id_apl1', 'CASCADE', 'CASCADE');
+        $this->forge->addForeignKey('id_asesi', 'asesi', 'id_asesi', 'CASCADE', 'CASCADE');
+        $this->forge->addForeignKey('id_asesor', 'asesor', 'id_asesor', 'CASCADE', 'CASCADE');
+        $this->forge->addForeignKey('id_skema', 'skema', 'id_skema', 'CASCADE', 'CASCADE');
+        $this->forge->createTable('assessment_results');
+
+        // Create competency_elements table for detailed tracking
+        $this->forge->addField([
+            'id_competency' => [
+                'type' => 'INT',
+                'constraint' => 11,
+                'auto_increment' => true
+            ],
+            'id_result' => [
+                'type' => 'INT',
+                'constraint' => 11,
+                'null' => false
+            ],
+            'id_unit' => [
+                'type' => 'INT',
+                'constraint' => 11,
+                'null' => false
+            ],
+            'id_elemen' => [
+                'type' => 'INT',
+                'constraint' => 11,
+                'null' => false
+            ],
+            'id_subelemen' => [
+                'type' => 'INT',
+                'constraint' => 11,
+                'null' => false
+            ],
+            'is_competent' => [
+                'type' => 'BOOLEAN',
+                'null' => false,
+                'default' => false
+            ],
+            'evidence' => [
+                'type' => 'TEXT',
+                'null' => true
+            ],
+            'assessor_notes' => [
+                'type' => 'TEXT',
+                'null' => true
+            ],
+            'created_at' => [
+                'type' => 'DATETIME',
+                'null' => true
+            ],
+            'updated_at' => [
+                'type' => 'DATETIME',
+                'null' => true
+            ]
+        ]);
+
+        $this->forge->addPrimaryKey('id_competency');
+        $this->forge->addForeignKey('id_result', 'assessment_results', 'id_result', 'CASCADE', 'CASCADE');
+        $this->forge->addForeignKey('id_unit', 'unit', 'id_unit', 'CASCADE', 'CASCADE');
+        $this->forge->addForeignKey('id_elemen', 'elemen', 'id_elemen', 'CASCADE', 'CASCADE');
+        $this->forge->addForeignKey('id_subelemen', 'sub_elemen', 'id_subelemen', 'CASCADE', 'CASCADE');
+        $this->forge->createTable('competency_elements');
+
+        // Add indexes for better performance
+        $this->db->query('CREATE INDEX idx_competency_lookup ON competency_elements(id_result, id_unit, id_elemen)');
+        $this->db->query('CREATE INDEX idx_result_lookup ON assessment_results(id_asesi, id_skema, final_result)');
+    }
+
+    public function down()
+    {
+        $this->forge->dropTable('competency_elements', true);
+        $this->forge->dropTable('assessment_results', true);
+    }
+}

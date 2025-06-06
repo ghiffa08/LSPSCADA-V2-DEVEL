@@ -23,9 +23,8 @@ class UserController extends BaseController
 
     public function profile($idUser)
     {
-
         $syarat = [
-            'id' => $idUser
+            'id_user' => $idUser
         ];
 
         $this->builder->select('users.id as userid, username, email, fullname, name');

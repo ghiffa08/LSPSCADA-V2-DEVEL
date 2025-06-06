@@ -416,7 +416,7 @@
         function deleteKelompokKerja(id) {
             $.ajax({
                 url: `${config.endpoints.delete}/${id}`,
-                type: 'DELETE',
+                type: 'GET',
                 dataType: 'json',
                 data: {
                     '<?= csrf_token() ?>': '<?= csrf_hash() ?>'

@@ -26,7 +26,7 @@ class KelompokKerja extends DataTableController
     }
 
     /**
-     * Save or update tuk data
+     * Save or update Kelompok Kerja data
      */
     public function save(): ResponseInterface
     {

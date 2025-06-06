@@ -68,9 +68,9 @@ class FeedbackAsesiModel extends Model
     protected function applyDataTableJoins($builder)
     {
         return $builder->join('asesi', 'asesi.id_asesi = feedback_asesi.id_asesi')
-            ->join('users as asesi_user', 'asesi_user.id = asesi.user_id')
+            ->join('users as asesi_user', 'asesi_user.id_user = asesi.user_id')
             ->join('skema', 'skema.id_skema = feedback_asesi.id_skema')
-            ->join('users as asesor', 'asesor.id = feedback_asesi.id_asesor');
+            ->join('users as asesor', 'asesor.id_user = feedback_asesi.id_asesor');
     }
 
     /**
@@ -111,9 +111,9 @@ class FeedbackAsesiModel extends Model
 
         // Join tables
         $builder->join('asesi', 'asesi.id_asesi = feedback_asesi.id_asesi');
-        $builder->join('users as asesi_user', 'asesi_user.id = asesi.user_id');
+        $builder->join('users as asesi_user', 'asesi_user.id_user = asesi.user_id');
         $builder->join('skema', 'skema.id_skema = feedback_asesi.id_skema');
-        $builder->join('users as asesor', 'asesor.id = feedback_asesi.id_asesor');
+        $builder->join('users as asesor', 'asesor.id_user = feedback_asesi.id_asesor');
 
         // Filter by feedback ID
         $builder->where('feedback_asesi.id_feedback', $id);

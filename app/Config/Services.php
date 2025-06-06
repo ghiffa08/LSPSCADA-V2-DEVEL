@@ -6,6 +6,9 @@ use CodeIgniter\Config\BaseService;
 use App\Libraries\Sidebar;
 use App\Services\FileUploadInterface;
 use App\Services\FileUploadService;
+use App\Services\FeedbackService;
+use App\Services\QRCodeService;
+use App\Services\PDFService;
 use CodeIgniter\Cache\CacheFactory;
 
 /**
@@ -99,6 +102,57 @@ class Services extends BaseService
         return new Sidebar();
     }
 
+    /**
+     * Return the feedback service
+     *
+     * @param bool $getShared
+     * @return FeedbackService
+     */
+    public static function feedback(bool $getShared = true): FeedbackService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('feedback');
+        }
+
+        return new FeedbackService();
+    }
+
+    /**
+     * Return the QR code service
+     *
+     * @param bool $getShared
+     * @return QRCodeService
+     */
+    public static function qrcode(bool $getShared = true): QRCodeService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('qrcode');
+        }
+
+        return new QRCodeService();
+    }
+
+    /**
+     * Return the PDF service
+     *
+     * @param bool $getShared
+     * @return PDFService
+     */
+    public static function pdf(bool $getShared = true): PDFService
+    {
+        if ($getShared) {
+            return static::getSharedInstance('pdf');
+        }
+
+        return new PDFService();
+    }
+
+    /**
+     * Return file upload service
+     *
+     * @param bool $getShared
+     * @return FileUploadInterface
+     */
     public static function fileUpload(bool $getShared = true): FileUploadInterface
     {
         if ($getShared) {
@@ -106,5 +160,40 @@ class Services extends BaseService
         }
 
         return new FileUploadService();
+    }
+
+    /**
+     * AsesiService factory
+     */
+    public static function AsesiService($getShared = true)
+    {
+        if ($getShared) {
+            return static::getSharedInstance('AsesiService');
+        }
+        $repository = new \App\Repositories\AsesiRepository();
+        $db = \Config\Database::connect();
+        return new \App\Services\AsesiService($repository, $db);
+    }
+
+    /**
+     * ValidationService factory
+     */
+    public static function ValidationService($getShared = true)
+    {
+        if ($getShared) {
+            return static::getSharedInstance('ValidationService');
+        }
+        return new \App\Services\ValidationService();
+    }
+
+    /**
+     * CustomResponseService factory
+     */
+    public static function CustomResponseService($getShared = true)
+    {
+        if ($getShared) {
+            return static::getSharedInstance('CustomResponseService');
+        }
+        return new \App\Services\CustomResponseService();
     }
 }

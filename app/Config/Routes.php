@@ -39,13 +39,19 @@ $routes->group('scan', function ($routes) {
     $routes->get('tanda-tangan-asesor/(:segment)', 'APL2Controller::scan_ttd_asesor/$1');
 });
 
+
+// Google OAuth 
+$routes->get('auth/google', 'OAuthController::google');
+$routes->get('OAuth/proses', 'OAuthController::proses');
+
 // =====================================================
 // ROUTES TERAUTENTIKASI
 // =====================================================
 $routes->group('', ['filter' => 'login'], function ($routes) {
+    // Dashboard router: redirect ke dashboard sesuai role
+    $routes->get('dashboard', 'DashboardRouterController::index');
 
     // Dashboard dan Profil Pengguna
-    $routes->get('dashboard', 'AsesiController::index');
     $routes->get('settings', 'Settings::index');
     $routes->get('profile', 'AsesiController::profile');
 
@@ -57,6 +63,7 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
         $routes->get('feedback/(:num)', 'FeedbackAsesiController::pdf/$1');
         $routes->get('apl1/(:num)', 'APL1Controller::pdf/$1');
         $routes->get('rekaman/(:num)', 'RekamanAsesmenController::pdf/$1');
+        $routes->get('rekaman', 'RekamanAsesmenController::pdf');
         $routes->get('laporan', 'LaporanAsesmenController::pdf');
     });
 
@@ -83,6 +90,7 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
     // Manajemen Admin
     $routes->group('admin', function ($routes) {
         $routes->get('/', 'AdminController::index');
+        $routes->get('dashboard', 'AdminController::dashboard');
         $routes->post('store', 'AdminController::store');
         $routes->post('import', 'AdminController::import');
         $routes->post('update', 'AdminController::update');
@@ -126,6 +134,7 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
     // Manajemen Asesi
     $routes->group('asesi', function ($routes) {
         $routes->get('/', 'AsesiController::index');
+        $routes->get('dashboard', 'AsesiController::dashboard');
         $routes->post('store', 'AsesiController::store');
         $routes->post('import', 'AsesiController::import');
         $routes->post('save', 'AsesiController::save');
@@ -141,6 +150,7 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
     // Manajemen Asesor
     $routes->group('asesor', function ($routes) {
         $routes->get('/', 'AsesorController::index');
+        $routes->get('dashboard', 'AsesorController::dashboard');
         $routes->post('store', 'AsesorController::store');
         $routes->post('update', 'AsesorController::update');
         $routes->post('delete', 'AsesorController::delete');
@@ -237,8 +247,8 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->post('save', 'KelompokKerjaController::save');
             $routes->post('import', 'KelompokKerjaController::import');
             $routes->post('update', 'KelompokKerjaController::update');
-            $routes->delete('delete/(:num)', 'KelompokKerjaController::delete/$1');
-            $routes->post('get-data-table', 'KelompokKerjaController::getDataTable');
+            $routes->delete('delete/(:num)', 'Api\KelompokKerja::delete/$1');
+            $routes->post('get-data-table', 'Api\KelompokKerja::getDataTable');
         });
 
         // TUK (Tempat Uji Kompetensi)
