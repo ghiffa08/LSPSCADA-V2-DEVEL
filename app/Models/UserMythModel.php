@@ -20,7 +20,6 @@ class UserMythModel extends Model
         'email',
         'username',
         'nama_lengkap',
-        'no_telp',
         'password_hash',
         'reset_hash',
         'reset_at',
@@ -30,7 +29,6 @@ class UserMythModel extends Model
         'status_message',
         'active',
         'force_pass_reset',
-        'permissions',
         'google_id'
     ];
     protected $useTimestamps   = true;

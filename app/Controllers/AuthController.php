@@ -7,6 +7,9 @@ use CodeIgniter\Session\Session;
 use Myth\Auth\Config\Auth as AuthConfig;
 use Myth\Auth\Entities\User;
 use Myth\Auth\Models\UserModel;
+use App\Services\Authentication\AuthenticationService;
+use App\DTOs\Authentication\LoginRequest;
+use App\DTOs\Authentication\RegisterRequest;
 
 class AuthController extends Controller
 {
@@ -57,7 +60,6 @@ class AuthController extends Controller
 
         return $this->_render($this->config->views['login'], ['config' => $this->config]);
     }
-
     /**
      * Attempts to verify the user's credentials
      * through a POST request.
@@ -80,23 +82,28 @@ class AuthController extends Controller
         $password = $this->request->getPost('password');
         $remember = (bool) $this->request->getPost('remember');
 
-        // Determine credential type
-        $type = filter_var($login, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+        // Use AuthenticationService for enhanced login
+        $authService = new AuthenticationService();
+        $loginRequest = new LoginRequest(
+            $login,
+            $password,
+            $remember,
+            $this->request->getIPAddress(),
+            (string) $this->request->getUserAgent()
+        );
+        $authResponse = $authService->login($loginRequest);
 
-        // Try to log them in...
-        if (!$this->auth->attempt([$type => $login, 'password' => $password], $remember)) {
-            return redirect()->back()->withInput()->with('error', $this->auth->error() ?? lang('Auth.badAttempt'));
+        if ($authResponse->isSuccess()) {
+            // Session sudah di-handle oleh AuthenticationService
+            return redirect()->to($authResponse->getRedirectUrl() ?: site_url('dashboard'))
+                ->withCookies()
+                ->with('message', $authResponse->getMessage());
+        } else {
+            // Login failed
+            return redirect()->back()
+                ->withInput()
+                ->with('error', $authResponse->getMessage());
         }
-
-        // Is the user being forced to reset their password?
-        if ($this->auth->user()->force_pass_reset === true) {
-            return redirect()->to(route_to('reset-password') . '?token=' . $this->auth->user()->reset_hash)->withCookies();
-        }
-
-        $redirectURL = session('redirect_url') ?? site_url('/dashboard');
-        unset($_SESSION['redirect_url']);
-
-        return redirect()->to($redirectURL)->withCookies()->with('message', lang('Auth.loginSuccess'));
     }
 
     /**
@@ -104,10 +111,11 @@ class AuthController extends Controller
      */
     public function logout()
     {
+        // Best practice: destroy session & clear all auth/session data
         if ($this->auth->check()) {
             $this->auth->logout();
         }
-
+        session()->destroy();
         return redirect()->to(site_url('/'));
     }
 

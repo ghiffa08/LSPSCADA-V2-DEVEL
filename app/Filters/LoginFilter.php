@@ -7,7 +7,7 @@ use CodeIgniter\HTTP\RedirectResponse;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
 
-class LoginFilter extends BaseFilter implements FilterInterface
+class LoginFilter implements FilterInterface
 {
     /**
      * Verifies that a user is logged in, or redirects to login.
@@ -18,18 +18,31 @@ class LoginFilter extends BaseFilter implements FilterInterface
      */
     public function before(RequestInterface $request, $arguments = null)
     {
-        // Make sure this isn't already a Myth\Auth routes.
-        foreach ($this->reservedRoutes as $reservedRoute) {
-            if (url_is(route_to($reservedRoute))) {
+        $authenticate = service('authentication');
+
+        // OAuth routes should not be checked
+        $reservedRoutes = [
+            'login',
+            'register',
+            'forgot',
+            'reset-password',
+            'activate-account',
+            'resend-activate',
+            'auth/google',
+            'OAuth/proses'
+        ];
+
+        // Make sure this isn't already an auth route
+        foreach ($reservedRoutes as $reservedRoute) {
+            if (strpos(current_url(), $reservedRoute) !== false) {
                 return;
             }
         }
 
         // If no user is logged in then send them to the login form.
-        if (! $this->authenticate->check()) {
+        if (!$authenticate->check()) {
             session()->set('redirect_url', current_url());
-
-            return redirect($this->reservedRoutes['login']);
+            return redirect()->to(site_url('login'));
         }
     }
 
@@ -38,7 +51,5 @@ class LoginFilter extends BaseFilter implements FilterInterface
      *
      * @return void
      */
-    public function after(RequestInterface $request, ResponseInterface $response, $arguments = null)
-    {
-    }
+    public function after(RequestInterface $request, ResponseInterface $response, $arguments = null) {}
 }

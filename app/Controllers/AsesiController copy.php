@@ -24,7 +24,6 @@ class AsesiController extends BaseController
     {
         $data = [
             'siteTitle' => 'Dashboard',
-
         ];
 
         return view('asesi/dashboard', $data);

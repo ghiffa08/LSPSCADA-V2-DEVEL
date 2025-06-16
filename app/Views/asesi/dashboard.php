@@ -26,10 +26,10 @@
             </div>
             <div class="card-wrap">
                 <div class="card-header">
-                    <h4>Status</h4>
+                    <h4>Total Pengajuan</h4>
                 </div>
                 <div class="card-body text-primary font-weight-bold">
-                    Aktif
+                    <?= isset($stat['total_pengajuan']) ? $stat['total_pengajuan'] : 0 ?>
                 </div>
             </div>
         </div>
@@ -41,10 +41,10 @@
             </div>
             <div class="card-wrap">
                 <div class="card-header">
-                    <h4>Sertifikasi</h4>
+                    <h4>Selesai</h4>
                 </div>
                 <div class="card-body text-success font-weight-bold">
-                    2 Proses
+                    <?= isset($stat['status']['selesai']) ? $stat['status']['selesai'] : 0 ?> Sertifikasi
                 </div>
             </div>
         </div>
@@ -59,7 +59,7 @@
                     <h4>Menunggu</h4>
                 </div>
                 <div class="card-body text-warning font-weight-bold">
-                    1 Verifikasi
+                    <?= isset($stat['status']['menunggu']) ? $stat['status']['menunggu'] : 0 ?> Verifikasi
                 </div>
             </div>
         </div>
@@ -74,7 +74,31 @@
                     <h4>Dokumen</h4>
                 </div>
                 <div class="card-body text-info font-weight-bold">
-                    5 Tersimpan
+                    <?= isset($stat['dokumen']) ? $stat['dokumen'] : 0 ?> Tersimpan
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Bar -->
+<div class="row mt-4">
+    <div class="col-lg-8">
+        <div class="card card-large-icons shadow">
+            <div class="card-header">
+                <h4><i class="fas fa-clipboard-check mr-2"></i>Progres Sertifikasi</h4>
+            </div>
+            <div class="card-body p-0">
+                <div class="p-4">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <div class="font-weight-bold">Progres Selesai</div>
+                        <div class="text-primary font-weight-bold">
+                            <?= isset($stat['progress']) ? $stat['progress'] : 0 ?>%
+                        </div>
+                    </div>
+                    <div class="progress mb-3" data-height="10" style="height: 10px;">
+                        <div class="progress-bar bg-primary" role="progressbar" data-width="<?= isset($stat['progress']) ? $stat['progress'] : 0 ?>%" aria-valuenow="<?= isset($stat['progress']) ? $stat['progress'] : 0 ?>" aria-valuemin="0" aria-valuemax="100" style="width: <?= isset($stat['progress']) ? $stat['progress'] : 0 ?>%;"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -101,7 +125,7 @@
                         <div class="progress-bar bg-primary" role="progressbar" data-width="50%" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100" style="width: 50%;"></div>
                     </div>
                 </div>
-                
+
                 <div class="activities px-4 pb-4">
                     <div class="activity">
                         <div class="activity-icon bg-success text-white shadow-success">

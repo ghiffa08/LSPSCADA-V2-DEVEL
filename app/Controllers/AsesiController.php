@@ -23,6 +23,8 @@ class AsesiController extends BaseController
 
     public function __construct()
     {
+        helper('auth');
+
         $this->asesiService = service('AsesiService');
         $this->validationService = new ValidationService();
         $this->responseService = service('CustomResponseService');
@@ -34,14 +36,47 @@ class AsesiController extends BaseController
     public function index()
     {
         try {
-            // Example: get asesi by user id
+            // Get asesi by user id
             $result = $this->asesiService->getAsesiByUserId($this->userId);
             if (!$result->success) {
                 return $this->responseService->error($result->message, $result->code, $result->errors);
             }
+            $asesi = $result->data;
+
+            // Ambil statistik nyata dari pengajuan sertifikasi user ini
+            $pengajuanModel = new \App\Models\PengajuanAsesmenModel();
+            $apl1Stats = $pengajuanModel->getAPL1Stats();
+
+            // Ambil data pengajuan user ini
+            $userApl1 = $pengajuanModel->where('id_asesi', $asesi->id_asesi ?? 0)->findAll();
+            $totalPengajuan = count($userApl1);
+            $statusCounts = [
+                'proses' => 0,
+                'menunggu' => 0,
+                'selesai' => 0
+            ];
+            $dokumenCount = 0;
+            $progress = 0;
+            foreach ($userApl1 as $row) {
+                if ($row['status'] === 'pending') $statusCounts['menunggu']++;
+                elseif ($row['status'] === 'approved') $statusCounts['selesai']++;
+                else $statusCounts['proses']++;
+            }
+            // Hitung dokumen dari dokumen_apl1 jika ada
+            $db = \Config\Database::connect();
+            $dokumenCount = $db->table('dokumen_apl1')->whereIn('id_apl1', array_column($userApl1, 'id_apl1'))->countAllResults();
+            // Progress: misal % pengajuan selesai dari total
+            $progress = $totalPengajuan > 0 ? round(($statusCounts['selesai'] / $totalPengajuan) * 100) : 0;
+
             $data = [
                 'siteTitle' => 'Dashboard',
-                'asesi' => $result->data
+                'asesi' => $asesi,
+                'stat' => [
+                    'total_pengajuan' => $totalPengajuan,
+                    'status' => $statusCounts,
+                    'dokumen' => $dokumenCount,
+                    'progress' => $progress
+                ]
             ];
             return view('asesi/dashboard', $data);
         } catch (Exception $e) {
@@ -408,6 +443,10 @@ class AsesiController extends BaseController
         if (!($userEntity instanceof \App\Entities\User ? $userEntity->isAsesi() : (new \App\Entities\User((array)$userEntity))->isAsesi())) {
             return redirect()->to(site_url('/dashboard'));
         }
-        return view('asesi/dashboard');
+
+        $data = [
+            'siteTitle' => 'Dashboard Asesi',
+        ];
+        return view('asesi/dashboard', $data);
     }
 }

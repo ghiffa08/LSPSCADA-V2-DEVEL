@@ -244,6 +244,12 @@ class AdminController extends BaseController
         if (!method_exists($userEntity, 'isAdmin') || !$userEntity->isAdmin()) {
             return redirect()->to(site_url('/dashboard'));
         }
-        return view('admin/dashboard');
+
+        $data = [
+            'siteTitle' => 'Dashboard Admin',
+            'user' => $userEntity,
+            'totalUsers' => $this->usermodel->countAll(),
+        ];
+        return view('admin/dashboard', $data);
     }
 }

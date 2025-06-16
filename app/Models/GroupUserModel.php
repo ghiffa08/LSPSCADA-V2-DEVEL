@@ -82,7 +82,6 @@ class GroupUserModel extends Model
             ->select('users.id as userid, users.username, users.email, users.no_telp, users.fullname, auth_groups.id as groupid, users.fullname as userfullname, auth_groups.name as groupname')
             ->Get()->getResultArray();
     }
-
     /**
      * Get all group names (roles) for a user by user_id
      * @param int|string $userId
@@ -94,7 +93,12 @@ class GroupUserModel extends Model
             ->join('auth_groups', 'auth_groups.id=auth_groups_users.group_id', 'left')
             ->where('auth_groups_users.user_id', $userId)
             ->select('auth_groups.name')
+            ->distinct()
             ->get()->getResultArray();
-        return array_map(fn($row) => $row['name'], $result);
+
+        $roles = array_map(fn($row) => $row['name'], $result);
+
+        // Additional safety: ensure unique roles in case of any edge cases
+        return array_unique($roles);
     }
 }

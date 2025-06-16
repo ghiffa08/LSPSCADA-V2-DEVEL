@@ -33,11 +33,10 @@ class Filters extends BaseFilters
         'cors'          => Cors::class,
         'forcehttps'    => ForceHTTPS::class,
         'pagecache'     => PageCache::class,
-        'performance'   => PerformanceMetrics::class,
-        // myth auth
-        'login'         => \Myth\Auth\Filters\LoginFilter::class,
-        'role'          => \Myth\Auth\Filters\RoleFilter::class,
-        'permission'    => \Myth\Auth\Filters\PermissionFilter::class,
+        'performance'   => PerformanceMetrics::class,        // myth auth - using custom filters
+        'login'         => \App\Filters\LoginFilter::class,
+        'role'          => \App\Filters\RoleFilter::class,
+        'permission'    => \App\Filters\PermissionFilter::class,
     ];
 
     /**

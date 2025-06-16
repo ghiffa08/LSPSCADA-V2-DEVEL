@@ -350,16 +350,14 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
     // Manajemen Menu (dengan filter auth)
     $routes->group('menu', ['filter' => 'auth'], function ($routes) {
         $routes->get('/', 'Menu::index');
-        $routes->get('items/(:num)', 'Menu::items/$1');
-
-        // Group CRUD
-        $routes->match(['get', 'post'], 'create-group', 'Menu::createGroup');
-        $routes->match(['get', 'post'], 'edit-group/(:num)', 'Menu::editGroup/$1');
+        $routes->get('items/(:num)', 'Menu::items/$1');        // Group CRUD
+        $routes->match(['GET', 'POST'], 'create-group', 'Menu::createGroup');
+        $routes->match(['GET', 'POST'], 'edit-group/(:num)', 'Menu::editGroup/$1');
         $routes->get('delete-group/(:num)', 'Menu::deleteGroup/$1');
 
         // Item CRUD
-        $routes->match(['get', 'post'], 'create-item/(:num)', 'Menu::createItem/$1');
-        $routes->match(['get', 'post'], 'edit-item/(:num)', 'Menu::editItem/$1');
+        $routes->match(['GET', 'POST'], 'create-item/(:num)', 'Menu::createItem/$1');
+        $routes->match(['GET', 'POST'], 'edit-item/(:num)', 'Menu::editItem/$1');
         $routes->get('delete-item/(:num)', 'Menu::deleteItem/$1');
         $routes->post('reorder-items', 'Menu::reorderItems');
     });
