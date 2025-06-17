@@ -3,28 +3,26 @@
 namespace App\Controllers\Api;
 
 use Config\Services;
-use App\Models\TUKModel;
 use CodeIgniter\HTTP\ResponseInterface;
 use App\Controllers\Api\DataTableController;
 
 class KelompokKerja extends DataTableController
 {
-
     public function __construct()
     {
         parent::__construct();
 
         $this->model = $this->kelompokKerjaModel;
 
-        // Optional: Define custom column mapping for complex ordering
+        // Column mapping for KelompokKerja DataTable ordering
         $this->columnMap = [
             0 => null, // No ordering for index column
-            1 => 'tuk.nama_tuk',
-            2 => 'tuk.jenis_tuk',
-            3 => null // No ordering for action column
+            1 => 'kelompok_kerja.nama_kelompok',
+            2 => 'skema.nama_skema',
+            3 => 'jumlah_unit', // Count from subquery
+            4 => null // No ordering for action column
         ];
     }
-
     /**
      * Save or update Kelompok Kerja data
      */
@@ -35,32 +33,31 @@ class KelompokKerja extends DataTableController
             return Services::response()->setStatusCode(404);
         }
 
-        $modelName = TUKModel::class;
         $data = $this->request->getPost();
 
         // Format data yang akan disimpan
         $formattedData = [
-            'id_tuk'     => $data['id_tuk'] ?? null,
-            'nama_tuk'   => $data['nama_tuk'],
-            'jenis_tuk'   => $data['jenis_tuk'],
+            'id_kelompok' => $data['id_kelompok'] ?? null,
+            'nama_kelompok' => $data['nama_kelompok'],
+            'id_skema' => $data['id_skema'],
         ];
 
         // Callback sebelum simpan (opsional)
         $beforeSave = function ($data) {
-            // Misalnya, validasi atau manipulasi data
+            // Validasi atau manipulasi data jika diperlukan
             return $data;
         };
 
-        // Callback sesudah simpan (opsional)
+        // Callback sesudah simpan (opsional)  
         $afterSave = function ($data, $id) {
-            // Misalnya, logging atau update tabel lain
+            // Logging atau update tabel lain jika diperlukan
         };
 
         // Simpan data
         $result = $this->dataService->save(
-            $modelName,
+            $this->kelompokKerjaModel,
             $formattedData,
-            'id_tuk',
+            'id_kelompok',
             $beforeSave,
             $afterSave
         );
@@ -68,9 +65,8 @@ class KelompokKerja extends DataTableController
         // Kembalikan response JSON
         return $this->dataService->response($result, $result['code']);
     }
-
     /**
-     * Delete tuk
+     * Delete kelompok kerja
      */
     public function delete($id = null): ResponseInterface
     {
@@ -78,26 +74,26 @@ class KelompokKerja extends DataTableController
             return Services::response()->setStatusCode(404);
         }
 
-        $tukModel = $this->tukModel;
+        $kelompokKerjaModel = $this->kelompokKerjaModel;
 
         // Start transaction
         $db = \Config\Database::connect();
         $db->transStart();
 
         try {
-            $deleted = $tukModel->delete($id);
+            $deleted = $kelompokKerjaModel->delete($id);
 
             $db->transComplete();
 
             if ($deleted) {
                 return $this->dataService->response([
                     'status' => true,
-                    'message' => 'tuk deleted successfully'
+                    'message' => 'Kelompok kerja berhasil dihapus'
                 ]);
             } else {
                 return $this->dataService->response([
                     'status' => false,
-                    'message' => 'Failed to delete tuk'
+                    'message' => 'Gagal menghapus kelompok kerja'
                 ], 400);
             }
         } catch (\Exception $e) {
@@ -105,13 +101,13 @@ class KelompokKerja extends DataTableController
 
             return $this->dataService->response([
                 'status' => false,
-                'message' => 'An error occurred: ' . $e->getMessage()
+                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
             ], 500);
         }
     }
 
     /**
-     * Get tuk by ID (for edit modal)
+     * Get kelompok kerja by ID (for edit modal)
      */
     public function getById($id = null): ResponseInterface
     {
@@ -119,19 +115,19 @@ class KelompokKerja extends DataTableController
             return Services::response()->setStatusCode(404);
         }
 
-        $tukModel = new $this->tukModel;
-        $tuk = $tukModel->find($id);
+        $kelompokKerjaModel = $this->kelompokKerjaModel;
+        $kelompokKerja = $kelompokKerjaModel->find($id);
 
-        if (!$tuk) {
+        if (!$kelompokKerja) {
             return $this->dataService->response([
                 'status' => false,
-                'message' => 'tuk not found'
+                'message' => 'Kelompok kerja tidak ditemukan'
             ], 404);
         }
 
         return $this->dataService->response([
             'status' => true,
-            'data' => $tuk
+            'data' => $kelompokKerja
         ]);
     }
 }

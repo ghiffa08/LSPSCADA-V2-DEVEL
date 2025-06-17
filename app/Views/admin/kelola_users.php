@@ -491,12 +491,119 @@
         }
     }
 
-    $(document).ready(function() {
-        // Initialize DataTable with Server-Side Processing
+    $(document).ready(function() { // Initialize DataTable with optimized configuration for production
         let usersTable = $('#users-table').DataTable({
-            processing: true,
-            serverSide: true,
-            ajax: {
+                processing: true,
+                serverSide: true,
+                deferRender: true,
+                stateSave: true,
+                stateDuration: 300, // 5 minutes
+                ajax: {
+                    url: '<?= site_url('/admin/kelola-users/data') ?>',
+                    type: 'POST',
+                    data: function(d) {
+                        d.role_filter = $('.role-filter.active').data('role') || '';
+                        d[csrf_token_name] = csrf_hash;
+                    },
+                    error: function(xhr, error, thrown) {
+                        console.error('DataTable error:', error);
+                        showAlert('error', 'Gagal memuat data pengguna');
+                    }
+                },
+                columns: [{
+                        data: 0,
+                        name: 'no',
+                        orderable: false,
+                        searchable: false,
+                        width: '5%',
+                        className: 'text-center'
+                    },
+                    {
+                        data: 1,
+                        name: 'username',
+                        width: '15%'
+                    },
+                    {
+                        data: 2,
+                        name: 'nama_lengkap',
+                        width: '20%'
+                    },
+                    {
+                        data: 3,
+                        name: 'email',
+                        width: '20%'
+                    },
+                    {
+                        data: 4,
+                        name: 'roles',
+                        orderable: false,
+                        width: '15%'
+                    },
+                    {
+                        data: 5,
+                        name: 'active',
+                        orderable: false,
+                        width: '10%',
+                        className: 'text-center'
+                    },
+                    {
+                        data: 6,
+                        name: 'created_at',
+                        width: '10%',
+                        className: 'text-center'
+                    },
+                    {
+                        data: 7,
+                        name: 'actions',
+                        orderable: false,
+                        searchable: false,
+                        width: '5%',
+                        className: 'text-center'
+                    }
+                ],
+                pageLength: 25,
+                lengthMenu: [
+                    [10, 25, 50, 100],
+                    [10, 25, 50, 100]
+                ],
+                order: [
+                    [6, 'desc']
+                ], // Order by created_at desc
+                language: {
+                    processing: '<i class="fas fa-spinner fa-spin"></i> Memuat data...',
+                    lengthMenu: 'Tampilkan _MENU_ data per halaman',
+                    zeroRecords: 'Tidak ada data yang ditemukan',
+                    info: 'Menampilkan _START_ sampai _END_ dari _TOTAL_ data',
+                    infoEmpty: 'Menampilkan 0 sampai 0 dari 0 data',
+                    infoFiltered: '(disaring dari _MAX_ total data)',
+                    search: 'Cari:',
+                    paginate: {
+                        first: 'Pertama',
+                        last: 'Terakhir',
+                        next: 'Selanjutnya',
+                        previous: 'Sebelumnya'
+                    }
+                },
+                dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rtip',
+                responsive: true,
+                autoWidth: false,
+                drawCallback: function(settings) {
+                    // Initialize tooltips for new elements
+                    $('[data-toggle="tooltip"]').tooltip();
+
+                    // Add loading states for action buttons
+                    $('.btn').on('click', function() {
+                        let btn = $(this);
+                        if (!btn.hasClass('no-loading')) {
+                            let originalHtml = btn.html();
+                            btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
+
+                            setTimeout(() => {
+                                btn.prop('disabled', false).html(originalHtml);
+                            }, 2000);
+                        }
+                    });
+                }
                 url: '<?= site_url('/api/user-management/get-data-table') ?>',
                 type: 'POST',
                 data: function(d) {
@@ -655,35 +762,35 @@
             }
         });
 
-        // Role filter change event
-        $('.role-filter').on('click', function() {
-            $('.role-filter').removeClass('active');
-            $(this).addClass('active');
-            usersTable.ajax.reload();
-        });
+    // Role filter change event
+    $('.role-filter').on('click', function() {
+        $('.role-filter').removeClass('active');
+        $(this).addClass('active');
+        usersTable.ajax.reload();
+    });
 
-        // View user details
-        $(document).on('click', '.view-user', function() {
-            let userId = $(this).data('id');
+    // View user details
+    $(document).on('click', '.view-user', function() {
+        let userId = $(this).data('id');
 
-            // Show loading in modal
-            $('#user-details-content').html(`
+        // Show loading in modal
+        $('#user-details-content').html(`
                 <div class="text-center">
                     <i class="fas fa-spinner fa-spin fa-2x"></i>
                     <p class="mt-2">Memuat detail pengguna...</p>
                 </div>
             `);
 
-            $('#viewUserModal').modal('show');
+        $('#viewUserModal').modal('show');
 
-            // Load user details
-            $.ajax({
-                url: '<?= site_url('/admin/kelola-users/details/') ?>' + userId,
-                type: 'GET',
-                success: function(response) {
-                    if (response.status === 'success') {
-                        let user = response.data;
-                        let html = `
+        // Load user details
+        $.ajax({
+            url: '<?= site_url('/admin/kelola-users/details/') ?>' + userId,
+            type: 'GET',
+            success: function(response) {
+                if (response.status === 'success') {
+                    let user = response.data;
+                    let html = `
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="card">
@@ -768,355 +875,355 @@
                             ` : ''}
                         `;
 
-                        $('#user-details-content').html(html);
+                    $('#user-details-content').html(html);
 
-                        // Generate role badges
-                        let rolesHtml = '';
-                        if (user.roles_array && user.roles_array.length > 0) {
-                            user.roles_array.forEach(function(role) {
-                                let badgeClass = 'badge-secondary';
-                                switch (role.trim()) {
-                                    case 'Admin':
-                                        badgeClass = 'badge-primary';
-                                        break;
-                                    case 'Asesor':
-                                        badgeClass = 'badge-info';
-                                        break;
-                                    case 'Asesi':
-                                        badgeClass = 'badge-warning';
-                                        break;
-                                }
-                                rolesHtml += '<span class="badge ' + badgeClass + ' mr-1">' + role.trim() + '</span>';
-                            });
-                        } else {
-                            rolesHtml = '<span class="badge badge-secondary">No Role</span>';
-                        }
-                        $('#user-roles-badges').html(rolesHtml);
+                    // Generate role badges
+                    let rolesHtml = '';
+                    if (user.roles_array && user.roles_array.length > 0) {
+                        user.roles_array.forEach(function(role) {
+                            let badgeClass = 'badge-secondary';
+                            switch (role.trim()) {
+                                case 'Admin':
+                                    badgeClass = 'badge-primary';
+                                    break;
+                                case 'Asesor':
+                                    badgeClass = 'badge-info';
+                                    break;
+                                case 'Asesi':
+                                    badgeClass = 'badge-warning';
+                                    break;
+                            }
+                            rolesHtml += '<span class="badge ' + badgeClass + ' mr-1">' + role.trim() + '</span>';
+                        });
                     } else {
-                        $('#user-details-content').html(`
+                        rolesHtml = '<span class="badge badge-secondary">No Role</span>';
+                    }
+                    $('#user-roles-badges').html(rolesHtml);
+                } else {
+                    $('#user-details-content').html(`
                             <div class="alert alert-danger">
                                 <i class="fas fa-exclamation-circle"></i>
                                 ${response.message || 'Gagal memuat detail pengguna'}
                             </div>
                         `);
-                    }
-                },
-                error: function() {
-                    $('#user-details-content').html(`
+                }
+            },
+            error: function() {
+                $('#user-details-content').html(`
                         <div class="alert alert-danger">
                             <i class="fas fa-exclamation-circle"></i>
                             Terjadi kesalahan saat memuat detail pengguna
                         </div>
                     `);
-                }
-            });
+            }
         });
+    });
 
-        // Edit user
-        $(document).on('click', '.edit-user', function() {
-            let userId = $(this).data('id');
+    // Edit user
+    $(document).on('click', '.edit-user', function() {
+        let userId = $(this).data('id');
 
-            // Load user details for editing
-            $.ajax({
-                url: '<?= site_url('/api/user-management/get-user-by-id') ?>',
-                type: 'GET',
-                data: {
-                    id: userId
-                },
-                success: function(response) {
-                    if (response.status && response.data) {
-                        let user = response.data;
+        // Load user details for editing
+        $.ajax({
+            url: '<?= site_url('/api/user-management/get-user-by-id') ?>',
+            type: 'GET',
+            data: {
+                id: userId
+            },
+            success: function(response) {
+                if (response.status && response.data) {
+                    let user = response.data;
 
-                        $('#edit-user-id').val(user.id);
-                        $('#edit-username').val(user.username);
-                        $('#edit-nama-lengkap').val(user.nama_lengkap || '');
-                        $('#edit-email').val(user.email || '');
-                        $('#edit-roles').val(user.roles || 'No Role');
+                    $('#edit-user-id').val(user.id);
+                    $('#edit-username').val(user.username);
+                    $('#edit-nama-lengkap').val(user.nama_lengkap || '');
+                    $('#edit-email').val(user.email || '');
+                    $('#edit-roles').val(user.roles || 'No Role');
 
-                        $('#editUserModal').modal('show');
-                    } else {
-                        showAlert('error', 'Gagal memuat data pengguna');
-                    }
-                },
-                error: function() {
-                    showAlert('error', 'Terjadi kesalahan saat memuat data');
+                    $('#editUserModal').modal('show');
+                } else {
+                    showAlert('error', 'Gagal memuat data pengguna');
                 }
-            });
+            },
+            error: function() {
+                showAlert('error', 'Terjadi kesalahan saat memuat data');
+            }
         });
+    });
 
-        // Handle edit user form submission
-        $('#editUserForm').on('submit', function(e) {
-            e.preventDefault();
+    // Handle edit user form submission
+    $('#editUserForm').on('submit', function(e) {
+        e.preventDefault();
 
-            let formData = $(this).serialize();
-            let submitBtn = $(this).find('button[type="submit"]');
-            let originalText = submitBtn.html();
+        let formData = $(this).serialize();
+        let submitBtn = $(this).find('button[type="submit"]');
+        let originalText = submitBtn.html();
 
-            // Disable submit button and show loading
-            submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Menyimpan...');
+        // Disable submit button and show loading
+        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Menyimpan...');
 
-            $.ajax({
-                url: '<?= site_url('/api/user-management/update-profile') ?>',
-                type: 'POST',
-                data: formData,
-                success: function(response) {
-                    if (response.status) {
-                        $('#editUserModal').modal('hide');
-                        showAlert('success', response.message);
-                        usersTable.ajax.reload(null, false); // Reload table without resetting pagination
-                    } else {
-                        showAlert('error', response.message);
-                    }
-                },
-                error: function() {
-                    showAlert('error', 'Terjadi kesalahan saat menyimpan data');
-                },
-                complete: function() {
-                    // Re-enable submit button
-                    submitBtn.prop('disabled', false).html(originalText);
+        $.ajax({
+            url: '<?= site_url('/api/user-management/update-profile') ?>',
+            type: 'POST',
+            data: formData,
+            success: function(response) {
+                if (response.status) {
+                    $('#editUserModal').modal('hide');
+                    showAlert('success', response.message);
+                    usersTable.ajax.reload(null, false); // Reload table without resetting pagination
+                } else {
+                    showAlert('error', response.message);
                 }
-            });
+            },
+            error: function() {
+                showAlert('error', 'Terjadi kesalahan saat menyimpan data');
+            },
+            complete: function() {
+                // Re-enable submit button
+                submitBtn.prop('disabled', false).html(originalText);
+            }
         });
+    });
 
-        // Toggle user status
-        $(document).on('click', '.toggle-status', function() {
-            let userId = $(this).data('id');
-            let newStatus = $(this).data('status');
-            let button = $(this);
-            let statusText = newStatus == 1 ? 'mengaktifkan' : 'menonaktifkan';
+    // Toggle user status
+    $(document).on('click', '.toggle-status', function() {
+        let userId = $(this).data('id');
+        let newStatus = $(this).data('status');
+        let button = $(this);
+        let statusText = newStatus == 1 ? 'mengaktifkan' : 'menonaktifkan';
 
-            Swal.fire({
-                title: 'Konfirmasi',
-                text: 'Apakah Anda yakin ingin ' + statusText + ' pengguna ini?',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'Ya, ' + statusText + '!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // Disable button and show loading
-                    button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
+        Swal.fire({
+            title: 'Konfirmasi',
+            text: 'Apakah Anda yakin ingin ' + statusText + ' pengguna ini?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Ya, ' + statusText + '!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Disable button and show loading
+                button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
 
-                    $.ajax({
-                        url: '<?= site_url('/api/user-management/update-status') ?>',
-                        type: 'POST',
-                        data: {
-                            id: userId,
-                            status: newStatus
-                        },
-                        success: function(response) {
-                            if (response.status) {
-                                showAlert('success', response.message);
-                                usersTable.ajax.reload(null, false); // Reload table without resetting pagination
-                                loadStatistics(); // Reload statistics
-                            } else {
-                                showAlert('error', response.message);
-                            }
-                        },
-                        error: function() {
-                            showAlert('error', 'Terjadi kesalahan saat mengubah status');
-                        },
-                        complete: function() {
-                            // Re-enable button
-                            button.prop('disabled', false);
+                $.ajax({
+                    url: '<?= site_url('/api/user-management/update-status') ?>',
+                    type: 'POST',
+                    data: {
+                        id: userId,
+                        status: newStatus
+                    },
+                    success: function(response) {
+                        if (response.status) {
+                            showAlert('success', response.message);
+                            usersTable.ajax.reload(null, false); // Reload table without resetting pagination
+                            loadStatistics(); // Reload statistics
+                        } else {
+                            showAlert('error', response.message);
                         }
-                    });
-                }
-            });
-        }); // Soft delete user
-        $(document).on('click', '.delete-user', function() {
-            let userId = $(this).data('id');
-            let userName = $(this).data('name');
-            let button = $(this);
+                    },
+                    error: function() {
+                        showAlert('error', 'Terjadi kesalahan saat mengubah status');
+                    },
+                    complete: function() {
+                        // Re-enable button
+                        button.prop('disabled', false);
+                    }
+                });
+            }
+        });
+    }); // Soft delete user
+    $(document).on('click', '.delete-user', function() {
+        let userId = $(this).data('id');
+        let userName = $(this).data('name');
+        let button = $(this);
 
-            Swal.fire({
-                title: 'Konfirmasi Pengarsipan',
-                text: `Apakah Anda yakin ingin mengarsipkan pengguna "${userName}"? Data akan disembunyikan namun dapat dipulihkan kembali.`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Ya, Arsipkan!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // Disable button and show loading
-                    button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
+        Swal.fire({
+            title: 'Konfirmasi Pengarsipan',
+            text: `Apakah Anda yakin ingin mengarsipkan pengguna "${userName}"? Data akan disembunyikan namun dapat dipulihkan kembali.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Ya, Arsipkan!',
+            cancelButtonText: 'Batal'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Disable button and show loading
+                button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
 
-                    $.ajax({
-                        url: '<?= site_url('/admin/kelola-users/delete') ?>/' + userId,
-                        type: 'POST',
-                        data: {
-                            '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
-                        },
-                        success: function(response) {
-                            if (response.status) {
-                                showAlert('success', response.message);
-                                usersTable.ajax.reload(null, false);
-                                loadStatistics();
-                            } else {
-                                showAlert('error', response.message);
-                            }
-                        },
-                        error: function() {
-                            showAlert('error', 'Terjadi kesalahan saat mengarsipkan pengguna');
-                        },
-                        complete: function() {
-                            button.prop('disabled', false).html('<i class="fas fa-trash"></i>');
+                $.ajax({
+                    url: '<?= site_url('/admin/kelola-users/delete') ?>/' + userId,
+                    type: 'POST',
+                    data: {
+                        '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
+                    },
+                    success: function(response) {
+                        if (response.status) {
+                            showAlert('success', response.message);
+                            usersTable.ajax.reload(null, false);
+                            loadStatistics();
+                        } else {
+                            showAlert('error', response.message);
                         }
-                    });
-                }
-            });
-        });
-
-        // Handle add admin form submission
-        $('#addAdminForm').on('submit', function(e) {
-            e.preventDefault();
-
-            // Validate password confirmation
-            let password = $('#admin-password').val();
-            let passwordConfirm = $('#admin-password-confirm').val();
-
-            if (password !== passwordConfirm) {
-                showAlert('error', 'Password dan konfirmasi password tidak cocok');
-                return;
-            }
-
-            if (password.length < 8) {
-                showAlert('error', 'Password minimal 8 karakter');
-                return;
-            }
-
-            let formData = $(this).serialize();
-            let submitBtn = $(this).find('button[type="submit"]');
-            let originalText = submitBtn.html();
-
-            submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Membuat...');
-
-            $.ajax({
-                url: '<?= site_url('/api/user-management/create-admin-user') ?>',
-                type: 'POST',
-                data: formData,
-                success: function(response) {
-                    if (response.status) {
-                        $('#addAdminModal').modal('hide');
-                        $('#addAdminForm')[0].reset();
-                        showAlert('success', response.message);
-                        usersTable.ajax.reload(null, false);
-                        loadStatistics();
-                    } else {
-                        showAlert('error', response.message);
+                    },
+                    error: function() {
+                        showAlert('error', 'Terjadi kesalahan saat mengarsipkan pengguna');
+                    },
+                    complete: function() {
+                        button.prop('disabled', false).html('<i class="fas fa-trash"></i>');
                     }
-                },
-                error: function() {
-                    showAlert('error', 'Terjadi kesalahan saat membuat admin');
-                },
-                complete: function() {
-                    submitBtn.prop('disabled', false).html(originalText);
-                }
-            });
-        });
-
-        // Handle add asesor form submission
-        $('#addAsesorForm').on('submit', function(e) {
-            e.preventDefault();
-
-            // Validate password confirmation
-            let password = $('#asesor-password').val();
-            let passwordConfirm = $('#asesor-password-confirm').val();
-
-            if (password !== passwordConfirm) {
-                showAlert('error', 'Password dan konfirmasi password tidak cocok');
-                return;
+                });
             }
-
-            if (password.length < 8) {
-                showAlert('error', 'Password minimal 8 karakter');
-                return;
-            }
-
-            let formData = $(this).serialize();
-            let submitBtn = $(this).find('button[type="submit"]');
-            let originalText = submitBtn.html();
-
-            submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Membuat...');
-
-            $.ajax({
-                url: '<?= site_url('/api/user-management/create-asesor-user') ?>',
-                type: 'POST',
-                data: formData,
-                success: function(response) {
-                    if (response.status) {
-                        $('#addAsesorModal').modal('hide');
-                        $('#addAsesorForm')[0].reset();
-                        showAlert('success', response.message);
-                        usersTable.ajax.reload(null, false);
-                        loadStatistics();
-                    } else {
-                        showAlert('error', response.message);
-                    }
-                },
-                error: function() {
-                    showAlert('error', 'Terjadi kesalahan saat membuat asesor');
-                },
-                complete: function() {
-                    submitBtn.prop('disabled', false).html(originalText);
-                }
-            });
         });
+    });
 
-        // Load statistics via AJAX
-        function loadStatistics() {
-            $.ajax({
-                url: '<?= site_url('/api/user-management/get-user-statistics-with-deleted') ?>',
-                type: 'GET',
-                success: function(response) {
-                    if (response.status && response.data) {
-                        let stats = response.data;
-                        $('#stat-admin').text(stats.role_admin || 0);
-                        $('#stat-asesor').text(stats.role_asesor || 0);
-                        $('#stat-asesi').text(stats.role_asesi || 0);
-                        $('#stat-deleted').text(stats.deleted_users || 0);
+    // Handle add admin form submission
+    $('#addAdminForm').on('submit', function(e) {
+        e.preventDefault();
 
-                        // Use the backend's total_users field instead of summing role counts
-                        // This prevents double-counting users with multiple roles
-                        $('#stat-total').text(stats.total_users || 0);
-                    } else {
-                        // Show error in stats cards
-                        $('#stat-admin, #stat-asesor, #stat-asesi, #stat-total, #stat-deleted').text('-');
-                    }
-                },
-                error: function() {
+        // Validate password confirmation
+        let password = $('#admin-password').val();
+        let passwordConfirm = $('#admin-password-confirm').val();
+
+        if (password !== passwordConfirm) {
+            showAlert('error', 'Password dan konfirmasi password tidak cocok');
+            return;
+        }
+
+        if (password.length < 8) {
+            showAlert('error', 'Password minimal 8 karakter');
+            return;
+        }
+
+        let formData = $(this).serialize();
+        let submitBtn = $(this).find('button[type="submit"]');
+        let originalText = submitBtn.html();
+
+        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Membuat...');
+
+        $.ajax({
+            url: '<?= site_url('/api/user-management/create-admin-user') ?>',
+            type: 'POST',
+            data: formData,
+            success: function(response) {
+                if (response.status) {
+                    $('#addAdminModal').modal('hide');
+                    $('#addAdminForm')[0].reset();
+                    showAlert('success', response.message);
+                    usersTable.ajax.reload(null, false);
+                    loadStatistics();
+                } else {
+                    showAlert('error', response.message);
+                }
+            },
+            error: function() {
+                showAlert('error', 'Terjadi kesalahan saat membuat admin');
+            },
+            complete: function() {
+                submitBtn.prop('disabled', false).html(originalText);
+            }
+        });
+    });
+
+    // Handle add asesor form submission
+    $('#addAsesorForm').on('submit', function(e) {
+        e.preventDefault();
+
+        // Validate password confirmation
+        let password = $('#asesor-password').val();
+        let passwordConfirm = $('#asesor-password-confirm').val();
+
+        if (password !== passwordConfirm) {
+            showAlert('error', 'Password dan konfirmasi password tidak cocok');
+            return;
+        }
+
+        if (password.length < 8) {
+            showAlert('error', 'Password minimal 8 karakter');
+            return;
+        }
+
+        let formData = $(this).serialize();
+        let submitBtn = $(this).find('button[type="submit"]');
+        let originalText = submitBtn.html();
+
+        submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Membuat...');
+
+        $.ajax({
+            url: '<?= site_url('/api/user-management/create-asesor-user') ?>',
+            type: 'POST',
+            data: formData,
+            success: function(response) {
+                if (response.status) {
+                    $('#addAsesorModal').modal('hide');
+                    $('#addAsesorForm')[0].reset();
+                    showAlert('success', response.message);
+                    usersTable.ajax.reload(null, false);
+                    loadStatistics();
+                } else {
+                    showAlert('error', response.message);
+                }
+            },
+            error: function() {
+                showAlert('error', 'Terjadi kesalahan saat membuat asesor');
+            },
+            complete: function() {
+                submitBtn.prop('disabled', false).html(originalText);
+            }
+        });
+    });
+
+    // Load statistics via AJAX
+    function loadStatistics() {
+        $.ajax({
+            url: '<?= site_url('/api/user-management/get-user-statistics-with-deleted') ?>',
+            type: 'GET',
+            success: function(response) {
+                if (response.status && response.data) {
+                    let stats = response.data;
+                    $('#stat-admin').text(stats.role_admin || 0);
+                    $('#stat-asesor').text(stats.role_asesor || 0);
+                    $('#stat-asesi').text(stats.role_asesi || 0);
+                    $('#stat-deleted').text(stats.deleted_users || 0);
+
+                    // Use the backend's total_users field instead of summing role counts
+                    // This prevents double-counting users with multiple roles
+                    $('#stat-total').text(stats.total_users || 0);
+                } else {
+                    // Show error in stats cards
                     $('#stat-admin, #stat-asesor, #stat-asesi, #stat-total, #stat-deleted').text('-');
                 }
-            });
-        }
+            },
+            error: function() {
+                $('#stat-admin, #stat-asesor, #stat-asesi, #stat-total, #stat-deleted').text('-');
+            }
+        });
+    }
 
-        // Helper function to show alerts using SweetAlert2
-        function showAlert(type, message) {
-            let icon = type === 'success' ? 'success' : 'error';
-            let title = type === 'success' ? 'Berhasil!' : 'Error!';
+    // Helper function to show alerts using SweetAlert2
+    function showAlert(type, message) {
+        let icon = type === 'success' ? 'success' : 'error';
+        let title = type === 'success' ? 'Berhasil!' : 'Error!';
 
-            Swal.fire({
-                icon: icon,
-                title: title,
-                text: message,
-                timer: type === 'success' ? 3000 : undefined,
-                showConfirmButton: type !== 'success',
-                timerProgressBar: true,
-                toast: true,
-                position: 'top-end',
-                showCloseButton: true
-            });
-        }
+        Swal.fire({
+            icon: icon,
+            title: title,
+            text: message,
+            timer: type === 'success' ? 3000 : undefined,
+            showConfirmButton: type !== 'success',
+            timerProgressBar: true,
+            toast: true,
+            position: 'top-end',
+            showCloseButton: true
+        });
+    }
 
-        // Load statistics on page load
-        loadStatistics();
+    // Load statistics on page load
+    loadStatistics();
 
-        // Initialize tooltips
-        $('[data-toggle="tooltip"]').tooltip();
+    // Initialize tooltips
+    $('[data-toggle="tooltip"]').tooltip();
     });
 </script>
 <?= $this->endSection() ?>

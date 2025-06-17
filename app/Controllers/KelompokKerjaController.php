@@ -22,6 +22,9 @@ class KelompokKerjaController extends DataTableController
     public function __construct()
     {
         parent::__construct();
+
+        helper('auth');
+
         $this->db = Database::connect();
 
         $this->model = $this->kelompokKerjaModel;
