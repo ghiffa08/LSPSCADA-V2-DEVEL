@@ -20,7 +20,6 @@ class AsesiController extends BaseController
     private $dependent;
     private $usermodel;
     private int $userId;
-
     public function __construct()
     {
         helper('auth');
@@ -30,7 +29,9 @@ class AsesiController extends BaseController
         $this->responseService = service('CustomResponseService');
         $this->dependent = new \App\Models\DynamicDependent();
         $this->usermodel = new \App\Models\UserMythModel();
-        $this->userId = user()->id ?? 0;
+
+        // Get user ID using Myth/Auth helper with fallback
+        $this->userId = user() ? user()->id : 0;
     }
 
     public function index()

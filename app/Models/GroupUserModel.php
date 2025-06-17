@@ -53,24 +53,22 @@ class GroupUserModel extends Model
             ->select('users.id as userid, users.username, auth_groups.id as groupid, users.fullname as userfullname, auth_groups.name as groupname, auth_groups_users.id as groupuserid')
             ->Get()->getResultArray();
     }
-
     public function getAsesors()
     {
         return $this->db->table('auth_groups_users')
             ->join('auth_groups', 'auth_groups.id=auth_groups_users.group_id', 'left')
             ->join('users', 'users.id=auth_groups_users.user_id', 'left')
             ->where('auth_groups.name', 'Asesor')
-            ->select('users.id as userid, users.username, users.email, users.no_telp, users.fullname, auth_groups.id as groupid, users.fullname as userfullname, auth_groups.name as groupname')
+            ->select('users.id as userid, users.username, users.email, users.nama_lengkap, auth_groups.id as groupid, users.nama_lengkap as userfullname, auth_groups.name as groupname')
             ->Get()->getResultArray();
     }
-
     public function getAsesi()
     {
         return $this->db->table('auth_groups_users')
             ->join('auth_groups', 'auth_groups.id=auth_groups_users.group_id', 'left')
             ->join('users', 'users.id=auth_groups_users.user_id', 'left')
             ->where('auth_groups.name', 'Asesi')
-            ->select('users.id as userid, users.username, users.email, users.no_telp, users.fullname, auth_groups.id as groupid, users.fullname as userfullname, auth_groups.name as groupname')
+            ->select('users.id as userid, users.username, users.email, users.nama_lengkap, auth_groups.id as groupid, users.nama_lengkap as userfullname, auth_groups.name as groupname')
             ->Get()->getResultArray();
     }
     public function getAdmin()
@@ -79,7 +77,7 @@ class GroupUserModel extends Model
             ->join('auth_groups', 'auth_groups.id=auth_groups_users.group_id', 'left')
             ->join('users', 'users.id=auth_groups_users.user_id', 'left')
             ->where('auth_groups.name', 'Admin')
-            ->select('users.id as userid, users.username, users.email, users.no_telp, users.fullname, auth_groups.id as groupid, users.fullname as userfullname, auth_groups.name as groupname')
+            ->select('users.id as userid, users.username, users.email, users.nama_lengkap, auth_groups.id as groupid, users.nama_lengkap as userfullname, auth_groups.name as groupname')
             ->Get()->getResultArray();
     }
     /**

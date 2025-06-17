@@ -28,15 +28,9 @@
                                 <label for="username"><?= lang('Auth.username') ?></label>
                                 <input type="text" class="form-control <?php if (session('errors.username')) : ?>is-invalid<?php endif ?>" name="username" placeholder="<?= lang('Auth.username') ?>" value="<?= old('username') ?>">
                             </div>
-
                             <div class="form-group">
                                 <label class="form-label">Nama Lengkap</label>
-                                <input type="text" name="fullname" class="form-control <?php if (session('errors.fullname')) : ?>is-invalid<?php endif ?>" placeholder="Nama Lengkap Asesor" value="<?= old('fullname') ?>">
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label">No Handphone</label>
-                                <input type="text" name="no_telp" class="form-control <?php if (session('errors.no_telp')) : ?>is-invalid<?php endif ?>" placeholder="Nomor Handphone/Whatsapp" value="<?= old('no_telp') ?>">
+                                <input type="text" name="nama_lengkap" class="form-control <?php if (session('errors.nama_lengkap')) : ?>is-invalid<?php endif ?>" placeholder="Nama Lengkap" value="<?= old('nama_lengkap') ?>">
                             </div>
 
                             <div class="form-group">

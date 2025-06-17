@@ -97,6 +97,35 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
         $routes->post('delete', 'AdminController::delete');
         $routes->get('profile/(:any)', 'UserController::profile/$1');
 
+        // Kelola Users Routes       
+        $routes->get('kelola-users', 'KelolaUsersController::index');
+        $routes->get('deleted-users', 'KelolaUsersController::deletedUsers');
+        $routes->post('kelola-users/data', 'KelolaUsersController::getUsersData');
+        $routes->post('deleted-users/data-table', 'KelolaUsersController::getDeletedUsersData');
+        $routes->get('kelola-users/stats', 'KelolaUsersController::getStats');
+        $routes->get('deleted-users/get-statistics', 'KelolaUsersController::getDeletedStats');
+        $routes->get('kelola-users/details/(:num)', 'KelolaUsersController::getUserDetails/$1');
+        $routes->get('deleted-users/details/(:num)', 'KelolaUsersController::getUserArchivedDetails/$1');
+        $routes->post('kelola-users/update', 'KelolaUsersController::updateUser');
+        $routes->post('kelola-users/toggle-status/(:num)', 'KelolaUsersController::toggleStatus/$1');
+        $routes->post('kelola-users/delete/(:num)', 'KelolaUsersController::deleteUser/$1');
+        $routes->post('kelola-users/restore/(:num)', 'KelolaUsersController::restoreUser/$1');
+        $routes->post('deleted-users/restore/(:num)', 'KelolaUsersController::restoreUser/$1');
+        $routes->post('deleted-users/permanent-delete/(:num)', 'KelolaUsersController::permanentlyDeleteUser/$1');
+        $routes->post('deleted-users/batch-action', 'KelolaUsersController::batchAction');
+
+        // User Management Routes
+        $routes->group('users', function ($routes) {
+            $routes->get('/', 'UserManagementController::index');
+            $routes->get('create', 'UserManagementController::create');
+            $routes->post('store', 'UserManagementController::store');
+            $routes->get('edit/(:num)', 'UserManagementController::edit/$1');
+            $routes->post('update/(:num)', 'UserManagementController::update/$1');
+            $routes->post('delete/(:num)', 'UserManagementController::delete/$1');
+            $routes->post('toggle-status/(:num)', 'UserManagementController::toggleStatus/$1');
+            $routes->get('stats', 'UserManagementController::stats');
+        });
+
         // Observasi Admin
         $routes->group('observasi', function ($routes) {
             $routes->get('/', 'CeklistObservasiController::index');
@@ -361,6 +390,14 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
         $routes->get('delete-item/(:num)', 'Menu::deleteItem/$1');
         $routes->post('reorder-items', 'Menu::reorderItems');
     });
+
+    // Profile Routes
+    $routes->group('profile', ['filter' => 'login'], function ($routes) {
+        $routes->get('/', 'ProfileController::index');
+        $routes->post('update', 'ProfileController::update');
+        $routes->post('change-password', 'ProfileController::changePassword');
+        $routes->post('upload-avatar', 'ProfileController::uploadAvatar');
+    });
 });
 
 // =====================================================
@@ -411,3 +448,20 @@ $routes->group('api', function ($routes) {
 // ROUTE TESTING (SEMENTARA)
 // =====================================================
 $routes->get('tes', 'TesController::index');
+
+// =====================================================
+// API ROUTTES
+// =====================================================
+$routes->group('api', function ($routes) {
+    // User Management API
+    $routes->group('user-management', function ($routes) {
+        $routes->post('get-data-table', 'Api\UserManagement::getDataTable');
+        $routes->get('get-user-statistics-with-deleted', 'Api\UserManagement::getUserStatisticsWithDeleted');
+        $routes->post('get-user-by-id', 'Api\UserManagement::getUserByIdPost');
+        $routes->post('create-admin-user', 'Api\UserManagement::createAdminUser');
+        $routes->post('create-asesor-user', 'Api\UserManagement::createAsesorUser');
+        $routes->post('update-profile', 'Api\UserManagement::updateProfile');
+        $routes->post('update-status', 'Api\UserManagement::updateStatus');
+        $routes->post('soft-delete-user', 'Api\UserManagement::softDeleteUser');
+    });
+});

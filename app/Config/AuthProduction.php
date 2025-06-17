@@ -6,7 +6,7 @@ use CodeIgniter\Config\BaseConfig;
 
 /**
  * Production Authentication Configuration
- * Optimized settings for production environment
+ * Optimized settings for production environment with enhanced security
  */
 class AuthProduction extends BaseConfig
 {
@@ -14,49 +14,61 @@ class AuthProduction extends BaseConfig
      * Authentication settings optimized for production
      */
     public array $authSettings = [
-        // Reduce debug logging in production
+        // Disable debug logging in production
         'enableDebugLogging' => false,
-        
-        // Session settings
-        'sessionTimeout' => 3600, // 1 hour
+
+        // Session settings - Enhanced security
+        'sessionTimeout' => 7200, // 2 hours for better security
         'sessionRegenerateId' => true,
         'sessionRegenerateDestroy' => true,
-        
+        'sessionSecure' => true, // HTTPS only
+        'sessionHttpOnly' => true, // Prevent XSS
+        'sessionSameSite' => 'Strict', // CSRF protection
+
+        // Authentication security
+        'requireActivation' => true,   // Require email activation
+        'allowRegistration' => false,  // Disable public registration
+        'allowRemembering' => false,   // Disable "remember me" 
+        'minimumPasswordLength' => 8,  // Strong passwords
+
+        // Rate limiting - Strict for production
+        'maxLoginAttempts' => 3,
+        'lockoutTime' => 900, // 15 minutes
+        'enableThrottling' => true,
+
         // Security settings
         'enableCSRF' => true,
         'csrfTokenName' => 'csrf_token',
         'csrfHeaderName' => 'X-CSRF-TOKEN',
-        
-        // Rate limiting
         'enableRateLimit' => true,
         'maxLoginAttempts' => 5,
         'rateLimitWindow' => 900, // 15 minutes
-        
+
         // Password settings
         'passwordMinLength' => 8,
         'passwordRequireSpecialChar' => true,
         'passwordRequireNumber' => true,
-        
+
         // OAuth settings
         'oauthTimeout' => 300, // 5 minutes
         'oauthCacheEnabled' => true,
-        
+
         // Database optimization
         'enableQueryCaching' => true,
         'cacheAuthQueries' => true,
         'cacheTimeout' => 300,
-        
+
         // Error handling
         'logAuthErrors' => true,
         'logSuccessfulLogins' => false, // Reduce log volume
         'logFailedLogins' => true,
-        
+
         // Cleanup settings
         'cleanupExpiredSessions' => true,
         'cleanupExpiredTokens' => true,
         'cleanupInterval' => 3600, // 1 hour
     ];
-    
+
     /**
      * Error messages for production (user-friendly)
      */
@@ -70,7 +82,7 @@ class AuthProduction extends BaseConfig
         'validation_error' => 'Please check your input and try again.',
         'rate_limit_exceeded' => 'Too many attempts. Please try again later.',
     ];
-    
+
     /**
      * Production redirect URLs
      */
@@ -83,7 +95,7 @@ class AuthProduction extends BaseConfig
         'password_reset' => '/reset-password',
         'account_locked' => '/login',
     ];
-    
+
     /**
      * Logging levels for production
      */

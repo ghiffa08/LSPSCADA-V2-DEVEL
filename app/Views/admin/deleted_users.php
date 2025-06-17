@@ -410,33 +410,27 @@ Arsip Pengguna
 
             // Show loading in modal
             $('#archived-user-details-content').html('<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Memuat data...</div>');
-            $('#viewArchivedUserModal').modal('show');
-
-            // Load user details via AJAX
+            $('#viewArchivedUserModal').modal('show'); // Load user details via AJAX
             $.ajax({
-                url: '<?= site_url('/admin/deleted-users/get-user-details') ?>',
+                url: '<?= site_url('/admin/deleted-users/details') ?>/' + userId,
                 type: 'GET',
-                data: {
-                    id: userId
-                },
                 success: function(response) {
-                    if (response.status && response.data) {
+                    if (response.status === 'success' && response.data) {
                         let user = response.data;
                         let rolesHtml = '';
 
-                        // Handle roles
-                        if (user.roles && user.roles !== 'No Role') {
-                            let rolesArray = Array.isArray(user.roles) ? user.roles : user.roles.split(', ');
-                            rolesArray.forEach(function(role) {
+                        // Handle multiple roles
+                        if (user.roles_array && user.roles_array.length > 0) {
+                            user.roles_array.forEach(function(role) {
                                 let badgeClass = 'badge-secondary';
                                 let icon = 'fas fa-user';
-                                switch (role.toLowerCase()) {
+                                switch (role.trim().toLowerCase()) {
                                     case 'admin':
                                         badgeClass = 'badge-primary';
                                         icon = 'fas fa-user-shield';
                                         break;
                                     case 'asesor':
-                                        badgeClass = 'badge-danger';
+                                        badgeClass = 'badge-info';
                                         icon = 'fas fa-user-tie';
                                         break;
                                     case 'asesi':
@@ -444,8 +438,27 @@ Arsip Pengguna
                                         icon = 'fas fa-user-graduate';
                                         break;
                                 }
-                                rolesHtml += '<span class="badge ' + badgeClass + ' mr-1"><i class="' + icon + '"></i> ' + role + '</span>';
+                                rolesHtml += '<span class="badge ' + badgeClass + ' mr-1"><i class="' + icon + '"></i> ' + role.trim() + '</span>';
                             });
+                        } else if (user.roles && user.roles !== 'No Role') {
+                            // Fallback for single role string
+                            let badgeClass = 'badge-secondary';
+                            let icon = 'fas fa-user';
+                            switch (user.roles.toLowerCase()) {
+                                case 'admin':
+                                    badgeClass = 'badge-primary';
+                                    icon = 'fas fa-user-shield';
+                                    break;
+                                case 'asesor':
+                                    badgeClass = 'badge-info';
+                                    icon = 'fas fa-user-tie';
+                                    break;
+                                case 'asesi':
+                                    badgeClass = 'badge-warning';
+                                    icon = 'fas fa-user-graduate';
+                                    break;
+                            }
+                            rolesHtml = '<span class="badge ' + badgeClass + ' mr-1"><i class="' + icon + '"></i> ' + user.roles + '</span>';
                         } else {
                             rolesHtml = '<span class="badge badge-secondary">No Role</span>';
                         }
@@ -549,12 +562,11 @@ Arsip Pengguna
                 if (result.isConfirmed) {
                     // Disable button and show loading
                     button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
-
                     $.ajax({
-                        url: '<?= site_url('/admin/deleted-users/restore') ?>',
+                        url: '<?= site_url('/admin/deleted-users/restore') ?>/' + userId,
                         type: 'POST',
                         data: {
-                            id: userId
+                            <?= csrf_token() ?>: '<?= csrf_hash() ?>'
                         },
                         success: function(response) {
                             if (response.status) {
@@ -604,9 +616,8 @@ Arsip Pengguna
                 if (result.isConfirmed) {
                     // Disable button and show loading
                     button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
-
                     $.ajax({
-                        url: '<?= site_url('/admin/deleted-users/permanent-delete') ?>',
+                        url: '<?= site_url('/admin/deleted-users/permanent-delete/') ?>' + userId,
                         type: 'POST',
                         data: {
                             id: userId
@@ -632,9 +643,7 @@ Arsip Pengguna
                     });
                 }
             });
-        });
-
-        // Bulk restore
+        }); // Bulk restore
         $('#bulk-restore-btn').on('click', function() {
             let selectedIds = $('.user-checkbox:checked').map(function() {
                 return $(this).val();
@@ -658,12 +667,13 @@ Arsip Pengguna
                 if (result.isConfirmed) {
                     let button = $(this);
                     button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Memulihkan...');
-
                     $.ajax({
-                        url: '<?= site_url('/admin/deleted-users/bulk-restore') ?>',
+                        url: '<?= site_url('/admin/deleted-users/batch-action') ?>',
                         type: 'POST',
                         data: {
-                            ids: selectedIds
+                            action: 'restore',
+                            user_ids: selectedIds,
+                            <?= csrf_token() ?>: '<?= csrf_hash() ?>'
                         },
                         success: function(response) {
                             if (response.status) {
@@ -671,6 +681,8 @@ Arsip Pengguna
                                 deletedUsersTable.ajax.reload(null, false);
                                 loadStatistics();
                                 $('#checkbox-all').prop('checked', false);
+                                $('.user-checkbox').prop('checked', false);
+                                updateBulkActionButtons();
                             } else {
                                 showAlert('error', response.message);
                             }
@@ -717,12 +729,13 @@ Arsip Pengguna
                 if (result.isConfirmed) {
                     let button = $(this);
                     button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Menghapus...');
-
                     $.ajax({
-                        url: '<?= site_url('/admin/deleted-users/bulk-permanent-delete') ?>',
+                        url: '<?= site_url('/admin/deleted-users/batch-action') ?>',
                         type: 'POST',
                         data: {
-                            ids: selectedIds
+                            action: 'permanent_delete',
+                            user_ids: selectedIds,
+                            <?= csrf_token() ?>: '<?= csrf_hash() ?>'
                         },
                         success: function(response) {
                             if (response.status) {
@@ -730,6 +743,8 @@ Arsip Pengguna
                                 deletedUsersTable.ajax.reload(null, false);
                                 loadStatistics();
                                 $('#checkbox-all').prop('checked', false);
+                                $('.user-checkbox').prop('checked', false);
+                                updateBulkActionButtons();
                             } else {
                                 showAlert('error', response.message);
                             }

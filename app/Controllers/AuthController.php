@@ -151,9 +151,7 @@ class AuthController extends Controller
             return redirect()->back()->withInput()->with('error', lang('Auth.registerDisabled'));
         }
 
-        $users = model(UserModel::class);
-
-        // Validate basics first since some password rules rely on these fields
+        $users = model(UserModel::class);        // Validate basics first since some password rules rely on these fields
         $rules = config('Validation')->registrationRules ?? [
             $rules = [
                 'username' => [
@@ -176,15 +174,8 @@ class AuthController extends Controller
                         'is_unique' => 'Kolom {field} sudah terdaftar. Silakan pilih username lain.',
                     ],
                 ],
-                'fullname'  => [
-                    'label' => "Email",
-                    'rules' =>  'required',
-                    'errors' => [
-                        'required' => 'Kolom {field} harus diisi.',
-                    ],
-                ],
-                'no_telp'    => [
-                    'label' => "Email",
+                'nama_lengkap'  => [
+                    'label' => "Nama Lengkap",
                     'rules' =>  'required',
                     'errors' => [
                         'required' => 'Kolom {field} harus diisi.',

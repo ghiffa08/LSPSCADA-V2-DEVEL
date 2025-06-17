@@ -141,6 +141,46 @@ class UserManagement extends DataTableController
     }
 
     /**
+     * Get user by ID (POST method alias)
+     */
+    public function getUserByIdPost(): ResponseInterface
+    {
+        if (!$this->request->isAJAX()) {
+            return Services::response()->setStatusCode(404);
+        }
+
+        $id = $this->request->getPost('id');
+
+        if (!$id) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => false,
+                'message' => 'User ID is required'
+            ]);
+        }
+
+        try {
+            $user = $this->model->getUserById($id);
+
+            if (!$user) {
+                return $this->response->setStatusCode(404)->setJSON([
+                    'status' => false,
+                    'message' => 'User not found'
+                ]);
+            }
+
+            return $this->response->setJSON([
+                'status' => true,
+                'data' => $user
+            ]);
+        } catch (\Exception $e) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => false,
+                'message' => 'Error fetching user: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
      * Update user status (activate/deactivate)
      */
     public function updateUserStatus(): ResponseInterface
@@ -238,6 +278,22 @@ class UserManagement extends DataTableController
     }
 
     /**
+     * Update user profile (alias method)
+     */
+    public function updateProfile(): ResponseInterface
+    {
+        return $this->updateUserProfile();
+    }
+
+    /**
+     * Update user status (alias method)
+     */
+    public function updateStatus(): ResponseInterface
+    {
+        return $this->updateUserStatus();
+    }
+
+    /**
      * Override getDataTable to handle role filter
      */
     public function getDataTable(): ResponseInterface
@@ -278,7 +334,6 @@ class UserManagement extends DataTableController
             'data' => $result['data']
         ]);
     }
-
     /**
      * Soft delete user
      */
@@ -298,12 +353,20 @@ class UserManagement extends DataTableController
         }
 
         try {
+            // Don't allow deleting own account
+            if ($id == user()->id) {
+                return $this->response->setJSON([
+                    'status' => false,
+                    'message' => 'Tidak dapat menghapus akun sendiri'
+                ]);
+            }
+
             $deleted = $this->model->softDeleteUser($id);
 
             if ($deleted) {
                 return $this->response->setJSON([
                     'status' => true,
-                    'message' => 'User deleted successfully'
+                    'message' => 'User berhasil diarsipkan'
                 ]);
             } else {
                 return $this->response->setStatusCode(400)->setJSON([
@@ -514,5 +577,115 @@ class UserManagement extends DataTableController
                 'message' => 'Error changing user role: ' . $e->getMessage()
             ]);
         }
+    }
+
+    /**
+     * Validation helper for user data
+     */
+    protected function validateUserData(array $data, ?int $userId = null): array
+    {
+        $rules = [
+            'username' => [
+                'label' => 'Username',
+                'rules' => $userId
+                    ? "required|alpha_numeric_space|min_length[3]|max_length[30]|is_unique[users.username,id,{$userId}]"
+                    : 'required|alpha_numeric_space|min_length[3]|max_length[30]|is_unique[users.username]',
+                'errors' => [
+                    'required' => '{field} harus diisi.',
+                    'alpha_numeric_space' => '{field} hanya boleh berisi huruf, angka, dan spasi.',
+                    'min_length' => '{field} minimal {param} karakter.',
+                    'max_length' => '{field} maksimal {param} karakter.',
+                    'is_unique' => '{field} sudah digunakan.'
+                ]
+            ],
+            'email' => [
+                'label' => 'Email',
+                'rules' => $userId
+                    ? "required|valid_email|is_unique[users.email,id,{$userId}]"
+                    : 'required|valid_email|is_unique[users.email]',
+                'errors' => [
+                    'required' => '{field} harus diisi.',
+                    'valid_email' => '{field} harus berformat valid.',
+                    'is_unique' => '{field} sudah digunakan.'
+                ]
+            ],
+            'nama_lengkap' => [
+                'label' => 'Nama Lengkap',
+                'rules' => 'required|min_length[3]|max_length[100]',
+                'errors' => [
+                    'required' => '{field} harus diisi.',
+                    'min_length' => '{field} minimal {param} karakter.',
+                    'max_length' => '{field} maksimal {param} karakter.'
+                ]
+            ]
+        ];
+
+        if (isset($data['password']) && !empty($data['password'])) {
+            $rules['password'] = [
+                'label' => 'Password',
+                'rules' => 'required|min_length[8]|strong_password',
+                'errors' => [
+                    'required' => '{field} harus diisi.',
+                    'min_length' => '{field} minimal {param} karakter.',
+                    'strong_password' => '{field} harus mengandung huruf besar, huruf kecil, angka, dan karakter khusus.'
+                ]
+            ];
+
+            $rules['pass_confirm'] = [
+                'label' => 'Konfirmasi Password',
+                'rules' => 'required|matches[password]',
+                'errors' => [
+                    'required' => '{field} harus diisi.',
+                    'matches' => '{field} harus sama dengan password.'
+                ]
+            ];
+        }
+
+        return $rules;
+    }
+
+    /**
+     * Log user activity
+     */
+    protected function logUserActivity(string $action, int $userId, array $details = []): void
+    {
+        $currentUser = service('AuthenticationService')->getCurrentUser();
+        $adminId = $currentUser ? $currentUser->id : 'system';
+
+        $logData = [
+            'action' => $action,
+            'target_user_id' => $userId,
+            'admin_id' => $adminId,
+            'details' => json_encode($details),
+            'timestamp' => date('Y-m-d H:i:s')
+        ];
+
+        log_message('info', "User Management: {$action} - User ID: {$userId} by Admin ID: {$adminId}");
+    }
+
+    /**
+     * Enhanced error response
+     */
+    protected function errorResponse(string $message, array $errors = [], int $statusCode = 400): ResponseInterface
+    {
+        return $this->response->setStatusCode($statusCode)->setJSON([
+            'status' => 'error',
+            'message' => $message,
+            'errors' => $errors,
+            'timestamp' => date('c')
+        ]);
+    }
+
+    /**
+     * Enhanced success response
+     */
+    protected function successResponse(string $message, array $data = []): ResponseInterface
+    {
+        return $this->response->setJSON([
+            'status' => 'success',
+            'message' => $message,
+            'data' => $data,
+            'timestamp' => date('c')
+        ]);
     }
 }

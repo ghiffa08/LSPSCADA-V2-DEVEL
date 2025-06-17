@@ -30,7 +30,7 @@ class Session extends BaseConfig
      *
      * The session cookie name, must contain only [0-9a-z_-] characters
      */
-    public string $cookieName = 'ci_session';
+    public string $cookieName = 'lsp_scada_session';
 
     /**
      * --------------------------------------------------------------------------
@@ -39,8 +39,9 @@ class Session extends BaseConfig
      *
      * The number of SECONDS you want the session to last.
      * Setting to 0 (zero) means expire when the browser is closed.
+     * For production: 8 hours (28800 seconds)
      */
-    public int $expiration = 7200;
+    public int $expiration = 28800;
 
     /**
      * --------------------------------------------------------------------------
@@ -65,11 +66,12 @@ class Session extends BaseConfig
      * --------------------------------------------------------------------------
      *
      * Whether to match the user's IP address when reading the session data.
+     * For production security: enabled
      *
      * WARNING: If you're using the database driver, don't forget to update
      *          your session table's PRIMARY KEY when changing this setting.
      */
-    public bool $matchIP = false;
+    public bool $matchIP = true;
 
     /**
      * --------------------------------------------------------------------------
@@ -77,6 +79,7 @@ class Session extends BaseConfig
      * --------------------------------------------------------------------------
      *
      * How many seconds between CI regenerating the session ID.
+     * For production security: more frequent regeneration
      */
     public int $timeToUpdate = 300;
 
@@ -86,10 +89,9 @@ class Session extends BaseConfig
      * --------------------------------------------------------------------------
      *
      * Whether to destroy session data associated with the old session ID
-     * when auto-regenerating the session ID. When set to FALSE, the data
-     * will be later deleted by the garbage collector.
+     * when auto-regenerating the session ID. For production security: enabled
      */
-    public bool $regenerateDestroy = false;
+    public bool $regenerateDestroy = true;
 
     /**
      * --------------------------------------------------------------------------

@@ -47,14 +47,11 @@ class AdminController extends BaseController
 
         return view('dashboard/kelola_admin', $data);
     }
-
     public function store()
     {
-
         $users = model(UserModel::class);
 
         // Validate basics first since some password rules rely on these fields
-        // config('Validation')->registrationRules ?? 
         $rules = [
             'username' => [
                 'label' => "Username",
@@ -73,24 +70,16 @@ class AdminController extends BaseController
                 'errors' => [
                     'required' => 'Kolom {field} harus diisi.',
                     'valid_email' => 'Format {field} harus valid',
-                    'is_unique' => 'Kolom {field} sudah terdaftar. Silakan pilih username lain.',
+                    'is_unique' => 'Kolom {field} sudah terdaftar. Silakan pilih email lain.',
                 ],
             ],
-            'fullname'  => [
-                'label' => "Email",
+            'nama_lengkap'  => [
+                'label' => "Nama Lengkap",
                 'rules' =>  'required',
                 'errors' => [
                     'required' => 'Kolom {field} harus diisi.',
                 ],
             ],
-            'no_telp'    => [
-                'label' => "Email",
-                'rules' =>  'required',
-                'errors' => [
-                    'required' => 'Kolom {field} harus diisi.',
-                ],
-            ],
-
         ];
 
         if (!$this->validate($rules)) {
@@ -148,23 +137,23 @@ class AdminController extends BaseController
             }
 
             // Success!
-            session()->setFlashdata('pesan', 'Admin "' . $this->request->getVar('fullname') . '" Berhasil ditambahkan, Silahkan Cek Email untuk validasi akun!');
+            session()->setFlashdata('pesan', 'Admin "' . $this->request->getVar('nama_lengkap') . '" Berhasil ditambahkan, Silahkan Cek Email untuk validasi akun!');
             return redirect()->to('/admin');
         }
 
         // Success!
-        session()->setFlashdata('pesan', 'Admin "' . $this->request->getVar('fullname') . '" Berhasil ditambahkan, Silahkan Cek Email untuk validasi akun!');
+        session()->setFlashdata('pesan', 'Admin "' . $this->request->getVar('nama_lengkap') . '" Berhasil ditambahkan, Silahkan Cek Email untuk validasi akun!');
         return redirect()->to('/admin');
     }
-
     public function update()
     {
         $rules = [
             'edit_email' => [
                 'label' => "Email",
-                'rules' => 'required',
+                'rules' => 'required|valid_email',
                 'errors' => [
                     'required' => 'Kolom {field} harus diisi.',
+                    'valid_email' => 'Format {field} harus valid',
                 ],
             ],
             'edit_username' => [
@@ -174,55 +163,37 @@ class AdminController extends BaseController
                     'required' => 'Kolom {field} harus diisi.',
                 ],
             ],
-            'edit_fullname' => [
+            'edit_nama_lengkap' => [
                 'label' => "Nama Lengkap",
                 'rules' => 'required',
                 'errors' => [
                     'required' => 'Kolom {field} harus diisi.',
                 ],
             ],
-            'edit_no_hp' => [
-                'rules' => 'required|numeric',
-                'errors' => [
-                    'required' => 'Kolom nomor HP harus diisi.',
-                    'numeric' => 'Kolom nomor HP harus berupa angka.',
-                ],
-            ],
-            'edit_tanda_tangan' => [
-                'label' => 'Tanda Tangan',
-                'rules' => 'uploaded[edit_tanda_tangan]|max_size[edit_tanda_tangan,2048]|mime_in[edit_tanda_tangan,image/jpg,image/jpeg,image/png]',
-                'errors' => [
-                    'uploaded' => 'Harus upload {field} *',
-                    'max_size' => 'File maksimal 2MB *',
-                    'mime_in' => 'File harus berupa gambar / foto'
-                ],
-            ],
-            // tambahkan aturan validasi lainnya sesuai kebutuhan
         ];
 
         if (!$this->validate($rules)) {
             session()->setFlashdata('warning', 'Periksa kembali, terdapat beberapa kesalahan yang perlu diperbaiki.');
-            session()->setFlashdata('modal_id', 'editAdminModal-' . $this->request->getVar('edit_id')); // Tetapkan id modal dalam flash dat
+            session()->setFlashdata('modal_id', 'editAdminModal-' . $this->request->getVar('edit_id'));
 
             return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
         }
 
-        $file_tanda_tangan = $this->request->getFile('edit_tanda_tangan');
-        $nama_tanda_tangan = $file_tanda_tangan->getRandomName();
-        $file_tanda_tangan->move('upload/tanda tangan', $nama_tanda_tangan);
-
         $data = [
             'email' => $this->request->getVar('edit_email'),
             'username' => $this->request->getVar('edit_username'),
-            'nama_lengkap' => $this->request->getVar('edit_fullname'),
-            'no_telp' => $this->request->getVar('edit_no_hp'),
-            'tanda_tangan' => $nama_tanda_tangan,
+            'nama_lengkap' => $this->request->getVar('edit_nama_lengkap'),
         ];
+
+        // Handle password update if provided
+        if ($this->request->getVar('edit_password')) {
+            $data['password_hash'] = password_hash($this->request->getVar('edit_password'), PASSWORD_DEFAULT);
+        }
 
         // Lakukan simpan user dengan data di atas
         $this->usermodel->update($this->request->getVar('edit_id'), $data);
 
-        session()->setFlashdata('pesan', 'Admin "' . $this->request->getVar('edit_fullname') . '" berhasil diupdate.');
+        session()->setFlashdata('pesan', 'Admin "' . $this->request->getVar('edit_nama_lengkap') . '" berhasil diupdate.');
         return redirect()->to('/admin');
     }
 

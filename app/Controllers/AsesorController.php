@@ -54,14 +54,11 @@ class AsesorController extends BaseController
         return view('dashboard/kelola_asesor', $data);
         // dd($data);
     }
-
     public function store()
     {
-
         $users = model(UserModel::class);
 
         // Validate basics first since some password rules rely on these fields
-        // config('Validation')->registrationRules ?? 
         $rules = [
             'username' => [
                 'label' => "Username",
@@ -80,18 +77,11 @@ class AsesorController extends BaseController
                 'errors' => [
                     'required' => 'Kolom {field} harus diisi.',
                     'valid_email' => 'Format {field} harus valid',
-                    'is_unique' => 'Kolom {field} sudah terdaftar. Silakan pilih username lain.',
+                    'is_unique' => 'Kolom {field} sudah terdaftar. Silakan pilih email lain.',
                 ],
             ],
-            'fullname'  => [
+            'nama_lengkap'  => [
                 'label' => "Nama Lengkap",
-                'rules' =>  'required',
-                'errors' => [
-                    'required' => 'Kolom {field} harus diisi.',
-                ],
-            ],
-            'no_telp'    => [
-                'label' => "Nomor Handphone",
                 'rules' =>  'required',
                 'errors' => [
                     'required' => 'Kolom {field} harus diisi.',
@@ -151,26 +141,24 @@ class AsesorController extends BaseController
 
             if (!$sent) {
                 return redirect()->back()->withInput()->with('error', $activator->error() ?? lang('Auth.unknownError'));
-            }
-
-            // Success!
-            session()->setFlashdata('pesan', 'Asesor Berhasil ditambahkan, Silahkan Cek Email untuk validasi akun!');
+            }            // Success!
+            session()->setFlashdata('pesan', 'Asesor "' . $this->request->getVar('nama_lengkap') . '" Berhasil ditambahkan, Silahkan Cek Email untuk validasi akun!');
             return redirect()->to('/asesor');
         }
 
         // Success!
-        session()->setFlashdata('pesan', 'Asesor Berhasil ditambahkan, Silahkan Cek Email untuk validasi akun!');
+        session()->setFlashdata('pesan', 'Asesor "' . $this->request->getVar('nama_lengkap') . '" Berhasil ditambahkan!');
         return redirect()->to('/asesor');
     }
-
     public function update()
     {
         $rules = [
             'edit_email' => [
                 'label' => "Email",
-                'rules' => 'required',
+                'rules' => 'required|valid_email',
                 'errors' => [
                     'required' => 'Kolom {field} harus diisi.',
+                    'valid_email' => 'Format {field} harus valid',
                 ],
             ],
             'edit_username' => [
@@ -180,26 +168,18 @@ class AsesorController extends BaseController
                     'required' => 'Kolom {field} harus diisi.',
                 ],
             ],
-            'edit_fullname' => [
+            'edit_nama_lengkap' => [
                 'label' => "Nama Lengkap",
                 'rules' => 'required',
                 'errors' => [
                     'required' => 'Kolom {field} harus diisi.',
                 ],
             ],
-            'edit_no_hp' => [
-                'rules' => 'required|numeric',
-                'errors' => [
-                    'required' => 'Kolom nomor HP harus diisi.',
-                    'numeric' => 'Kolom nomor HP harus berupa angka.',
-                ],
-            ],
-            // tambahkan aturan validasi lainnya sesuai kebutuhan
         ];
 
         if (!$this->validate($rules)) {
             session()->setFlashdata('warning', 'Periksa kembali, terdapat beberapa kesalahan yang perlu diperbaiki.');
-            session()->setFlashdata('modal_id', 'editAsesorModal-' . $this->request->getVar('edit_id')); // Tetapkan id modal dalam flash dat
+            session()->setFlashdata('modal_id', 'editAsesorModal-' . $this->request->getVar('edit_id'));
 
             return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
         }
@@ -207,14 +187,16 @@ class AsesorController extends BaseController
         $data = [
             'email' => $this->request->getVar('edit_email'),
             'username' => $this->request->getVar('edit_username'),
-            'fullname' => $this->request->getVar('edit_fullname'),
-            'no_telp' => $this->request->getVar('edit_no_hp'),
+            'nama_lengkap' => $this->request->getVar('edit_nama_lengkap'),
         ];
 
-        // Lakukan simpan user dengan data di atas
+        // Handle password update if provided
+        if ($this->request->getVar('edit_password')) {
+            $data['password_hash'] = password_hash($this->request->getVar('edit_password'), PASSWORD_DEFAULT);
+        }        // Lakukan simpan user dengan data di atas
         $this->userModel->update($this->request->getVar('edit_id'), $data);
 
-        session()->setFlashdata('pesan', 'User berhasil diupdate');
+        session()->setFlashdata('pesan', 'Asesor "' . $this->request->getVar('edit_nama_lengkap') . '" berhasil diupdate.');
         return redirect()->to('/asesor');
     }
 

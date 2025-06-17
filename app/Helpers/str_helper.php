@@ -18,6 +18,10 @@ if (!function_exists('format_uppercase_label')) {
 
 function getInitials($name)
 {
+    if ($name === null || $name === '') {
+        return '';
+    }
+
     $words = explode(' ', strtoupper(trim($name)));
     return ($words[0][0] ?? '') . ($words[1][0] ?? '');
 }

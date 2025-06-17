@@ -13,24 +13,34 @@ class DashboardRouterController extends Controller
     {
         $this->authService = new AuthenticationService();
     }
+
+    /**
+     * Log debug messages only in development environment
+     */
+    private function debugLog(string $message): void
+    {
+        if (ENVIRONMENT === 'development') {
+            log_message('debug', $message);
+        }
+    }
     public function index()
     {
-        log_message('debug', '[DashboardRouter] Starting dashboard routing');
+        $this->debugLog('[DashboardRouter] Starting dashboard routing');
 
         // Check if user is authenticated
         if (!$this->authService->isAuthenticated()) {
-            log_message('debug', '[DashboardRouter] User not authenticated, redirecting to login');
+            $this->debugLog('[DashboardRouter] User not authenticated, redirecting to login');
             return redirect()->to(site_url('login'));
         }
 
         // Get current user
         $user = $this->authService->getCurrentUser();
         if (!$user) {
-            log_message('debug', '[DashboardRouter] Could not get current user, redirecting to login');
+            $this->debugLog('[DashboardRouter] Could not get current user, redirecting to login');
             return redirect()->to(site_url('login'));
         }
 
-        log_message('debug', '[DashboardRouter] Got current user: ID=' . $user->id . ', Email=' . ($user->email ?? 'N/A'));
+        $this->debugLog('[DashboardRouter] Got current user: ID=' . $user->id . ', Email=' . ($user->email ?? 'N/A'));
 
         // Ensure user is instance of our User entity
         if (!($user instanceof \App\Entities\User)) {
@@ -38,22 +48,21 @@ class DashboardRouterController extends Controller
         }
 
         // Check role methods and redirect
-        try {
-            // Role-based redirection with priority order
+        try {            // Role-based redirection with priority order
             if ($user->isAdmin()) {
-                log_message('debug', '[DashboardRouter] Redirecting admin to admin/dashboard');
+                $this->debugLog('[DashboardRouter] Redirecting admin to admin/dashboard');
                 return redirect()->to(site_url('admin/dashboard'));
             }
             if ($user->isAsesor()) {
-                log_message('debug', '[DashboardRouter] Redirecting asesor to asesor/dashboard');
+                $this->debugLog('[DashboardRouter] Redirecting asesor to asesor/dashboard');
                 return redirect()->to(site_url('asesor/dashboard'));
             }
             if ($user->isAsesi()) {
-                log_message('debug', '[DashboardRouter] Redirecting asesi to asesi/dashboard');
+                $this->debugLog('[DashboardRouter] Redirecting asesi to asesi/dashboard');
                 return redirect()->to(site_url('asesi/dashboard'));
             }
 
-            log_message('debug', '[DashboardRouter] No specific role found, redirecting to home');
+            $this->debugLog('[DashboardRouter] No specific role found, redirecting to home');
             // If no specific role matches, redirect to home
             return redirect()->to(site_url('/'));
         } catch (\Exception $e) {

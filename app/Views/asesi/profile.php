@@ -51,13 +51,14 @@
         <div class="row">
             <div class="form-group mb-3 col-12 col-md-4">
                 <label class="form-label">Email<span class="text-danger">*</span></label>
-                <input type="text" class="form-control" value="<?= user()->email ?>" readonly>
-                <input type="hidden" name="email" value="<?= user()->email ?>">
+                <input type="text" class="form-control" value="<?= user()->email ?>" readonly> <input type="hidden" name="email" value="<?= user()->email ?>">
             </div>
+            <!-- 
             <div class="form-group mb-3 col-12 col-md-4">
                 <label class="form-label">Nomor Handphone<span class="text-danger">*</span></label>
                 <input type="number" class="form-control" name="no_telp" value="<?= user()->no_telp ?>">
             </div>
+            -->
             <div class="form-group mb-3 col-12 col-md-4">
                 <label class="form-label">Nomor Telpon</label>
                 <input type="number" class="form-control <?php if (session('errors.telpon_rumah')) : ?>is-invalid<?php endif ?>"

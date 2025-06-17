@@ -667,117 +667,147 @@
             let userId = $(this).data('id');
 
             // Show loading in modal
-            $('#user-details-content').html('<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Memuat data...</div>');
+            $('#user-details-content').html(`
+                <div class="text-center">
+                    <i class="fas fa-spinner fa-spin fa-2x"></i>
+                    <p class="mt-2">Memuat detail pengguna...</p>
+                </div>
+            `);
+
             $('#viewUserModal').modal('show');
 
-            // Load user details via AJAX
+            // Load user details
             $.ajax({
-                url: '<?= site_url('/api/user-management/get-user-by-id') ?>',
+                url: '<?= site_url('/admin/kelola-users/details/') ?>' + userId,
                 type: 'GET',
-                data: {
-                    id: userId
-                },
                 success: function(response) {
-                    if (response.status && response.data) {
+                    if (response.status === 'success') {
                         let user = response.data;
-                        let rolesHtml = '';
+                        let html = `
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h6 class="mb-0"><i class="fas fa-user"></i> Informasi Dasar</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <table class="table table-sm table-borderless">
+                                                <tr>
+                                                    <td><strong>ID:</strong></td>
+                                                    <td>${user.id}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Username:</strong></td>
+                                                    <td>${user.username || '-'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Email:</strong></td>
+                                                    <td>${user.email}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Nama Lengkap:</strong></td>
+                                                    <td>${user.nama_lengkap || '-'}</td>
+                                                </tr>                                                <tr>
+                                                    <td><strong>Role:</strong></td>
+                                                    <td>
+                                                        <div id="user-roles-badges"></div>
+                                                    </td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Status:</strong></td>
+                                                    <td>
+                                                        ${user.active == 1 
+                                                            ? '<span class="badge badge-success">Aktif</span>' 
+                                                            : '<span class="badge badge-danger">Nonaktif</span>'
+                                                        }
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h6 class="mb-0"><i class="fas fa-calendar"></i> Informasi Waktu</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <table class="table table-sm table-borderless">
+                                                <tr>
+                                                    <td><strong>Dibuat:</strong></td>
+                                                    <td>${user.created_at ? new Date(user.created_at).toLocaleString('id-ID') : '-'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Diupdate:</strong></td>
+                                                    <td>${user.updated_at ? new Date(user.updated_at).toLocaleString('id-ID') : '-'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Login Terakhir:</strong></td>
+                                                    <td>${user.last_login ? new Date(user.last_login).toLocaleString('id-ID') : 'Belum pernah login'}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td><strong>Email Terverifikasi:</strong></td>
+                                                    <td>
+                                                        ${user.activate_hash 
+                                                            ? '<span class="badge badge-warning">Belum Terverifikasi</span>' 
+                                                            : '<span class="badge badge-success">Terverifikasi</span>'
+                                                        }
+                                                    </td>
+                                                </tr>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            ${user.reset_hash ? `
+                                <div class="alert alert-warning mt-3">
+                                    <i class="fas fa-exclamation-triangle"></i>
+                                    <strong>Perhatian:</strong> User ini memiliki token reset password yang aktif.
+                                </div>
+                            ` : ''}
+                        `;
 
-                        // Handle roles - check if it's a string or array
-                        if (user.roles && user.roles !== 'No Role') {
-                            let rolesArray = Array.isArray(user.roles) ? user.roles : user.roles.split(', ');
-                            rolesArray.forEach(function(role) {
+                        $('#user-details-content').html(html);
+
+                        // Generate role badges
+                        let rolesHtml = '';
+                        if (user.roles_array && user.roles_array.length > 0) {
+                            user.roles_array.forEach(function(role) {
                                 let badgeClass = 'badge-secondary';
-                                let icon = 'fas fa-user';
-                                switch (role.toLowerCase()) {
-                                    case 'admin':
+                                switch (role.trim()) {
+                                    case 'Admin':
                                         badgeClass = 'badge-primary';
-                                        icon = 'fas fa-user-shield';
                                         break;
-                                    case 'asesor':
-                                        badgeClass = 'badge-danger';
-                                        icon = 'fas fa-user-tie';
+                                    case 'Asesor':
+                                        badgeClass = 'badge-info';
                                         break;
-                                    case 'asesi':
+                                    case 'Asesi':
                                         badgeClass = 'badge-warning';
-                                        icon = 'fas fa-user-graduate';
                                         break;
                                 }
-                                rolesHtml += '<span class="badge ' + badgeClass + ' mr-1"><i class="' + icon + '"></i> ' + role + '</span>';
+                                rolesHtml += '<span class="badge ' + badgeClass + ' mr-1">' + role.trim() + '</span>';
                             });
                         } else {
                             rolesHtml = '<span class="badge badge-secondary">No Role</span>';
                         }
-
-                        let userDetailsHtml = `
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h4><i class="fas fa-info-circle"></i> Informasi Dasar</h4>
-                                    </div>
-                                    <div class="card-body">
-                                        <table class="table table-borderless">
-                                            <tr>
-                                                <td><strong><i class="fas fa-hashtag"></i> ID:</strong></td>
-                                                <td>${user.id}</td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong><i class="fas fa-user"></i> Username:</strong></td>
-                                                <td><div class="badge badge-light">${user.username}</div></td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong><i class="fas fa-id-card"></i> Nama:</strong></td>
-                                                <td>${user.nama_lengkap || '-'}</td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong><i class="fas fa-envelope"></i> Email:</strong></td>
-                                                <td>${user.email || '-'}</td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong><i class="fas fa-toggle-on"></i> Status:</strong></td>
-                                                <td>${user.active == 1 ? '<span class="badge badge-success"><i class="fas fa-check-circle"></i> Aktif</span>' : '<span class="badge badge-danger"><i class="fas fa-times-circle"></i> Tidak Aktif</span>'}</td>
-                                            </tr>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="card">
-                                    <div class="card-header">
-                                        <h4><i class="fas fa-clock"></i> Informasi Waktu</h4>
-                                    </div>
-                                    <div class="card-body">
-                                        <table class="table table-borderless">
-                                            <tr>
-                                                <td><strong><i class="fas fa-user-tag"></i> Role:</strong></td>
-                                                <td>${rolesHtml}</td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong><i class="fas fa-calendar-plus"></i> Dibuat:</strong></td>
-                                                <td>${user.created_at ? new Date(user.created_at).toLocaleString('id-ID') : '-'}</td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong><i class="fas fa-calendar-edit"></i> Diperbarui:</strong></td>
-                                                <td>${user.updated_at ? new Date(user.updated_at).toLocaleString('id-ID') : '-'}</td>
-                                            </tr>
-                                            <tr>
-                                                <td><strong><i class="fas fa-sign-in-alt"></i> Login Terakhir:</strong></td>
-                                                <td>${user.last_active ? new Date(user.last_active).toLocaleString('id-ID') : '<span class="text-muted">Belum pernah login</span>'}</td>
-                                            </tr>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-
-                        $('#user-details-content').html(userDetailsHtml);
+                        $('#user-roles-badges').html(rolesHtml);
                     } else {
-                        $('#user-details-content').html('<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> Gagal memuat detail pengguna</div>');
+                        $('#user-details-content').html(`
+                            <div class="alert alert-danger">
+                                <i class="fas fa-exclamation-circle"></i>
+                                ${response.message || 'Gagal memuat detail pengguna'}
+                            </div>
+                        `);
                     }
                 },
                 error: function() {
-                    $('#user-details-content').html('<div class="alert alert-danger"><i class="fas fa-exclamation-triangle"></i> Terjadi kesalahan saat memuat data</div>');
+                    $('#user-details-content').html(`
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle"></i>
+                            Terjadi kesalahan saat memuat detail pengguna
+                        </div>
+                    `);
                 }
             });
         });
@@ -895,15 +925,15 @@
                     });
                 }
             });
-        });
-
-        // Soft delete user
-        $(document).on('click', '.soft-delete-user', function() {
+        }); // Soft delete user
+        $(document).on('click', '.delete-user', function() {
             let userId = $(this).data('id');
+            let userName = $(this).data('name');
             let button = $(this);
+
             Swal.fire({
                 title: 'Konfirmasi Pengarsipan',
-                text: 'Apakah Anda yakin ingin mengarsipkan pengguna ini? Data akan disembunyikan namun dapat dipulihkan kembali.',
+                text: `Apakah Anda yakin ingin mengarsipkan pengguna "${userName}"? Data akan disembunyikan namun dapat dipulihkan kembali.`,
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#d33',
@@ -916,10 +946,10 @@
                     button.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i>');
 
                     $.ajax({
-                        url: '<?= site_url('/api/user-management/soft-delete-user') ?>',
+                        url: '<?= site_url('/admin/kelola-users/delete') ?>/' + userId,
                         type: 'POST',
                         data: {
-                            id: userId
+                            '<?= csrf_token() ?>': '<?= csrf_hash() ?>'
                         },
                         success: function(response) {
                             if (response.status) {
@@ -934,7 +964,7 @@
                             showAlert('error', 'Terjadi kesalahan saat mengarsipkan pengguna');
                         },
                         complete: function() {
-                            button.prop('disabled', false);
+                            button.prop('disabled', false).html('<i class="fas fa-trash"></i>');
                         }
                     });
                 }

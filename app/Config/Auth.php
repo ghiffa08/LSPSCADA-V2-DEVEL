@@ -123,7 +123,7 @@ class Auth extends \Myth\Auth\Config\Auth
      *
      * @var string[]
      */
-    public $personalFields = ['nama_lengkap', 'no_telp', 'tanda_tangan'];
+    public $personalFields = ['nama_lengkap', 'tanda_tangan'];
 
     /**
      * --------------------------------------------------------------------
@@ -162,7 +162,6 @@ class Auth extends \Myth\Auth\Config\Auth
      * @var int
      */
     public $maxSimilarity = 50;
-
     /**
      * --------------------------------------------------------------------
      * Allow User Registration
@@ -171,10 +170,12 @@ class Auth extends \Myth\Auth\Config\Auth
      * When enabled (default) any unregistered user may apply for a new
      * account. If you disable registration you may need to ensure your
      * controllers and views know not to offer registration.
+     * 
+     * PRODUCTION: Set to false for security
      *
      * @var bool
      */
-    public $allowRegistration = true;
+    public $allowRegistration = false;
 
     /**
      * --------------------------------------------------------------------
@@ -183,6 +184,8 @@ class Auth extends \Myth\Auth\Config\Auth
      *
      * When enabled, every registered user will receive an email message
      * with an activation link to confirm the account.
+     * 
+     * PRODUCTION: Keep enabled for security
      *
      * @var string|null Name of the ActivatorInterface class
      */

@@ -111,4 +111,32 @@ class User extends MythUser
     {
         return $this->attributes['id'] ?? null;
     }
+
+    /**
+     * Get user's primary role
+     *
+     * @return string|null
+     */
+    public function getRole(): ?string
+    {
+        if (empty($this->roles)) {
+            $this->roles = model('GroupUserModel')->getRolesByUserId($this->id);
+        }
+
+        return $this->roles[0] ?? null;
+    }
+
+    /**
+     * Get all user roles
+     *
+     * @return array
+     */
+    public function getRoles(): array
+    {
+        if (empty($this->roles)) {
+            $this->roles = model('GroupUserModel')->getRolesByUserId($this->id);
+        }
+
+        return $this->roles ?? [];
+    }
 }

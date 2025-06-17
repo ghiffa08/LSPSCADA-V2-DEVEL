@@ -34,6 +34,17 @@ class AuthenticationService
     protected $config;
     protected $session;
     protected $db;
+
+    /**
+     * Log debug messages only in development environment
+     */
+    private function debugLog(string $message): void
+    {
+        if (ENVIRONMENT === 'development') {
+            log_message('debug', $message);
+        }
+    }
+
     public function __construct()
     {
         $this->userModel = model(UserModel::class);
@@ -130,7 +141,7 @@ class AuthenticationService
             $isOAuthUser = !empty($user->google_id) || !empty($user->facebook_id) || !empty($user->oauth_provider);
 
             // Log untuk debugging
-            log_message('debug', '[Login] User ID: ' . $user->id . ', force_pass_reset: ' . ($user->force_pass_reset ? 'true' : 'false') . ', isOAuthUser: ' . ($isOAuthUser ? 'true' : 'false') . ', google_id: ' . ($user->google_id ?? 'NULL'));
+            $this->debugLog('[Login] User ID: ' . $user->id . ', force_pass_reset: ' . ($user->force_pass_reset ? 'true' : 'false') . ', isOAuthUser: ' . ($isOAuthUser ? 'true' : 'false') . ', google_id: ' . ($user->google_id ?? 'NULL'));
 
             if ($user->force_pass_reset === true && !$isOAuthUser) {
                 log_message('info', '[Login] Redirecting to reset password for user: ' . $user->id);
@@ -158,7 +169,7 @@ class AuthenticationService
             session()->set('logged_in', $user->id);
             session()->set('user_email', $user->email);
             session()->set('roles', model('GroupUserModel')->getRolesByUserId($user->id));
-            log_message('debug', 'Session after login: ' . print_r(session()->get(), true));
+            $this->debugLog('Session after login: ' . print_r(session()->get(), true));
 
             // Determine redirect URL based on role
             $redirectUrl = $this->determineRedirectUrl($user);
@@ -555,21 +566,21 @@ class AuthenticationService
         $sessionUserId = session('logged_in');
         if ($sessionUserId) {
             try {
-                log_message('debug', '[getCurrentUser] Looking for user ID: ' . $sessionUserId);
+                $this->debugLog('[getCurrentUser] Looking for user ID: ' . $sessionUserId);
                 $user = $this->userModel->find($sessionUserId);
                 if ($user) {
-                    log_message('debug', '[getCurrentUser] Found user from DB: ID=' . ($user->id ?? 'N/A') . ', Email=' . ($user->email ?? 'N/A'));
+                    $this->debugLog('[getCurrentUser] Found user from DB: ID=' . ($user->id ?? 'N/A') . ', Email=' . ($user->email ?? 'N/A'));
 
                     // Ensure user is instance of our User entity
                     if (!($user instanceof User)) {
                         $user = new User((array)$user);
-                        log_message('debug', '[getCurrentUser] Converted to App\Entities\User');
+                        $this->debugLog('[getCurrentUser] Converted to App\Entities\User');
                     }
 
                     // Ensure ID is properly set
                     if (empty($user->id)) {
                         $user->id = $sessionUserId;
-                        log_message('debug', '[getCurrentUser] Set user ID from session: ' . $sessionUserId);
+                        $this->debugLog('[getCurrentUser] Set user ID from session: ' . $sessionUserId);
                     }
 
                     return $user;
@@ -678,7 +689,7 @@ class AuthenticationService
     public function determineRedirectUrl(User $user): string
     {
         try {
-            log_message('debug', '[RedirectURL] Determining redirect for user: ' . $user->id . ', email: ' . $user->email);
+            $this->debugLog('[RedirectURL] Determining redirect for user: ' . $user->id . ', email: ' . $user->email);
 
             // Check for stored redirect URL first - only if it's not an auth-related URL
             $redirectUrl = session('redirect_url');
