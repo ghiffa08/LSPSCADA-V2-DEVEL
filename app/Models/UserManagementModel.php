@@ -406,8 +406,7 @@ class UserManagementModel extends Model
      *
      * @param array $userData
      * @return array
-     */
-    public function createAsesorUser($userData)
+     */    public function createAsesorUser($userData)
     {
         $db = \Config\Database::connect();
         $db->transBegin();
@@ -415,6 +414,7 @@ class UserManagementModel extends Model
         try {
             // Create user
             $userModel = new \App\Models\UserMythModel();
+            $asesorModel = new \App\Models\AsesorModel();
             $groupModel = new \Myth\Auth\Models\GroupModel();
 
             $user = new \App\Entities\User($userData);
@@ -431,10 +431,29 @@ class UserManagementModel extends Model
                 ];
             }
 
+            $userId = $userModel->getInsertID();
+
+            // Create asesor record
+            $asesorData = [
+                'id_user' => $userId,
+                'bidang_kompetensi' => $userData['bidang_kompetensi'],
+                'nomor_registrasi' => $userData['nomor_registrasi'] ?? null
+            ];
+
+            if (!$asesorModel->save($asesorData)) {
+                $db->transRollback();
+                return [
+                    'success' => false,
+                    'errors' => $asesorModel->errors(),
+                    'message' => 'Failed to create asesor record'
+                ];
+            }
+
             $db->transCommit();
             return [
                 'success' => true,
-                'user_id' => $userModel->getInsertID(),
+                'user_id' => $userId,
+                'asesor_id' => $asesorModel->getInsertID(),
                 'message' => 'Asesor user created successfully'
             ];
         } catch (\Exception $e) {

@@ -2,73 +2,73 @@
 
 namespace App\Models;
 
-use App\Entities\Asesor;
 use CodeIgniter\Model;
 
 class AsesorModel extends Model
 {
-    protected $table            = 'asesor';
-    protected $primaryKey       = 'id_asesor';
-    protected $useAutoIncrement = false;
-    protected $returnType       = Asesor::class;
-    protected $useSoftDeletes   = false;
-    protected $protectFields    = true;
-    protected $allowedFields    = [
-        'id_asesor',
-        'user_id',
-        'no_registrasi',
-        'tanggal_lahir',
-        'tempat_lahir',
-        'jenis_kelamin',
-        'pendidikan_terakhir',
-        'pekerjaan',
-        'alamat',
-        'no_hp',
-        'email',
-        'is_active',
-        'created_at',
-        'updated_at'
+    protected $table = 'asesor';
+    protected $primaryKey = 'id_asesor';
+    protected $useAutoIncrement = true;
+    protected $returnType = 'array';
+    protected $useSoftDeletes = false;
+    protected $protectFields = true;
+    protected $allowedFields = [
+        'id_user',
+        'nomor_registrasi',
+        'bidang_kompetensi'
     ];
 
     // Dates
-    protected $useTimestamps = true;
-    protected $dateFormat    = 'datetime';
-    protected $createdField  = 'created_at';
-    protected $updatedField  = 'updated_at';
+    protected $useTimestamps = false;
+    protected $dateFormat = 'datetime';
+    protected $createdField = 'created_at';
+    protected $updatedField = 'updated_at';
+    protected $deletedField = 'deleted_at';
 
     // Validation
-    protected $validationRules      = [
-        'id_asesor' => 'required|max_length[36]',
-        'user_id' => 'required|integer',
-        'no_registrasi' => 'required|max_length[50]|is_unique[asesor.no_registrasi,id_asesor,{id_asesor}]',
-        'email' => 'required|valid_email|is_unique[asesor.email,id_asesor,{id_asesor}]',
+    protected $validationRules = [
+        'id_user' => 'required|integer|is_unique[asesor.id_user]',
+        'bidang_kompetensi' => 'required|max_length[100]',
+        'nomor_registrasi' => 'permit_empty|max_length[50]'
     ];
 
-    protected $validationMessages   = [
-        'no_registrasi' => [
-            'required' => 'Nomor registrasi asesor harus diisi',
-            'max_length' => 'Nomor registrasi maksimal 50 karakter',
-            'is_unique' => 'Nomor registrasi sudah digunakan'
+    protected $validationMessages = [
+        'id_user' => [
+            'required' => 'ID User harus diisi',
+            'integer' => 'ID User harus berupa angka',
+            'is_unique' => 'User sudah terdaftar sebagai asesor'
         ],
-        'email' => [
-            'required' => 'Email harus diisi',
-            'valid_email' => 'Format email tidak valid',
-            'is_unique' => 'Email sudah digunakan'
+        'bidang_kompetensi' => [
+            'required' => 'Bidang kompetensi harus diisi',
+            'max_length' => 'Bidang kompetensi maksimal 100 karakter'
+        ],
+        'nomor_registrasi' => [
+            'max_length' => 'Nomor registrasi maksimal 50 karakter'
         ]
     ];
 
-    protected $skipValidation       = false;
+    protected $skipValidation = false;
     protected $cleanValidationRules = true;
 
+    // Callbacks
+    protected $allowCallbacks = true;
+    protected $beforeInsert = [];
+    protected $afterInsert = [];
+    protected $beforeUpdate = [];
+    protected $afterUpdate = [];
+    protected $beforeFind = [];
+    protected $afterFind = [];
+    protected $beforeDelete = [];
+    protected $afterDelete = [];
     /**
      * Get asesor by user ID
      *
      * @param int $userId
-     * @return Asesor|null
+     * @return array|null
      */
     public function getByUserId(int $userId)
     {
-        return $this->where('user_id', $userId)->first();
+        return $this->where('id_user', $userId)->first();
     }
 
     /**
@@ -80,9 +80,25 @@ class AsesorModel extends Model
     public function getWithUser(string $idAsesor)
     {
         $builder = $this->db->table('asesor a');
-        $builder->select('a.*, u.fullname, u.email as user_email, u.active, u.tanda_tangan');
-        $builder->join('users u', 'u.id_user = a.id_user');
+        $builder->select('a.*, u.username, u.nama_lengkap, u.email as user_email, u.active');
+        $builder->join('users u', 'u.id = a.id_user');
         $builder->where('a.id_asesor', $idAsesor);
+
+        return $builder->get()->getRowArray();
+    }
+
+    /**
+     * Get asesor by user ID with user data
+     *
+     * @param int $userId
+     * @return array|null
+     */
+    public function getByUserIdWithUser(int $userId)
+    {
+        $builder = $this->db->table('asesor a');
+        $builder->select('a.*, u.username, u.nama_lengkap, u.email as user_email, u.active');
+        $builder->join('users u', 'u.id = a.id_user');
+        $builder->where('a.id_user', $userId);
 
         return $builder->get()->getRowArray();
     }
@@ -96,116 +112,14 @@ class AsesorModel extends Model
     public function getAllWithUser(bool $activeOnly = false)
     {
         $builder = $this->db->table('asesor a');
-        $builder->select('a.*, u.fullname, u.email as user_email, u.active');
-        $builder->join('users u', 'u.id_user = a.id_user');
+        $builder->select('a.*, u.username, u.nama_lengkap, u.email as user_email, u.active');
+        $builder->join('users u', 'u.id = a.id_user');
 
         if ($activeOnly) {
-            $builder->where('a.is_active', 1);
             $builder->where('u.active', 1);
         }
-
-        $builder->orderBy('u.fullname', 'ASC');
+        $builder->orderBy('u.nama_lengkap', 'ASC');
         return $builder->get()->getResultArray();
-    }
-
-    /**
-     * Get assigned skema for an asesor
-     *
-     * @param string $idAsesor
-     * @return array
-     */
-    public function getAssignedSkema(string $idAsesor)
-    {
-        $builder = $this->db->table('asesor_skema as');
-        $builder->select('s.*');
-        $builder->join('skema s', 's.id_skema = as.id_skema');
-        $builder->where('as.id_asesor', $idAsesor);
-
-        return $builder->get()->getResultArray();
-    }
-
-    /**
-     * Get asesor assessment statistics
-     *
-     * @param string $idAsesor
-     * @return array
-     */
-    public function getAssessmentStats(string $idAsesor)
-    {
-        // Get assessment counts by status
-        $sql = "SELECT 
-                    pa.status,
-                    COUNT(pa.id_apl1) as count
-                FROM 
-                    asesmen a
-                JOIN 
-                    pengajuan_asesmen pa ON pa.id_asesmen = a.id_asesmen
-                WHERE 
-                    a.id_asesor = ?
-                GROUP BY 
-                    pa.status";
-
-        $query = $this->db->query($sql, [$idAsesor]);
-        $results = $query->getResultArray();
-
-        $stats = [
-            'pending' => 0,
-            'approved' => 0,
-            'on_progress' => 0,
-            'completed' => 0,
-            'rejected' => 0,
-            'total' => 0
-        ];
-
-        foreach ($results as $row) {
-            if (isset($stats[$row['status']])) {
-                $stats[$row['status']] = (int)$row['count'];
-                $stats['total'] += (int)$row['count'];
-            }
-        }
-
-        return $stats;
-    }
-
-    /**
-     * Assign a skema to an asesor
-     *
-     * @param string $idAsesor
-     * @param string $idSkema
-     * @return bool
-     */
-    public function assignSkema(string $idAsesor, string $idSkema): bool
-    {
-        $data = [
-            'id_asesor' => $idAsesor,
-            'id_skema' => $idSkema
-        ];
-
-        // Check if assignment already exists
-        $exists = $this->db->table('asesor_skema')
-            ->where($data)
-            ->countAllResults() > 0;
-
-        if ($exists) {
-            return true; // Already assigned
-        }
-
-        return $this->db->table('asesor_skema')->insert($data);
-    }
-
-    /**
-     * Unassign a skema from an asesor
-     *
-     * @param string $idAsesor
-     * @param string $idSkema
-     * @return bool
-     */
-    public function unassignSkema(string $idAsesor, string $idSkema): bool
-    {
-        return $this->db->table('asesor_skema')
-            ->where('id_asesor', $idAsesor)
-            ->where('id_skema', $idSkema)
-            ->delete();
     }
 
     /**
@@ -217,13 +131,30 @@ class AsesorModel extends Model
     public function search(string $search)
     {
         $builder = $this->db->table('asesor a');
-        $builder->select('a.*, u.fullname, u.email as user_email');
-        $builder->join('users u', 'u.id_user = a.id_user');
+        $builder->select('a.*, u.username, u.nama_lengkap, u.email as user_email');
+        $builder->join('users u', 'u.id = a.id_user');
         $builder->groupStart()
-            ->like('u.fullname', $search)
-            ->orLike('a.no_registrasi', $search)
-            ->orLike('a.email', $search)
+            ->like('u.nama_lengkap', $search)
+            ->orLike('a.nomor_registrasi', $search)
+            ->orLike('u.email', $search)
+            ->orLike('a.bidang_kompetensi', $search)
             ->groupEnd();
+
+        return $builder->get()->getResultArray();
+    }
+
+    /**
+     * Get asesor count by bidang kompetensi
+     *
+     * @return array
+     */
+    public function getCountByBidangKompetensi()
+    {
+        $builder = $this->db->table('asesor');
+        $builder->select('bidang_kompetensi, COUNT(*) as total');
+        $builder->where('bidang_kompetensi IS NOT NULL');
+        $builder->groupBy('bidang_kompetensi');
+        $builder->orderBy('total', 'DESC');
 
         return $builder->get()->getResultArray();
     }

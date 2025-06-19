@@ -461,7 +461,17 @@ $routes->group('api', function ($routes) {
         $routes->post('create-admin-user', 'Api\UserManagement::createAdminUser');
         $routes->post('create-asesor-user', 'Api\UserManagement::createAsesorUser');
         $routes->post('update-profile', 'Api\UserManagement::updateProfile');
+        $routes->post('update-user', 'Api\UserManagement::updateUser');
         $routes->post('update-status', 'Api\UserManagement::updateStatus');
         $routes->post('soft-delete-user', 'Api\UserManagement::softDeleteUser');
+
+        // Asesor management routes
+        $routes->get('get-asesor-by-user-id', 'Api\UserManagement::getAsesorByUserId');
+        $routes->get('get-all-asesor', 'Api\UserManagement::getAllAsesor');
+        $routes->post('update-asesor', 'Api\UserManagement::updateAsesor');
+        $routes->get('get-asesor-statistics', 'Api\UserManagement::getAsesorStatistics');
+
+        // Skema routes
+        $routes->get('get-active-skemas', 'Api\UserManagement::getActiveSkemas');
     });
 });

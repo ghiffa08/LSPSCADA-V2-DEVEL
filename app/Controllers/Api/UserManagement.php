@@ -467,7 +467,6 @@ class UserManagement extends DataTableController
             ]);
         }
     }
-
     /**
      * Create asesor user
      */
@@ -480,7 +479,7 @@ class UserManagement extends DataTableController
         $data = $this->request->getPost();
 
         // Validate required fields
-        $required = ['username', 'email', 'nama_lengkap', 'password'];
+        $required = ['username', 'email', 'nama_lengkap', 'password', 'bidang_kompetensi'];
         foreach ($required as $field) {
             if (empty($data[$field])) {
                 return $this->response->setStatusCode(400)->setJSON([
@@ -687,5 +686,278 @@ class UserManagement extends DataTableController
             'data' => $data,
             'timestamp' => date('c')
         ]);
+    }
+
+    /**
+     * Update user with role management
+     */    public function updateUser(): ResponseInterface
+    {
+        if (!$this->request->isAJAX()) {
+            return Services::response()->setStatusCode(404);
+        }
+
+        $data = $this->request->getPost();
+        $id = $data['id'] ?? null;
+        $role = $data['role'] ?? null;
+
+        if (!$id) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => false,
+                'message' => 'User ID is required'
+            ]);
+        }
+
+        try {
+            // Prepare user data for update
+            $updateData = [
+                'nama_lengkap' => $data['nama_lengkap'] ?? null,
+                'email' => $data['email'] ?? null,
+                'updated_at' => date('Y-m-d H:i:s')
+            ];
+
+            // Remove empty values
+            $updateData = array_filter($updateData, function ($value) {
+                return $value !== null && $value !== '';
+            });
+
+            // Update user profile
+            $userUpdated = $this->model->update($id, $updateData);            // Handle role update if provided
+            $roleUpdated = true;
+            $roleMessage = '';
+
+            if ($role && $userUpdated) {
+                try {
+                    // Normalize role name (capitalize first letter)
+                    $normalizedRole = ucfirst(strtolower($role));
+
+                    // Load auth models
+                    $authGroupsModel = model('GroupModel');
+                    $db = \Config\Database::connect();
+
+                    // Remove user from all existing groups
+                    $db->table('auth_groups_users')->where('user_id', $id)->delete();                    // Add user to new role group
+                    $groupData = $authGroupsModel->where('name', $normalizedRole)->first();
+                    if (!$groupData) {
+                        // Try original case
+                        $groupData = $authGroupsModel->where('name', $role)->first();
+                    }
+                    if (!$groupData) {
+                        // Try lowercase
+                        $groupData = $authGroupsModel->where('LOWER(name)', strtolower($role))->first();
+                    }
+
+                    if ($groupData) {
+                        $db->table('auth_groups_users')->insert([
+                            'group_id' => $groupData->id,
+                            'user_id' => $id
+                        ]);
+                        $roleMessage = ' dengan role ' . $normalizedRole;
+                    } else {
+                        $roleUpdated = false;
+                        $roleMessage = ' (Role tidak valid atau tidak ditemukan)';
+                    }
+                } catch (\Exception $roleError) {
+                    $roleUpdated = false;
+                    $roleMessage = ' (Gagal mengubah role)';
+                }
+            }
+
+            if ($userUpdated && $roleUpdated) {
+                return $this->response->setJSON([
+                    'status' => true,
+                    'message' => 'User berhasil diperbarui' . $roleMessage
+                ]);
+            } else {
+                return $this->response->setStatusCode(400)->setJSON([
+                    'status' => false,
+                    'message' => 'Gagal memperbarui user' . $roleMessage
+                ]);
+            }
+        } catch (\Exception $e) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => false,
+                'message' => 'Error updating user: ' . $e->getMessage()
+            ]);
+        }
+    }
+    /**
+     * Get asesor details by user ID
+     */
+    public function getAsesorByUserId(): ResponseInterface
+    {
+        if (!$this->request->isAJAX()) {
+            return Services::response()->setStatusCode(404);
+        }
+
+        $userId = $this->request->getGet('user_id');
+
+        if (!$userId) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => false,
+                'message' => 'User ID is required'
+            ]);
+        }
+
+        try {
+            $asesorModel = new \App\Models\AsesorModel();
+            $asesor = $asesorModel->getByUserIdWithUser($userId);
+
+            if ($asesor) {
+                return $this->response->setJSON([
+                    'status' => true,
+                    'data' => $asesor
+                ]);
+            } else {
+                return $this->response->setStatusCode(404)->setJSON([
+                    'status' => false,
+                    'message' => 'Asesor not found'
+                ]);
+            }
+        } catch (\Exception $e) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => false,
+                'message' => 'Error fetching asesor: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Get all asesor with user data
+     */
+    public function getAllAsesor(): ResponseInterface
+    {
+        if (!$this->request->isAJAX()) {
+            return Services::response()->setStatusCode(404);
+        }
+
+        try {
+            $asesorModel = new \App\Models\AsesorModel();
+            $activeOnly = $this->request->getGet('active_only') === 'true';
+            $asesorList = $asesorModel->getAllWithUser($activeOnly);
+
+            return $this->response->setJSON([
+                'status' => true,
+                'data' => $asesorList
+            ]);
+        } catch (\Exception $e) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => false,
+                'message' => 'Error fetching asesor list: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Update asesor data
+     */
+    public function updateAsesor(): ResponseInterface
+    {
+        if (!$this->request->isAJAX()) {
+            return Services::response()->setStatusCode(404);
+        }
+
+        $data = $this->request->getPost();
+        $asesorId = $data['id_asesor'] ?? null;
+
+        if (!$asesorId) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => false,
+                'message' => 'Asesor ID is required'
+            ]);
+        }
+
+        try {
+            $asesorModel = new \App\Models\AsesorModel();
+
+            $updateData = [
+                'nomor_registrasi' => $data['nomor_registrasi'] ?? null,
+                'bidang_kompetensi' => $data['bidang_kompetensi'] ?? null
+            ];
+
+            // Remove empty values
+            $updateData = array_filter($updateData, function ($value) {
+                return $value !== null && $value !== '';
+            });
+
+            if (empty($updateData)) {
+                return $this->response->setStatusCode(400)->setJSON([
+                    'status' => false,
+                    'message' => 'No data to update'
+                ]);
+            }
+
+            $updated = $asesorModel->update($asesorId, $updateData);
+
+            if ($updated) {
+                return $this->response->setJSON([
+                    'status' => true,
+                    'message' => 'Asesor data updated successfully'
+                ]);
+            } else {
+                return $this->response->setStatusCode(400)->setJSON([
+                    'status' => false,
+                    'message' => 'Failed to update asesor data',
+                    'errors' => $asesorModel->errors()
+                ]);
+            }
+        } catch (\Exception $e) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => false,
+                'message' => 'Error updating asesor: ' . $e->getMessage()
+            ]);
+        }
+    }
+    /**
+     * Get asesor statistics
+     */
+    public function getAsesorStatistics(): ResponseInterface
+    {
+        if (!$this->request->isAJAX()) {
+            return Services::response()->setStatusCode(404);
+        }
+
+        try {
+            $asesorModel = new \App\Models\AsesorModel();
+            $statistics = [
+                'total_asesor' => count($asesorModel->getAllWithUser()),
+                'active_asesor' => count($asesorModel->getAllWithUser(true)),
+                'by_bidang_kompetensi' => $asesorModel->getCountByBidangKompetensi()
+            ];
+
+            return $this->response->setJSON([
+                'status' => true,
+                'data' => $statistics
+            ]);
+        } catch (\Exception $e) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => false,
+                'message' => 'Error fetching asesor statistics: ' . $e->getMessage()
+            ]);
+        }
+    }
+
+    /**
+     * Get active skemas for asesor form
+     */
+    public function getActiveSkemas(): ResponseInterface
+    {
+        if (!$this->request->isAJAX()) {
+            return Services::response()->setStatusCode(404);
+        }
+
+        try {
+            $skemaModel = new \App\Models\SkemaModel();
+            $skemas = $skemaModel->getActiveSchemes();
+
+            return $this->response->setJSON([
+                'status' => true,
+                'data' => $skemas
+            ]);
+        } catch (\Exception $e) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => false,
+                'message' => 'Error fetching skemas: ' . $e->getMessage()
+            ]);
+        }
     }
 }

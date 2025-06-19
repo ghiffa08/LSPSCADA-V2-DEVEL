@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asesor System Test - AJAX Endpoints</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Asesor System - AJAX Endpoint Test</h1>
+        <p class="text-muted">This page tests the AJAX endpoints for the asesor system. Make sure you are logged in as an asesor.</p>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Authentication Test</h5>
+                    </div>
+                    <div class="card-body">
+                        <button class="btn btn-primary" onclick="testAuth()">Test Authentication Status</button>
+                        <div id="auth-result"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Asesor Statistics</h5>
+                    </div>
+                    <div class="card-body">
+                        <button class="btn btn-info" onclick="testStatistics()">Get Statistics</button>
+                        <div id="statistics-result"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Recent Activities</h5>
+                    </div>
+                    <div class="card-body">
+                        <button class="btn btn-success" onclick="testRecentActivities()">Get Recent Activities</button>
+                        <div id="activities-result"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Skema Detail Test</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="input-group mb-3">
+                            <input type="number" class="form-control" id="skema-id" placeholder="Enter Skema ID" value="1">
+                            <button class="btn btn-warning" onclick="testSkemaDetail()">Get Skema Detail</button>
+                        </div>
+                        <div id="skema-detail-result"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Asesmen by Skema Test</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="input-group mb-3">
+                            <input type="number" class="form-control" id="asesmen-skema-id" placeholder="Enter Skema ID" value="1">
+                            <button class="btn btn-secondary" onclick="testAsesmenBySkema()">Get Asesmen by Skema</button>
+                        </div>
+                        <div id="asesmen-by-skema-result"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>All Endpoints Test</h5>
+                    </div>
+                    <div class="card-body">
+                        <button class="btn btn-danger" onclick="testAllEndpoints()">Test All Endpoints</button>
+                        <div id="all-tests-result"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Base URL for API endpoints
+        const baseUrl = window.location.origin;
+        
+        function showResult(elementId, result, type = 'info') {
+            const element = document.getElementById(elementId);
+            const cssClass = type === 'success' ? 'success' : (type === 'error' ? 'error' : 'warning');
+            element.innerHTML = `<div class="test-result ${cssClass}"><pre>${JSON.stringify(result, null, 2)}</pre></div>`;
+        }
+
+        function testAuth() {
+            // Test if user is authenticated by trying to access a protected endpoint
+            $.ajax({
+                url: `${baseUrl}/asesor/api/statistics`,
+                method: 'GET',
+                success: function(data) {
+                    showResult('auth-result', {
+                        status: 'authenticated',
+                        message: 'User is logged in and has access',
+                        data: data
+                    }, 'success');
+                },
+                error: function(xhr) {
+                    if (xhr.status === 404) {
+                        showResult('auth-result', {
+                            status: 'not_authenticated',
+                            message: 'User is not logged in or lacks access',
+                            error: xhr.responseText
+                        }, 'error');
+                    } else {
+                        showResult('auth-result', {
+                            status: 'authenticated_but_endpoint_error',
+                            message: 'User is authenticated but endpoint has issues',
+                            error: xhr.responseText
+                        }, 'warning');
+                    }
+                }
+            });
+        }
+
+        function testStatistics() {
+            $.ajax({
+                url: `${baseUrl}/asesor/api/statistics`,
+                method: 'GET',
+                success: function(data) {
+                    showResult('statistics-result', data, 'success');
+                },
+                error: function(xhr) {
+                    showResult('statistics-result', {
+                        error: xhr.responseText,
+                        status: xhr.status
+                    }, 'error');
+                }
+            });
+        }
+
+        function testRecentActivities() {
+            $.ajax({
+                url: `${baseUrl}/asesor/api/activities/recent`,
+                method: 'GET',
+                success: function(data) {
+                    showResult('activities-result', data, 'success');
+                },
+                error: function(xhr) {
+                    showResult('activities-result', {
+                        error: xhr.responseText,
+                        status: xhr.status
+                    }, 'error');
+                }
+            });
+        }
+
+        function testSkemaDetail() {
+            const skemaId = document.getElementById('skema-id').value;
+            if (!skemaId) {
+                showResult('skema-detail-result', {error: 'Please enter a Skema ID'}, 'error');
+                return;
+            }
+
+            $.ajax({
+                url: `${baseUrl}/asesor/api/skema/detail/${skemaId}`,
+                method: 'GET',
+                success: function(data) {
+                    showResult('skema-detail-result', data, 'success');
+                },
+                error: function(xhr) {
+                    showResult('skema-detail-result', {
+                        error: xhr.responseText,
+                        status: xhr.status
+                    }, 'error');
+                }
+            });
+        }
+
+        function testAsesmenBySkema() {
+            const skemaId = document.getElementById('asesmen-skema-id').value;
+            if (!skemaId) {
+                showResult('asesmen-by-skema-result', {error: 'Please enter a Skema ID'}, 'error');
+                return;
+            }
+
+            $.ajax({
+                url: `${baseUrl}/asesor/api/skema/asesmen/${skemaId}`,
+                method: 'GET',
+                success: function(data) {
+                    showResult('asesmen-by-skema-result', data, 'success');
+                },
+                error: function(xhr) {
+                    showResult('asesmen-by-skema-result', {
+                        error: xhr.responseText,
+                        status: xhr.status
+                    }, 'error');
+                }
+            });
+        }
+
+        function testAllEndpoints() {
+            const resultsDiv = document.getElementById('all-tests-result');
+            resultsDiv.innerHTML = '<div class="test-result warning">Testing all endpoints...</div>';
+            
+            const endpoints = [
+                {name: 'Statistics', url: '/asesor/api/statistics'},
+                {name: 'Recent Activities', url: '/asesor/api/activities/recent'},
+                {name: 'Skema Detail (ID: 1)', url: '/asesor/api/skema/detail/1'},
+                {name: 'Asesmen by Skema (ID: 1)', url: '/asesor/api/skema/asesmen/1'}
+            ];
+            
+            let results = [];
+            let completed = 0;
+            
+            endpoints.forEach(endpoint => {
+                $.ajax({
+                    url: `${baseUrl}${endpoint.url}`,
+                    method: 'GET',
+                    success: function(data) {
+                        results.push({
+                            endpoint: endpoint.name,
+                            status: 'SUCCESS',
+                            response: data
+                        });
+                        completed++;
+                        checkAllCompleted();
+                    },
+                    error: function(xhr) {
+                        results.push({
+                            endpoint: endpoint.name,
+                            status: 'ERROR',
+                            error: xhr.responseText,
+                            httpStatus: xhr.status
+                        });
+                        completed++;
+                        checkAllCompleted();
+                    }
+                });
+            });
+            
+            function checkAllCompleted() {
+                if (completed === endpoints.length) {
+                    showResult('all-tests-result', {
+                        summary: `${results.filter(r => r.status === 'SUCCESS').length}/${endpoints.length} endpoints working`,
+                        results: results
+                    }, results.some(r => r.status === 'ERROR') ? 'warning' : 'success');
+                }
+            }
+        }
+
+        // Auto-test on page load
+        $(document).ready(function() {
+            console.log('Asesor System AJAX Test Page Loaded');
+            console.log('Base URL:', baseUrl);
+        });
+    </script>
+</body>
+</html>

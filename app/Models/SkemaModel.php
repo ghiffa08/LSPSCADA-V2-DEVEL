@@ -226,4 +226,30 @@ class SkemaModel extends Model
             ->where('status', 'Y')
             ->countAllResults() > 0;
     }
+
+    /**
+     * Get all active skemas for selection
+     *
+     * @return array
+     */
+    public function getActiveSkemas()
+    {
+        return $this->where('status', 'Y')
+            ->orderBy('nama_skema', 'ASC')
+            ->findAll();
+    }
+
+    /**
+     * Get skema by type
+     *
+     * @param string $type
+     * @return array
+     */
+    public function getSkemasByType(string $type)
+    {
+        return $this->where('status', 'Y')
+            ->where('jenis_skema', $type)
+            ->orderBy('nama_skema', 'ASC')
+            ->findAll();
+    }
 }
