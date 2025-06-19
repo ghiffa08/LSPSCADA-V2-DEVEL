@@ -7,29 +7,27 @@ use CodeIgniter\Model;
 class PengajuanAsesmenModel extends Model
 {
     protected $table            = 'pengajuan_asesmen';
-    protected $primaryKey       = 'id_apl1';
-    protected $useAutoIncrement = false;
+    protected $primaryKey       = 'id_pengajuan';
+    protected $useAutoIncrement = true;
     protected $returnType       = 'array';
-    protected $useSoftDeletes   = true;
+    protected $useSoftDeletes   = false;
     protected $protectFields    = true;
     protected $allowedFields    = [
-        'id_apl1',
+        'id_pengajuan',
         'id_asesi',
-        'id_asesmen',
-        'status',
-        'validator',
-        'email_validasi',
-        'created_at',
-        'updated_at',
-        'deleted_at'
+        'id_asesor',
+        'id_skema',
+        'status_pengajuan',
+        'tanggal_pengajuan',
+        'status'
     ];
 
     // Dates
-    protected $useTimestamps = true;
+    protected $useTimestamps = false;
     protected $dateFormat    = 'datetime';
-    protected $createdField  = 'created_at';
-    protected $updatedField  = 'updated_at';
-    protected $deletedField  = 'deleted_at';
+    protected $createdField  = 'tanggal_pengajuan';
+    protected $updatedField  = '';
+    protected $deletedField  = '';
 
     // Validation
     protected $validationRules      = [];
@@ -62,7 +60,7 @@ class PengajuanAsesmenModel extends Model
         // Select all necessary fields with table aliases to avoid ambiguity
         $builder->select('
             pa.*,
-            a.id_asesi, a.user_id, a.nik, a.tempat_lahir, a.tanggal_lahir, 
+            a.id_asesi, a.id_user, a.nik, a.tempat_lahir, a.tanggal_lahir, 
             a.jenis_kelamin, a.pendidikan_terakhir, a.nama_sekolah, a.jurusan, 
             a.kebangsaan, a.telpon_rumah, a.pekerjaan, 
             a.nama_lembaga, a.jabatan, a.alamat_perusahaan, a.email_perusahaan, 
@@ -119,7 +117,7 @@ class PengajuanAsesmenModel extends Model
                 ],
                 'asesi' => [
                     'id_asesi' => $result['id_asesi'],
-                    'user_id' => $result['user_id'],
+                    'id_user' => $result['id_user'],
                     'nik' => $result['nik'],
                     'nama' => $result['nama'],
                     'tempat_lahir' => $result['tempat_lahir'],
@@ -693,5 +691,51 @@ class PengajuanAsesmenModel extends Model
             'data' => $builder->limit($limit, $offset)->get()->getResultArray(),
             'total' => $builder->countAllResults(false)
         ];
+    }
+
+    /**
+     * Get asesi data by asesmen ID for observation checklist
+     * Since pengajuan_asesmen schema changed, we now get assessees
+     * from the same scheme as the assessment session
+     *
+     * @param int $id_asesmen
+     * @return array
+     */
+    public function getAsesiByAsesmen(int $id_asesmen): array
+    {
+        try {
+            // First get the id_skema from asesmen table
+            $asesmenQuery = $this->db->table('asesmen')
+                ->where('id_asesmen', $id_asesmen)
+                ->select('id_skema')
+                ->get()
+                ->getRowArray();
+
+            if (!$asesmenQuery) {
+                log_message('warning', 'No asesmen found with ID: ' . $id_asesmen);
+                return [];
+            }
+
+            $id_skema = $asesmenQuery['id_skema'];
+            log_message('info', 'Found asesmen with scheme ID: ' . $id_skema);
+
+            // Get pengajuan_asesmen for that skema with accepted status
+            $result = $this->db->table('pengajuan_asesmen pa')
+                ->join('asesi a', 'a.id_asesi = pa.id_asesi', 'left')
+                ->join('users u', 'u.id = a.id_user', 'left')
+                ->where('pa.id_skema', $id_skema)
+                ->where('pa.status_pengajuan', 'diterima')
+                ->select('a.id_asesi, a.nik, a.email, u.nama_lengkap as nama, u.username, pa.id_pengajuan, pa.status_pengajuan, pa.status')
+                ->orderBy('u.nama_lengkap', 'ASC')
+                ->get()
+                ->getResultArray();
+
+            log_message('info', 'Found ' . count($result) . ' assessees for scheme ID: ' . $id_skema);
+            return $result;
+        } catch (\Exception $e) {
+            log_message('error', 'Query failed in getAsesiByAsesmen: ' . $e->getMessage());
+            log_message('error', 'Stack trace: ' . $e->getTraceAsString());
+            throw $e;
+        }
     }
 }

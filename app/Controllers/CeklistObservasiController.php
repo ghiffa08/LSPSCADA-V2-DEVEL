@@ -45,13 +45,40 @@ class CeklistObservasiController extends ResourceController
 
         return view('admin/observasi', $data);
     }
-
     public function create()
     {
+        // Get asesor info and their skema
+        $asesorModel = model('AsesorModel');
+        $asesorInfo = $asesorModel->getByUserIdWithUser($this->id_asesor);
+
+        if (!$asesorInfo) {
+            return redirect()->back()->with('error', 'Data asesor tidak ditemukan. Silakan hubungi administrator.');
+        }
+
+        // Get skema based on asesor's bidang_kompetensi
+        $skemaModel = model('SkemaModel');
+        $skemaList = $skemaModel->where('nama_skema', $asesorInfo['bidang_kompetensi'])->findAll();
+
+        if (empty($skemaList)) {
+            return redirect()->back()->with('error', 'Skema sertifikasi asesor tidak ditemukan dalam database.');
+        }
+
+        // Get asesmen data for the skema
+        $asesmen = [];
+        foreach ($skemaList as $skema) {
+            $asesmenData = $this->asesmenModel->where('id_skema', $skema['id_skema'])->findAll();
+            foreach ($asesmenData as $data) {
+                $data['nama_skema'] = $skema['nama_skema'];
+                $data['kode_skema'] = $skema['kode_skema'];
+                $asesmen[] = $data;
+            }
+        }
 
         $data = [
             'siteTitle' => 'Ceklis Observasi',
-            'skema' => $this->asesmenModel->getAllAsesmen()
+            'asesor' => $asesorInfo,
+            'skemaList' => $skemaList,
+            'asesmen' => $asesmen
         ];
 
         return view('asesor/ceklist_observasi', $data);
@@ -135,5 +162,56 @@ class CeklistObservasiController extends ResourceController
             'detailObservasi' => $detailObservasi,
             'existing_data' => $existing_data,
         ];
+    }
+    /**
+     * Get asesi data by asesmen ID
+     * AJAX endpoint for loading asesi dropdown
+     */
+    public function getAsesiByAsesmen()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->failNotFound('Not found');
+        }
+
+        $id_asesmen = $this->request->getGet('id_asesmen');
+
+        if (!$id_asesmen) {
+            return $this->fail('ID Asesmen required');
+        }
+        try {
+            // Get asesi data for this asesmen
+            $pengajuanModel = model('PengajuanAsesmenModel');
+            $asesiData = $pengajuanModel->getAsesiByAsesmen($id_asesmen);
+
+            $count = count($asesiData);
+            log_message('info', "Loaded " . $count . " asesi for asesmen ID: " . $id_asesmen);
+
+            // Provide informative messages based on data availability
+            $message = '';
+            if ($count === 0) {
+                $message = 'Belum ada asesi yang terdaftar untuk asesmen ini. Pastikan asesi sudah mengajukan permohonan dan statusnya telah disetujui.';
+            } else {
+                $message = "Ditemukan {$count} asesi yang terdaftar untuk asesmen ini.";
+            }
+
+            return $this->respond([
+                'success' => true,
+                'asesi' => $asesiData,
+                'count' => $count,
+                'message' => $message,
+                'isEmpty' => $count === 0
+            ]);
+        } catch (\Exception $e) {
+            log_message('error', 'Error getting asesi by asesmen ID ' . $id_asesmen . ': ' . $e->getMessage());
+            log_message('error', 'Stack trace: ' . $e->getTraceAsString());
+
+            return $this->respond([
+                'success' => false,
+                'message' => 'Terjadi kesalahan database: ' . $e->getMessage(),
+                'asesi' => [],
+                'count' => 0,
+                'isEmpty' => true
+            ], 500);
+        }
     }
 }

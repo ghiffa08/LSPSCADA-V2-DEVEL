@@ -15,6 +15,8 @@ class Observasi extends DataTableController
     {
         parent::__construct();
 
+        helper('auth');
+
         $this->model = $this->observasiModel;
 
         $this->id_asesor = user()->id;

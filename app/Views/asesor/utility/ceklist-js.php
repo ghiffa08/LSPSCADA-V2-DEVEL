@@ -1,5 +1,7 @@
 <script>
     $(document).ready(function() {
+        'use strict';
+
         // Initialize select2
         $('.select2').select2({
             placeholder: "Pilih...",
@@ -9,8 +11,8 @@
 
         // State management
         const state = {
-            id_skema: '',
             id_asesmen: '',
+            id_skema: '',
             totalKUK: 0,
             pendingChanges: false,
             saveQueue: [],
@@ -24,100 +26,137 @@
 
         // Event handlers
         function initEventHandlers() {
-            // Skema selection change
-            $('#id_skema').on('change', handleSkemaChange);
-
-            // Asesi selection change
+            // Asesmen selection change
+            $('#id_asesmen').on('change', handleAsesmenChange); // Asesi selection change
             $('#id_asesi').on('change', function() {
-                $('#form_id_asesi').val($(this).val());
-                if ($('#id_skema').val() && $(this).val()) {
+                const asesiId = $(this).val();
+                $('#form_id_asesi').val(asesiId);
+
+                if (state.id_asesmen && asesiId) {
                     loadObservasiData();
                     saveSettings();
+                    saveSessionState();
                 } else {
+                    // Hide form and show appropriate message
                     $('#formObservasi').hide();
-                }
-            });
+                    $('#loadingData').hide();
 
-            // Tanggal observasi change
+                    if (!asesiId && state.id_asesmen) {
+                        // Asesi deselected but assessment is still selected
+                        $('#initialInstructions').hide();
+                        $('#emptyDataMessage').hide();
+                    }
+                }
+            }); // Tanggal observasi change
             $('#tanggal_observasi').on('change', function() {
                 $('#form_tanggal_observasi').val($(this).val());
                 saveSettings();
+                saveSessionState();
             });
 
             // Check/uncheck all buttons
-            $('#checkAll').click(() => handleBulkCheck(true));
-            $('#uncheckAll').click(() => handleBulkCheck(false));
+            $('#checkAll').on('click', () => handleBulkCheck(true));
+            $('#uncheckAll').on('click', () => handleBulkCheck(false));
 
             // KUK checkbox changes
             $(document).on('change', '.kuk-checkbox', handleKUKCheckboxChange);
 
             // Keterangan input changes
-            $(document).on('input', '.keterangan-input', debounce(handleKeteranganChange, 500));
-
-            // Form submission
+            $(document).on('input', '.keterangan-input', debounce(handleKeteranganChange, 500)); // Form submission
             $('#formObservasi').submit(handleFormSubmit);
-        }
-
-        // Main functions
-        async function handleSkemaChange() {
-            state.id_skema = $(this).val();
-            state.id_asesmen = $(this).find('option:selected').data('id-asesmen');
+        } // Main functions
+        async function handleAsesmenChange() {
+            const selectedOption = $(this).find('option:selected');
+            state.id_asesmen = $(this).val();
+            state.id_skema = selectedOption.data('id-skema');
 
             $('#form_id_skema').val(state.id_skema);
             $('#form_id_asesmen').val(state.id_asesmen);
+            $('#kode_skema').val(selectedOption.data('kode-skema') || '');
+
+            // Reset asesi dropdown and hide form
             $('#id_asesi').prop('disabled', true).empty().append('<option value="">-- Memuat Asesi... --</option>');
             $('#form_id_asesi').val('');
             $('#observasiContainer').empty();
             $('#formObservasi').hide();
+            $('#loadingData').hide();
+            $('#emptyDataMessage').hide();
             resetProgressBar();
 
-            if (!state.id_skema) {
-                $('#id_asesi').empty().append('<option value="">-- Pilih Skema Terlebih Dahulu --</option>');
-                $('#kode_skema').val('');
+            if (!state.id_asesmen) {
+                $('#id_asesi').empty().append('<option value="">-- Pilih Asesmen Terlebih Dahulu --</option>');
+                $('#initialInstructions').show();
                 return;
             }
 
+            // Hide initial instructions when asesmen is selected
+            $('#initialInstructions').hide();
+
             try {
                 const response = await $.ajax({
-                    url: '<?= base_url('/asesor/observasi/getSkemaDetails') ?>',
+                    url: '<?= base_url('/asesor/observasi/getAsesiByAsesmen') ?>',
                     type: 'GET',
                     data: {
-                        id_skema: state.id_skema
+                        id_asesmen: state.id_asesmen
                     },
                     dataType: 'json'
                 });
 
                 if (response.success) {
-                    $('#kode_skema').val(response.skema.kode_skema || '');
-                    populateAsesiDropdown(response.asesi);
+                    populateAsesiDropdown(response.asesi, response);
                 } else {
-                    showError('Gagal memuat detail skema', response.message);
+                    showError('Gagal memuat data asesi', response.message);
+                    $('#id_asesi').empty().append('<option value="">-- Error memuat data --</option>');
                 }
             } catch (error) {
-                showError('Terjadi kesalahan saat memuat data');
+                console.error('Error loading asesi data:', error);
+                const errorMessage = error.responseJSON?.message || 'Terjadi kesalahan saat memuat data asesi';
+                showError('Error Database', errorMessage);
+                $('#id_asesi').empty().append('<option value="">-- Error memuat data --</option>');
             }
         }
 
-        function populateAsesiDropdown(asesiList) {
-            const $asesiDropdown = $('#id_asesi').empty().append('<option value="">-- Pilih Asesi --</option>');
+        function populateAsesiDropdown(asesiList, response = {}) {
+            const $asesiDropdown = $('#id_asesi').empty();
 
             if (asesiList && asesiList.length > 0) {
+                $asesiDropdown.append('<option value="">-- Pilih Asesi --</option>');
+
                 asesiList.forEach(asesi => {
-                    $asesiDropdown.append(`<option value="${asesi.id_asesi}">${asesi.nama_lengkap}</option>`);
+                    // nama is now alias of nama_lengkap from users table
+                    const displayName = asesi.nama || 'Nama tidak tersedia';
+                    const nik = asesi.nik || 'NIK tidak tersedia';
+                    $asesiDropdown.append(`<option value="${asesi.id_asesi}" data-pengajuan="${asesi.id_pengajuan}">${displayName} (${nik})</option>`);
                 });
+
                 $asesiDropdown.prop('disabled', false);
+                $('#emptyDataMessage').hide();
+
+                // Show success message if provided
+                if (response.message) {
+                    showSuccess('Data berhasil dimuat', response.message);
+                }
             } else {
-                $asesiDropdown.append('<option value="">-- Tidak Ada Asesi Tersedia --</option>');
+                $asesiDropdown.append('<option value="">-- Belum Ada Asesi Terdaftar --</option>');
+                $asesiDropdown.prop('disabled', true);
+                $('#emptyDataMessage').show();
+
+                // Show informative message
+                if (response.message) {
+                    showInfo('Informasi', response.message);
+                }
             }
         }
-
         async function loadObservasiData() {
-            const id_skema = $('#id_skema').val();
+            const id_asesmen = state.id_asesmen;
             const id_asesi = $('#id_asesi').val();
 
-            if (!id_skema || !id_asesi) return;
+            if (!id_asesmen || !id_asesi) return;
 
             try {
+                // Hide other elements and show loading
+                $('#initialInstructions').hide();
+                $('#emptyDataMessage').hide();
                 $('#loadingData').show();
                 $('#formObservasi').hide();
 
@@ -125,24 +164,31 @@
                     url: '<?= base_url('/asesor/observasi/loadObservasi') ?>',
                     type: 'GET',
                     data: {
-                        id_skema: id_skema,
-                        id_asesmen: state.id_asesmen,
+                        id_skema: state.id_skema,
+                        id_asesmen: id_asesmen,
                         id_asesi: id_asesi
                     },
                     dataType: 'json'
                 });
 
                 if (response.success) {
-                    renderObservasiTable(response.observasi, response.existing_data);
-                    state.totalKUK = response.totalKUK;
-                    updateProgressBar();
-                    $('#formObservasi').show();
+                    if (response.observasi && response.observasi.length > 0) {
+                        renderObservasiTable(response.observasi, response.existing_data);
+                        state.totalKUK = response.totalKUK || 0;
+                        updateProgressBar();
+                        $('#formObservasi').show();
+                        showSuccess('Data berhasil dimuat', `${response.totalKUK} unit kompetensi siap untuk observasi`);
+                    } else {
+                        showInfo('Belum Ada Data Observasi', 'Belum ada unit kompetensi yang tersedia untuk asesmen ini.');
+                        $('#formObservasi').hide();
+                    }
                 } else {
                     showError('Gagal memuat data observasi', response.message);
                 }
             } catch (error) {
-                const errorMessage = error.responseJSON?.messages || 'Terjadi kesalahan saat memuat data';
-                showError(errorMessage);
+                console.error('Error loading observasi data:', error);
+                const errorMessage = error.responseJSON?.message || 'Terjadi kesalahan saat memuat data observasi';
+                showError('Error Database', errorMessage);
             } finally {
                 $('#loadingData').hide();
             }
@@ -452,30 +498,53 @@
 
         // UI helpers
         function updateProgressBar() {
-            const checkedKUK = $('.kuk-checkbox:checked').length;
-            if (state.totalKUK === 0) return;
+            const totalChecked = $('.kuk-checkbox:checked').length;
+            const progressPercent = state.totalKUK > 0 ? Math.round((totalChecked / state.totalKUK) * 100) : 0;
 
-            const percentage = Math.round((checkedKUK / state.totalKUK) * 100);
-            const $progressBar = $('#progress-bar');
+            $('#progress-bar').css('width', `${progressPercent}%`).attr('aria-valuenow', progressPercent);
+            $('#progress-text').text(`${progressPercent}%`);
 
-            $progressBar.css('width', percentage + '%')
-                .attr('aria-valuenow', percentage)
-                .removeClass('bg-danger bg-warning bg-info bg-success')
-                .addClass(
-                    percentage < 25 ? 'bg-danger' :
-                    percentage < 50 ? 'bg-warning' :
-                    percentage < 75 ? 'bg-info' : 'bg-success'
-                );
+            // Update status text
+            const statusText = totalChecked === 0 ? 'Belum ada yang dicentang' :
+                progressPercent === 100 ? 'Semua kriteria telah dicentang' :
+                `${totalChecked} dari ${state.totalKUK} kriteria dicentang`;
 
-            $('#progress-text').text(`${percentage}% (${checkedKUK}/${state.totalKUK})`);
+            $('#data-status').html(`<i class="fas fa-info-circle text-info"></i> ${statusText}`);
+
+            // Update progress bar color
+            const progressBar = $('#progress-bar');
+            progressBar.removeClass('bg-warning bg-success');
+            if (progressPercent === 100) {
+                progressBar.addClass('bg-success');
+            } else if (progressPercent > 0) {
+                progressBar.addClass('bg-warning');
+            }
         }
 
         function resetProgressBar() {
-            $('#progress-bar').css('width', '0%').attr('aria-valuenow', 0).removeClass('bg-danger bg-warning bg-info bg-success');
+            $('#progress-bar').css('width', '0%').attr('aria-valuenow', 0);
             $('#progress-text').text('0%');
+            $('#data-status').html('<i class="fas fa-sync text-muted"></i> Menunggu data...');
+            state.totalKUK = 0;
         }
 
-        // Utility functions
+        // Session state management for better UX
+        function saveSessionState() {
+            const state_data = {
+                id_asesmen: state.id_asesmen,
+                id_skema: state.id_skema,
+                tanggal_observasi: $('#tanggal_observasi').val(),
+                timestamp: Date.now()
+            };
+
+            try {
+                sessionStorage.setItem('observasi_state', JSON.stringify(state_data));
+            } catch (e) {
+                // Storage might be full or disabled
+            }
+        }
+
+        // Utility functions optimized for production
         function escapeHtml(str) {
             if (!str) return '';
             const div = document.createElement('div');
@@ -485,23 +554,145 @@
 
         function debounce(func, wait) {
             let timeout;
-            return function() {
-                const context = this,
-                    args = arguments;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func.apply(this, args);
+                };
                 clearTimeout(timeout);
-                timeout = setTimeout(() => func.apply(context, args), wait);
+                timeout = setTimeout(later, wait);
             };
         }
 
+        // Optimized notification functions
         function showSuccess(message) {
-            Swal.fire('Berhasil', message, 'success');
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil',
+                text: message,
+                timer: 3000,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end'
+            });
         }
 
         function showError(title, message = '') {
-            Swal.fire(title, message, 'error');
+            Swal.fire({
+                icon: 'error',
+                title: title,
+                text: message,
+                confirmButtonText: 'OK',
+                customClass: {
+                    confirmButton: 'btn btn-primary'
+                }
+            });
         }
 
-        // Initialize
-        initEventHandlers();
+        function showSuccess(title, message = '') {
+            Swal.fire({
+                icon: 'success',
+                title: title,
+                text: message,
+                timer: 3000,
+                timerProgressBar: true,
+                showConfirmButton: false
+            });
+        }
+
+        function showInfo(title, message = '') {
+            Swal.fire({
+                icon: 'info',
+                title: title,
+                text: message,
+                confirmButtonText: 'Mengerti',
+                customClass: {
+                    confirmButton: 'btn btn-info'
+                }
+            });
+        }
+
+        // Initialize page state
+        function initializePageState() {
+            // Hide loading and form initially
+            $('#loadingData').hide();
+            $('#formObservasi').hide();
+            $('#emptyDataMessage').hide();
+
+            // Show initial instructions
+            $('#initialInstructions').show();
+
+            // Reset dropdowns to default state
+            if (!$('#id_asesmen').val()) {
+                $('#id_asesi').empty().append('<option value="">-- Pilih Asesmen Terlebih Dahulu --</option>').prop('disabled', true);
+            }
+        }
+
+        // Network error handler
+        function handleNetworkError(error) {
+            const isNetworkError = !error.status || error.status === 0;
+            const isServerError = error.status >= 500;
+
+            if (isNetworkError) {
+                showError('Koneksi Terputus', 'Periksa koneksi internet Anda dan coba lagi.');
+            } else if (isServerError) {
+                showError('Server Error', 'Terjadi kesalahan pada server. Silakan coba lagi nanti.');
+            } else {
+                const message = error.responseJSON?.message || 'Terjadi kesalahan. Silakan coba lagi.';
+                showError('Error', message);
+            }
+        } // Performance monitoring (production safe)
+        function trackPerformance(action, startTime) {
+            const duration = performance.now() - startTime;
+            if (duration > 3000) { // Log slow operations
+                // In production, this could send to analytics
+                if (window.console && window.console.warn) {
+                    console.warn(`Slow operation detected: ${action} took ${duration}ms`);
+                }
+            }
+        }
+
+        // Initialize page state
+        function initializePageState() {
+            // Hide loading and form initially
+            $('#loadingData').hide();
+            $('#formObservasi').hide();
+            $('#emptyDataMessage').hide();
+
+            // Show initial instructions
+            $('#initialInstructions').show();
+
+            // Reset dropdowns to default state
+            if (!$('#id_asesmen').val()) {
+                $('#id_asesi').empty().append('<option value="">-- Pilih Asesmen Terlebih Dahulu --</option>').prop('disabled', true);
+            }
+        }
+
+        // Initialize with error boundary
+        try {
+            initEventHandlers();
+
+            // Initialize page state
+            initializePageState();
+
+            // Load saved settings if available
+            const savedData = sessionStorage.getItem('observasi_state');
+            if (savedData) {
+                try {
+                    const parsed = JSON.parse(savedData);
+                    if (parsed.id_asesmen) {
+                        $('#id_asesmen').val(parsed.id_asesmen).trigger('change');
+                    }
+                    if (parsed.tanggal_observasi) {
+                        $('#tanggal_observasi').val(parsed.tanggal_observasi);
+                    }
+                } catch (e) {
+                    // Silent fail for session storage
+                    sessionStorage.removeItem('observasi_state');
+                }
+            }
+        } catch (error) {
+            showError('Initialization Error', 'Terjadi kesalahan saat memuat halaman. Silakan refresh halaman.');
+        }
     });
 </script>

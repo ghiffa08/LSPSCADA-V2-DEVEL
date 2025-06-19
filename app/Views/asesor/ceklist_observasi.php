@@ -24,35 +24,48 @@
                     </div>
                 </div>
             </div>
-
             <div class="card-body">
-                <!-- Informasi Asesi & Skema -->
+                <!-- Informasi Asesor & Skema -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="alert alert-info border-left-info">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <h6 class="font-weight-bold mb-1">
+                                        <i class="fas fa-user-tie mr-1"></i>Asesor
+                                    </h6>
+                                    <p class="mb-0"><?= esc($asesor['nama_lengkap']) ?></p>
+                                </div>
+                                <div class="col-md-4">
+                                    <h6 class="font-weight-bold mb-1">
+                                        <i class="fas fa-bookmark mr-1"></i>Skema Sertifikasi
+                                    </h6>
+                                    <p class="mb-0"><?= esc($asesor['bidang_kompetensi']) ?></p>
+                                </div>
+                                <div class="col-md-4">
+                                    <h6 class="font-weight-bold mb-1">
+                                        <i class="fas fa-id-badge mr-1"></i>Nomor Registrasi
+                                    </h6>
+                                    <p class="mb-0"><?= esc($asesor['nomor_registrasi'] ?? 'Tidak ada') ?></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div> <!-- Pilih Asesmen -->
                 <div class="row mb-4">
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label class="font-weight-bold"><i class="fas fa-bookmark text-primary mr-1"></i>Nama Skema</label>
-                            <select name="id_skema" id="id_skema" class="form-control select2" required>
-                                <option value="">-- Pilih Skema --</option>
-                                <?php foreach ($skema as $s): ?>
-                                    <option value="<?= $s['id_skema'] ?>" data-id-asesmen="<?= $s['id_asesmen'] ?>"><?= $s['nama_skema'] ?></option>
+                            <label class="font-weight-bold"><i class="fas fa-tasks text-primary mr-1"></i>Pilih Asesmen</label>
+                            <select name="id_asesmen" id="id_asesmen" class="form-control select2" required>
+                                <option value="">-- Pilih Asesmen --</option>
+                                <?php foreach ($asesmen as $a): ?>
+                                    <option value="<?= $a['id_asesmen'] ?>"
+                                        data-id-skema="<?= $a['id_skema'] ?>"
+                                        data-kode-skema="<?= $a['kode_skema'] ?? '' ?>"
+                                        data-nama-skema="<?= $a['nama_skema'] ?>">
+                                        <?= esc($a['tujuan']) ?> - <?= esc($a['nama_skema']) ?>
+                                    </option>
                                 <?php endforeach ?>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label class="font-weight-bold"><i class="fas fa-hashtag text-primary mr-1"></i>Nomor Skema</label>
-                            <input type="text" class="form-control bg-light" id="kode_skema" value="" readonly>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="row mb-4">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label class="font-weight-bold"><i class="fas fa-user text-primary mr-1"></i>Nama Asesi</label>
-                            <select name="id_asesi" id="id_asesi" class="form-control select2" required disabled>
-                                <option value="">-- Pilih Skema Terlebih Dahulu --</option>
                             </select>
                         </div>
                     </div>
@@ -60,6 +73,24 @@
                         <div class="form-group">
                             <label class="font-weight-bold"><i class="fas fa-calendar-alt text-primary mr-1"></i>Tanggal Observasi</label>
                             <input type="date" class="form-control" name="tanggal_observasi" id="tanggal_observasi" value="<?= date('Y-m-d') ?>">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pilih Asesi -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="font-weight-bold"><i class="fas fa-user text-primary mr-1"></i>Nama Asesi</label>
+                            <select name="id_asesi" id="id_asesi" class="form-control select2" required disabled>
+                                <option value="">-- Pilih Asesmen Terlebih Dahulu --</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="font-weight-bold"><i class="fas fa-hashtag text-primary mr-1"></i>Kode Skema</label>
+                            <input type="text" class="form-control bg-light" id="kode_skema" value="" readonly>
                         </div>
                     </div>
                 </div>
@@ -80,23 +111,40 @@
                             <div id="progress-bar" class="progress-bar progress-bar-striped" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
                         </div>
                     </div>
-                </div>
-
-                <!-- Loading Indicator -->
-                <div id="loadingData" class="text-center py-5">
+                </div> <!-- Instruction/Loading Indicator -->
+                <div id="loadingData" class="text-center py-5" style="display: none;">
                     <div class="spinner-border text-primary" role="status">
                         <span class="sr-only">Loading...</span>
                     </div>
                     <p class="mt-2">Memuat data observasi...</p>
                 </div>
 
-                <!-- Form Observasi -->
+                <!-- Initial Instructions -->
+                <div id="initialInstructions" class="alert alert-info text-center py-4">
+                    <i class="fas fa-info-circle fa-2x text-info mb-3"></i>
+                    <h5 class="alert-heading">Instruksi Penggunaan</h5>
+                    <p class="mb-2">Untuk memulai observasi, silakan ikuti langkah berikut:</p>
+                    <ol class="list-unstyled mb-0">
+                        <li class="mb-2"><strong>1.</strong> Pilih <strong>Asesmen</strong> dari dropdown di atas</li>
+                        <li class="mb-2"><strong>2.</strong> Pilih <strong>Asesi</strong> yang akan diobservasi</li>
+                        <li class="mb-0"><strong>3.</strong> Form observasi akan muncul secara otomatis</li>
+                    </ol>
+                </div>
+
+                <!-- Empty Data Message -->
+                <div id="emptyDataMessage" class="alert alert-warning text-center py-4" style="display: none;">
+                    <i class="fas fa-exclamation-triangle fa-2x text-warning mb-3"></i>
+                    <h5 class="alert-heading">Belum Ada Data Asesi</h5>
+                    <p class="mb-2">Belum ada asesi yang terdaftar untuk asesmen yang dipilih.</p>
+                    <p class="mb-0">Pastikan asesi sudah mengajukan permohonan dan statusnya telah disetujui.</p>
+                </div><!-- Form Observasi -->
                 <form action="<?= base_url('/asesor/observasi/save') ?>" method="POST" id="formObservasi" style="display: none;">
                     <?= csrf_field() ?>
                     <input type="hidden" name="id_asesmen" id="form_id_asesmen" value="">
                     <input type="hidden" name="id_skema" id="form_id_skema" value="">
                     <input type="hidden" name="tanggal_observasi" id="form_tanggal_observasi" value="<?= date('Y-m-d') ?>">
                     <input type="hidden" name="id_asesi" id="form_id_asesi" value="">
+                    <input type="hidden" name="id_asesor" id="form_id_asesor" value="<?= $asesor['id_asesor'] ?>">
 
                     <!-- Toolbar Buttons -->
                     <div class="d-flex justify-content-between mb-3">

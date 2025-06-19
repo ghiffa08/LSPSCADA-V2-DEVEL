@@ -182,14 +182,13 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
         $routes->get('dashboard', 'AsesorController::dashboard');
         $routes->post('store', 'AsesorController::store');
         $routes->post('update', 'AsesorController::update');
-        $routes->post('delete', 'AsesorController::delete');
-
-        // Observasi Asesor
+        $routes->post('delete', 'AsesorController::delete');        // Observasi Asesor
         $routes->group('observasi', function ($routes) {
             $routes->get('/', 'CeklistObservasiController::index');
             $routes->get('ceklist', 'CeklistObservasiController::create');
             $routes->get('loadObservasi', 'Api\Observasi::loadObservasi');
             $routes->get('getSkemaDetails', 'Api\Observasi::getSkemaDetails');
+            $routes->get('getAsesiByAsesmen', 'CeklistObservasiController::getAsesiByAsesmen');
             $routes->post('save', 'Api\Observasi::save');
         });
 
