@@ -148,19 +148,14 @@ class Observasi extends DataTableController
         if (empty($id_asesi)) {
             return $this->handleErrorResponse('ID Asesi diperlukan', $isAjax);
         }
-
         try {
-            // Get APL1 ID from pengajuan_asesmen
+            // Note: The relationship between observasi and pengajuan_asesmen is established through id_asesi
+            // However, the observasi table still has id_apl1 field (legacy), so we provide a placeholder
             $db = Database::connect();
-            $pengajuan = $db->table('pengajuan_asesmen')
-                ->select('id_apl1')
-                ->where('id_asesi', $id_asesi)
-                ->where('id_asesmen', $id_asesmen)
-                ->where('deleted_at', null)
-                ->get()
-                ->getRow();
 
-            $id_apl1 = $pengajuan->id_apl1 ?? '0';
+            // Generate a placeholder id_apl1 based on id_asesi for legacy compatibility
+            // This maintains database constraint while the relationship is handled via id_asesi
+            $id_apl1 = 'APL_' . $id_asesi;
 
             // Check for existing observation
             $observasi = null;
@@ -172,14 +167,12 @@ class Observasi extends DataTableController
                     ->getRow();
             }
 
-            $id_observasi = $this->request->getPost('id_observasi') ?? ($observasi->id_observasi ?? null);
-
-            // Prepare master data
+            $id_observasi = $this->request->getPost('id_observasi') ?? ($observasi->id_observasi ?? null);            // Prepare master data
             $masterData = [
                 'id_observasi' => $id_observasi,
                 'id_asesor' => $id_asesor,
                 'id_asesi' => $id_asesi,
-                'id_apl1' => $id_apl1,
+                'id_apl1' => $id_apl1, // Legacy field - actual relationship via id_asesi
                 'tanggal_observasi' => $tanggal_observasi
             ];
 
