@@ -192,6 +192,18 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->post('save', 'Api\Observasi::save');
         });
 
+        // New REST API for Observasi (Production-ready)
+        $routes->group('api/observasi', function ($routes) {
+            $routes->get('/', 'Api\ObservasiV2Controller::index');
+            $routes->get('(:num)', 'Api\ObservasiV2Controller::show/$1');
+            $routes->post('/', 'Api\ObservasiV2Controller::create');
+            $routes->put('(:num)', 'Api\ObservasiV2Controller::update/$1');
+            $routes->get('kuk-structure/(:num)', 'Api\ObservasiV2Controller::getKukStructure/$1');
+            $routes->post('batch', 'Api\ObservasiV2Controller::batchSave');
+            $routes->get('(:num)/summary', 'Api\ObservasiV2Controller::getSummary/$1');
+            $routes->post('validate', 'Api\ObservasiV2Controller::validateObservationData');
+        });
+
         // Feedback Asesi Asesor
         $routes->group('feedback', function ($routes) {
             $routes->get('/', 'FeedbackAsesiController::create');

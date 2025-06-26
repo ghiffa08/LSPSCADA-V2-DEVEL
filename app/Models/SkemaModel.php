@@ -119,7 +119,9 @@ class SkemaModel extends Model
      */
     public function getActiveSchemes(): array
     {
-        return $this->where('status', 'Y')
+        // Explicitly select needed columns to ensure consistent data structure
+        return $this->select('id_skema, kode_skema, nama_skema, jenis_skema')
+            ->where('status', 'Y')
             ->orderBy('nama_skema', 'ASC')
             ->findAll();
     }

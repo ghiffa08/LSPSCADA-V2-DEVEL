@@ -112,13 +112,12 @@ class AsesmenModel extends Model
 
     public function getAllAsesmen()
     {
-
         return $this->db->table('asesmen')
             ->join('skema', 'skema.id_skema=asesmen.id_skema', 'left')
             ->join('tuk', 'tuk.id_tuk=asesmen.id_tuk', 'left')
             ->join('set_tanggal', 'set_tanggal.id_tanggal=asesmen.id_tanggal', 'left')
-            ->select('asesmen.id_asesmen, asesmen.id_skema, asesmen.id_tuk, asesmen.id_tanggal, asesmen.tujuan, skema.nama_skema,skema.kode_skema, skema.jenis_skema, tuk.nama_tuk, DATE_FORMAT(set_tanggal.tanggal, "%d/%m/%Y") AS tanggal')
-            ->Get()->getResultArray();
+            ->select('asesmen.id_asesmen, asesmen.id_skema, asesmen.id_tuk, asesmen.id_tanggal, asesmen.tujuan, skema.nama_skema, skema.kode_skema, skema.jenis_skema, tuk.nama_tuk, DATE_FORMAT(set_tanggal.tanggal, "%d/%m/%Y") AS tanggal')
+            ->get()->getResultArray();
     }
 
     public function getJadwal($id_skema)
@@ -128,7 +127,7 @@ class AsesmenModel extends Model
             ->join('tuk', 'tuk.id_tuk=asesmen.id_tuk', 'left')
             ->join('set_tanggal', 'set_tanggal.id_tanggal=asesmen.id_tanggal', 'left')
             ->select('asesmen.id_asesmen, asesmen.id_tanggal, DATE_FORMAT(set_tanggal.tanggal, "%d/%m/%Y") AS tanggal, set_tanggal.keterangan, asesmen.id_tuk, tuk.nama_tuk')
-            ->Get()->getResultArray();
+            ->get()->getResultArray();
     }
     public function getTuk($id_skema)
     {
@@ -136,6 +135,6 @@ class AsesmenModel extends Model
             ->where('id_skema', $id_skema)
             ->join('tuk', 'tuk.id_tuk=asesmen.id_tuk', 'left')
             ->select('asesmen.id_tuk, tuk.nama_tuk')
-            ->Get()->getResultArray();
+            ->get()->getResultArray();
     }
 }

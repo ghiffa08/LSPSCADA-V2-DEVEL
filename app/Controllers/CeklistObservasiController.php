@@ -47,41 +47,174 @@ class CeklistObservasiController extends ResourceController
     }
     public function create()
     {
-        // Get asesor info and their skema
-        $asesorModel = model('AsesorModel');
-        $asesorInfo = $asesorModel->getByUserIdWithUser($this->id_asesor);
+        try {
+            // Get current user ID
+            $userId = user()->id ?? 0;
+            log_message('debug', 'CeklistObservasi::create - User ID: ' . $userId);
 
-        if (!$asesorInfo) {
-            return redirect()->back()->with('error', 'Data asesor tidak ditemukan. Silakan hubungi administrator.');
-        }
+            // Get asesor info with their skema (one-to-one)
+            $asesorModel = model('AsesorModel');
+            $asesorInfo = $asesorModel->getWithSkema($this->getCurrentAsesorId());
 
-        // Get skema based on asesor's bidang_kompetensi
-        $skemaModel = model('SkemaModel');
-        $skemaList = $skemaModel->where('nama_skema', $asesorInfo['bidang_kompetensi'])->findAll();
+            log_message('debug', 'CeklistObservasi::create - Current asesor ID: ' . $this->getCurrentAsesorId());
+            log_message('debug', 'CeklistObservasi::create - Asesor info: ' . json_encode($asesorInfo));
 
-        if (empty($skemaList)) {
-            return redirect()->back()->with('error', 'Skema sertifikasi asesor tidak ditemukan dalam database.');
-        }
-
-        // Get asesmen data for the skema
-        $asesmen = [];
-        foreach ($skemaList as $skema) {
-            $asesmenData = $this->asesmenModel->where('id_skema', $skema['id_skema'])->findAll();
-            foreach ($asesmenData as $data) {
-                $data['nama_skema'] = $skema['nama_skema'];
-                $data['kode_skema'] = $skema['kode_skema'];
-                $asesmen[] = $data;
+            if (!$asesorInfo) {
+                throw new \Exception('Data asesor tidak ditemukan untuk user ID: ' . $userId);
             }
+
+            // Check if asesor has assigned skema
+            if (empty($asesorInfo['id_skema'])) {
+                throw new \Exception('Asesor belum memiliki skema kompetensi yang ditetapkan');
+            }
+
+            $id_skema = $asesorInfo['id_skema'];
+            log_message('debug', 'CeklistObservasi::create - ID Skema: ' . $id_skema);
+
+            // Get skema data
+            $skemaModel = model('SkemaModel');
+            $skema = $skemaModel->find($id_skema);
+
+            log_message('debug', 'CeklistObservasi::create - Skema data: ' . json_encode($skema));
+
+            if (!$skema) {
+                throw new \Exception('Skema sertifikasi dengan ID ' . $id_skema . ' tidak ditemukan dalam database');
+            }
+
+            // Multiple fallback approach for getting asesmen data
+            $asesmen = [];
+            $method_used = '';
+
+            // Method 1: Try with JOIN
+            try {
+                $db = \Config\Database::connect();
+                $asesmen = $db->table('asesmen')
+                    ->select('asesmen.id_asesmen, asesmen.tujuan, asesmen.id_skema, skema.nama_skema, skema.kode_skema')
+                    ->join('skema', 'asesmen.id_skema = skema.id_skema', 'left')
+                    ->where('asesmen.id_skema', $id_skema)
+                    ->get()
+                    ->getResultArray();
+
+                $method_used = 'JOIN Query';
+                log_message('debug', 'CeklistObservasi::create - Method 1 (JOIN) found: ' . count($asesmen) . ' records');
+            } catch (\Exception $e) {
+                log_message('error', 'CeklistObservasi::create - Method 1 failed: ' . $e->getMessage());
+            }
+
+            // Method 2: Fallback simple query
+            if (empty($asesmen)) {
+                try {
+                    $asesmen = $this->asesmenModel
+                        ->where('id_skema', $id_skema)
+                        ->findAll();
+
+                    $method_used = 'Simple Query + Manual Join';
+                    log_message('debug', 'CeklistObservasi::create - Method 2 (Simple) found: ' . count($asesmen) . ' records');
+
+                    // Manually add skema info
+                    foreach ($asesmen as &$item) {
+                        $item['nama_skema'] = $skema['nama_skema'];
+                        $item['kode_skema'] = $skema['kode_skema'];
+                    }
+                } catch (\Exception $e) {
+                    log_message('error', 'CeklistObservasi::create - Method 2 failed: ' . $e->getMessage());
+                }
+            }
+
+            // Method 3: Check total asesmen in database
+            if (empty($asesmen)) {
+                $totalAsesmen = $this->asesmenModel->countAll();
+                log_message('warning', 'CeklistObservasi::create - No asesmen found for skema ' . $id_skema . '. Total asesmen in DB: ' . $totalAsesmen);
+                $method_used = 'No Data Found';
+
+                if ($totalAsesmen == 0) {
+                    log_message('warning', 'CeklistObservasi::create - Asesmen table is completely empty');
+                }
+            }
+
+            // Validate asesmen data structure
+            $validAsesmen = [];
+            foreach ($asesmen as $a) {
+                if (isset($a['id_asesmen']) && !empty($a['id_asesmen'])) {
+                    // Ensure required fields
+                    if (!isset($a['nama_skema'])) $a['nama_skema'] = $skema['nama_skema'];
+                    if (!isset($a['kode_skema'])) $a['kode_skema'] = $skema['kode_skema'];
+                    $validAsesmen[] = $a;
+                } else {
+                    log_message('warning', 'CeklistObservasi::create - Skipping invalid asesmen: ' . json_encode($a));
+                }
+            }
+
+            log_message('debug', 'CeklistObservasi::create - Valid asesmen count: ' . count($validAsesmen));
+            log_message('debug', 'CeklistObservasi::create - Method used: ' . $method_used);
+
+            // Prepare data for view
+            $data = [
+                'siteTitle' => 'Ceklis Observasi',
+                'asesor' => $asesorInfo,
+                'skema' => [
+                    'id_skema' => $id_skema,
+                    'nama_skema' => $asesorInfo['nama_skema'] ?? $skema['nama_skema'],
+                    'kode_skema' => $asesorInfo['kode_skema'] ?? $skema['kode_skema'],
+                    'jenis_skema' => $asesorInfo['jenis_skema'] ?? $skema['jenis_skema'] ?? ''
+                ],
+                'asesmen' => $validAsesmen
+            ];
+
+            // Add debug info for development
+            if (ENVIRONMENT === 'development') {
+                $data['debug_info'] = [
+                    'user_id' => $userId,
+                    'asesor_id' => $this->getCurrentAsesorId(),
+                    'id_skema' => $id_skema,
+                    'asesmen_count' => count($validAsesmen),
+                    'total_asesmen_db' => $this->asesmenModel->countAll(),
+                    'method_used' => $method_used,
+                    'raw_asesmen_count' => count($asesmen)
+                ];
+            }
+
+            log_message('debug', 'CeklistObservasi::create - Final summary: ' . json_encode([
+                'user_id' => $userId,
+                'asesor_found' => !empty($asesorInfo),
+                'skema_id' => $id_skema,
+                'skema_found' => !empty($skema),
+                'asesmen_count' => count($validAsesmen),
+                'method_used' => $method_used
+            ]));
+
+            return view('asesor/ceklist_observasi', $data);
+        } catch (\Exception $e) {
+            log_message('error', 'CeklistObservasi::create - Exception: ' . $e->getMessage());
+            log_message('error', 'CeklistObservasi::create - Stack trace: ' . $e->getTraceAsString());
+
+            // Return view with error info for debugging
+            return view('asesor/ceklist_observasi', [
+                'siteTitle' => 'Ceklis Observasi',
+                'asesor' => $asesorInfo ?? [],
+                'skema' => [],
+                'asesmen' => [],
+                'error_message' => $e->getMessage(),
+                'debug_info' => [
+                    'user_id' => user()->id ?? 0,
+                    'error' => $e->getMessage(),
+                    'has_asesor_model' => class_exists('\App\Models\AsesorModel'),
+                    'has_asesmen_model' => class_exists('\App\Models\AsesmenModel')
+                ]
+            ]);
         }
+    }
 
-        $data = [
-            'siteTitle' => 'Ceklis Observasi',
-            'asesor' => $asesorInfo,
-            'skemaList' => $skemaList,
-            'asesmen' => $asesmen
-        ];
-
-        return view('asesor/ceklist_observasi', $data);
+    /**
+     * Get current asesor ID from session user
+     *
+     * @return int|null
+     */
+    private function getCurrentAsesorId(): ?int
+    {
+        $asesorModel = model('AsesorModel');
+        $asesor = $asesorModel->getByUserId($this->id_asesor);
+        return $asesor ? $asesor['id_asesor'] : null;
     }
 
     /**

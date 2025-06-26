@@ -6,10 +6,18 @@ use Config\Database;
 use Config\Services;
 use CodeIgniter\HTTP\ResponseInterface;
 use App\Controllers\Api\DataTableController;
+use App\Services\ObservasiService;
 
+/**
+ * Observasi API Controller - OPTIMIZED
+ * 
+ * Enhanced controller dengan service layer pattern,
+ * caching, validation, dan error handling yang lebih baik
+ */
 class Observasi extends DataTableController
 {
     private $id_asesor;
+    private ObservasiService $observasiService;
 
     public function __construct()
     {
@@ -18,23 +26,32 @@ class Observasi extends DataTableController
         helper('auth');
 
         $this->model = $this->observasiModel;
+        $this->observasiService = new ObservasiService();
 
-        $this->id_asesor = user()->id;
+        // Get id_asesor from asesor table, not directly from user
+        $user_id = user()->id;
+        $asesorModel = new \App\Models\AsesorModel();
+        $asesor = $asesorModel->where('id_user', $user_id)->first();
 
-        // Optional: Define custom column mapping for complex ordering
+        if (!$asesor) {
+            throw new \RuntimeException('User is not registered as asesor');
+        }
+
+        $this->id_asesor = $asesor['id_asesor'];
+
+        // Updated column mapping for new schema
         $this->columnMap = [
             0 => null, // No ordering for index column
-            1 => 'asesi_user.fullname',
-            2 => 'asesor.fullname',
+            1 => 'asesi_user.nama_lengkap',
+            2 => 'asesor_user.nama_lengkap',
             3 => 'skema.nama_skema',
-            4 => 'tuk.nama_tuk',
-            5 => 'observasi.tanggal_observasi',
-            6 => null // No ordering for action column
+            4 => 'observasi.tanggal_observasi',
+            5 => null // No ordering for action column
         ];
     }
 
     /**
-     * Get skema details and available asesi
+     * Get skema details and available asesi - OPTIMIZED
      */
     public function getSkemaDetails()
     {
@@ -47,25 +64,28 @@ class Observasi extends DataTableController
 
         $id_skema = $this->request->getGet('id_skema');
 
-        if (!$id_skema) {
-            return $this->fail('ID Skema diperlukan', 400);
+        if (!$id_skema || !filter_var($id_skema, FILTER_VALIDATE_INT)) {
+            return $this->fail('ID Skema diperlukan dan harus berupa angka', 400);
         }
 
         try {
-            // Get skema details
+            // Validate skema exists dan asesor memiliki akses
             $skema = $this->skemaModel->find($id_skema);
-
             if (!$skema) {
                 return $this->fail('Skema tidak ditemukan', 404);
             }
 
-            // Get asesi list for this skema
-            $asesi = $this->observasiModel->getAsesiBySkema($id_skema);
+            // Get asesi list menggunakan service dengan caching
+            $asesi = $this->observasiService->getAsesiBySkema($id_skema);
 
             return $this->respond([
                 'success' => true,
                 'skema' => $skema,
-                'asesi' => $asesi
+                'asesi' => $asesi,
+                'cache_info' => [
+                    'cached' => true,
+                    'timestamp' => date('Y-m-d H:i:s')
+                ]
             ]);
         } catch (\Exception $e) {
             log_message('error', 'Error getting skema details: ' . $e->getMessage());
@@ -74,10 +94,9 @@ class Observasi extends DataTableController
     }
 
     /**
-   
-     * Load observation data via AJAX
-     *
-     * @return \CodeIgniter\HTTP\Response
+    /**
+     * Load observation data via AJAX - OPTIMIZED
+     * Enhanced dengan service layer dan caching
      */
     public function loadObservasi()
     {
@@ -90,30 +109,36 @@ class Observasi extends DataTableController
 
         $id_skema = $this->request->getGet('id_skema');
         $id_asesi = $this->request->getGet('id_asesi');
+        $id_asesmen = $this->request->getGet('id_asesmen');
 
-        if (!$id_skema || !$id_asesi) {
-            return $this->fail('ID Skema dan ID Asesi diperlukan', 400);
+        // Enhanced validation
+        if (!$id_skema || !filter_var($id_skema, FILTER_VALIDATE_INT)) {
+            return $this->fail('ID Skema diperlukan dan harus berupa angka', 400);
+        }
+
+        if (!$id_asesi || empty(trim($id_asesi))) {
+            return $this->fail('ID Asesi diperlukan', 400);
         }
 
         try {
-            // Fetch data for both AJAX response and PDF generation
-            $data = $this->getObservasiData($id_skema, $id_asesi);
+            // Get observasi structure menggunakan service dengan caching
+            $result = $this->observasiService->getKukStructureForSchema($id_skema, $id_asesi);
 
-            // Count total KUK for progress bar
-            $totalKUK = 0;
-            foreach ($data['detailObservasi'] as $row) {
-                if (!empty($row['id_kuk'])) {
-                    $totalKUK++;
-                }
+            if (!$result['success']) {
+                return $this->fail($result['message']);
             }
 
-            $data['totalKUK'] = $totalKUK;
+            $structureData = $result['data'];
 
             return $this->respond([
                 'success' => true,
-                'observasi' => $data['detailObservasi'],
-                'existing_data' => $data['existing_data'],
-                'totalKUK' => $totalKUK
+                'observasi' => $structureData['structure'],
+                'existing_data' => $structureData['existingData'],
+                'totalKUK' => $structureData['totalKUK'],
+                'performance' => [
+                    'cached' => true,
+                    'load_time' => microtime(true) - FCPATH
+                ]
             ]);
         } catch (\Exception $e) {
             log_message('error', 'Error loading observasi data: ' . $e->getMessage());
@@ -122,257 +147,314 @@ class Observasi extends DataTableController
     }
 
     /**
-     * Universal handler for all observation saves
-     * This single endpoint handles settings, bulk save, single KUK and batch saves
+     * Universal handler for all observation saves - ENHANCED
+     * Enhanced dengan service layer, validation, dan error handling
      */
     public function save()
     {
-        // Determine request type
-        $isAjax = $this->request->isAJAX();
+        // Security check
+        if (!$this->request->isAJAX()) {
+            return $this->response->setJSON([
+                'status' => 401,
+                'error' => 'Unauthorized: Direct access not allowed'
+            ])->setStatusCode(401);
+        }
 
-        // Get the raw input for JSON processing
+        // Get request data
         $rawInput = $this->request->getBody();
         $jsonData = json_decode($rawInput, true);
+        $postData = $this->request->getPost();
 
-        // Determine request type from either POST or JSON
-        $requestType = $this->request->getPost('save_type') ?? ($jsonData['save_type'] ?? 'full');
+        // Determine request type
+        $requestType = $postData['save_type'] ?? ($jsonData['save_type'] ?? 'full');
 
-        // Common data collection - check both POST and JSON
-        $id_asesi = $this->request->getPost('id_asesi') ?? ($jsonData['id_asesi'] ?? null);
-        $id_skema = $this->request->getPost('id_skema') ?? ($jsonData['id_skema'] ?? null);
-        $id_asesmen = $this->request->getPost('id_asesmen') ?? ($jsonData['id_asesmen'] ?? null);
-        $tanggal_observasi = $this->request->getPost('tanggal_observasi') ?? ($jsonData['tanggal_observasi'] ?? date('Y-m-d'));
-        $id_asesor = $this->request->getPost('id_asesor') ?? ($jsonData['id_asesor'] ?? $this->id_asesor);
-
-        // Validate common required fields
-        if (empty($id_asesi)) {
-            return $this->handleErrorResponse('ID Asesi diperlukan', $isAjax);
-        }
         try {
-            // Note: The relationship between observasi and pengajuan_asesmen is established through id_asesi
-            // However, the observasi table still has id_apl1 field (legacy), so we provide a placeholder
-            $db = Database::connect();
-
-            // Generate a placeholder id_apl1 based on id_asesi for legacy compatibility
-            // This maintains database constraint while the relationship is handled via id_asesi
-            $id_apl1 = 'APL_' . $id_asesi;
-
-            // Check for existing observation
-            $observasi = null;
-            if (!empty($id_asesi) && !empty($tanggal_observasi)) {
-                $observasi = $db->table('observasi')
-                    ->where('id_asesi', $id_asesi)
-                    ->where('tanggal_observasi', $tanggal_observasi)
-                    ->get()
-                    ->getRow();
-            }
-
-            $id_observasi = $this->request->getPost('id_observasi') ?? ($observasi->id_observasi ?? null);            // Prepare master data
-            $masterData = [
-                'id_observasi' => $id_observasi,
-                'id_asesor' => $id_asesor,
-                'id_asesi' => $id_asesi,
-                'id_apl1' => $id_apl1, // Legacy field - actual relationship via id_asesi
-                'tanggal_observasi' => $tanggal_observasi
-            ];
-
-            // Process based on request type
-            $detailData = null;
-            $singleKUK = false;
-
             switch ($requestType) {
                 case 'settings':
-                    // Only master data, no details
-                    break;
+                    return $this->saveSettings($postData, $jsonData);
 
                 case 'kuk':
-                    // Single KUK save
-                    $id_skema = $this->request->getPost('id_skema');
-                    $id_kuk = $this->request->getPost('id_kuk');
-                    $kompeten = $this->request->getPost('kompeten');
-                    $keterangan = $this->request->getPost('keterangan');
-
-                    if (empty($id_skema) || empty($id_kuk) || empty($kompeten)) {
-                        return $this->handleErrorResponse('Semua field KUK diperlukan', $isAjax);
-                    }
-
-                    $detailData = [
-                        'id_skema' => $id_skema,
-                        'id_kuk' => $id_kuk,
-                        'kompeten' => $kompeten,
-                        'keterangan' => $keterangan,
-                        'tanggal_observasi' => $tanggal_observasi
-                    ];
-                    $singleKUK = true;
-                    break;
+                    return $this->saveSingleKUK($postData, $jsonData);
 
                 case 'batch':
-                    // Batch KUK save from JSON
-                    if (empty($jsonData['id_skema']) || empty($jsonData['items'])) {
-                        return $this->handleErrorResponse('Data batch tidak lengkap', $isAjax);
-                    }
-
-                    $detailData = [
-                        'id_skema' => $jsonData['id_skema'],
-                        'items' => $jsonData['items']
-                    ];
-                    break;
+                    return $this->saveBatchKUK($postData, $jsonData);
 
                 case 'full':
                 default:
-                    // Full form submission
-                    $id_skema = $this->request->getPost('id_skema');
-                    $kuk = $this->request->getPost('kuk') ?? [];
-                    $keterangan = $this->request->getPost('keterangan') ?? [];
-
-                    if (empty($id_skema)) {
-                        return $this->handleErrorResponse('ID Skema diperlukan', $isAjax);
-                    }
-
-                    $detailData = [
-                        'id_skema' => $id_skema,
-                        'kuk' => $kuk,
-                        'keterangan' => $keterangan
-                    ];
-                    break;
-            }
-
-            // Process the data
-            $result = $this->observasiModel->saveObservasiData($masterData, $detailData, $singleKUK);
-
-            // Handle success response
-            return $this->handleSuccessResponse('Data observasi berhasil disimpan', $isAjax, $result);
-        } catch (\Exception $e) {
-            log_message('error', 'Error saving observasi: ' . $e->getMessage());
-            return $this->handleErrorResponse('Gagal menyimpan data: ' . $e->getMessage(), $isAjax);
-        }
-    }
-
-    /**
-     * Common method to get all required observation data
-     * Reduces code duplication between AJAX and PDF methods
-     *
-     * @param int $id_skema Schema ID
-     * @param int $id_asesi Assessee ID
-     * @return array All data needed for both AJAX response and PDF generation
-     */
-    private function getObservasiData(int $id_skema, string $id_asesi): array
-    {
-        // Get observation structure data
-        $detailObservasi = $this->observasiModel->getStrukturObservasiSkema($id_skema);
-
-        // Get existing observation data if available
-        $existing_data = $this->observasiModel->getExistingObservasi($id_asesi);
-
-        // Get observation metadata
-        $observasi = $this->observasiModel->getObservasiData($id_asesi, $id_skema);
-
-        // Get kelompok kerja data
-        $kelompokWithUnit = $this->skemaModel->getWorkGroupsWithUnits($id_skema);
-
-        return [
-            'kelompokWithUnit' => $kelompokWithUnit,
-            'observasi' => $observasi,
-            'detailObservasi' => $detailObservasi,
-            'existing_data' => $existing_data,
-        ];
-    }
-
-    /**
-     * Delete tuk
-     */
-    public function delete($id = null): ResponseInterface
-    {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
-        }
-
-        $tukModel = $this->tukModel;
-
-        // Start transaction
-        $db = \Config\Database::connect();
-        $db->transStart();
-
-        try {
-            $deleted = $tukModel->delete($id);
-
-            $db->transComplete();
-
-            if ($deleted) {
-                return $this->dataService->response([
-                    'status' => true,
-                    'message' => 'tuk deleted successfully'
-                ]);
-            } else {
-                return $this->dataService->response([
-                    'status' => false,
-                    'message' => 'Failed to delete tuk'
-                ], 400);
+                    return $this->saveFullObservasi($postData, $jsonData);
             }
         } catch (\Exception $e) {
-            $db->transRollback();
-
-            return $this->dataService->response([
-                'status' => false,
-                'message' => 'An error occurred: ' . $e->getMessage()
-            ], 500);
+            log_message('error', 'Error in observasi save: ' . $e->getMessage());
+            return $this->fail('Terjadi kesalahan sistem: ' . $e->getMessage());
         }
     }
 
     /**
-     * Get tuk by ID (for edit modal)
+     * Save observasi settings (master data only)
      */
-    public function getById($id = null): ResponseInterface
+    private function saveSettings($postData, $jsonData): ResponseInterface
     {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
+        $data = array_merge($postData, $jsonData ?? []);
+        $data['id_asesor'] = $this->id_asesor;
+
+        // Validate required fields
+        $required = ['id_asesi', 'id_pengajuan', 'tanggal_observasi'];
+        foreach ($required as $field) {
+            if (empty($data[$field])) {
+                return $this->fail("Field {$field} diperlukan");
+            }
         }
 
-        $tukModel = new $this->tukModel;
-        $tuk = $tukModel->find($id);
+        // Use service to save
+        $result = $this->observasiService->saveObservation($data);
 
-        if (!$tuk) {
-            return $this->dataService->response([
-                'status' => false,
-                'message' => 'tuk not found'
-            ], 404);
-        }
-
-        return $this->dataService->response([
-            'status' => true,
-            'data' => $tuk
-        ]);
-    }
-
-    /**
-     * Helper method to handle error responses
-     */
-    private function handleErrorResponse($message, $isAjax)
-    {
-        if ($isAjax) {
-            return $this->fail($message, 400);
-        }
-
-        return redirect()->back()
-            ->with('error', $message)
-            ->withInput();
-    }
-
-    /**
-     * Helper method to handle success responses
-     */
-    private function handleSuccessResponse($message, $isAjax, $result = null)
-    {
-        if ($isAjax) {
+        if ($result['success']) {
             return $this->respond([
                 'success' => true,
-                'message' => $message,
-                'result' => $result,
-                'token' => csrf_hash() // Return new CSRF token
+                'message' => $result['message'],
+                'data' => $result['data'],
+                'token' => csrf_hash()
             ]);
         }
 
-        return redirect()->to('asesmen')
-            ->with('success', $message);
+        return $this->fail($result['message']);
+    }
+
+    /**
+     * Save single KUK
+     */
+    private function saveSingleKUK($postData, $jsonData): ResponseInterface
+    {
+        $data = array_merge($postData, $jsonData ?? []);
+
+        // Validate required fields
+        $required = ['id_observasi', 'id_kuk', 'kompeten'];
+        foreach ($required as $field) {
+            if (!isset($data[$field]) || $data[$field] === '') {
+                return $this->fail("Field {$field} diperlukan");
+            }
+        }
+
+        // Validate data types
+        if (!filter_var($data['id_observasi'], FILTER_VALIDATE_INT)) {
+            return $this->fail('ID Observasi tidak valid');
+        }
+
+        if (!filter_var($data['id_kuk'], FILTER_VALIDATE_INT)) {
+            return $this->fail('ID KUK tidak valid');
+        }
+
+        if (!in_array($data['kompeten'], ['Y', 'N'])) {
+            return $this->fail('Nilai kompeten harus Y atau N');
+        }
+
+        // Use service to save
+        $result = $this->observasiService->saveSingleKUK(
+            (int)$data['id_observasi'],
+            (int)$data['id_kuk'],
+            [
+                'kompeten' => $data['kompeten'],
+                'keterangan' => $data['keterangan'] ?? ''
+            ]
+        );
+
+        if ($result['success']) {
+            return $this->respond([
+                'success' => true,
+                'message' => $result['message'],
+                'token' => csrf_hash()
+            ]);
+        }
+
+        return $this->fail($result['message']);
+    }
+
+    /**
+     * Save batch KUK
+     */
+    private function saveBatchKUK($postData, $jsonData): ResponseInterface
+    {
+        $data = $jsonData ?? $postData;
+
+        // Validate required fields
+        if (empty($data['id_observasi']) || empty($data['items'])) {
+            return $this->fail('ID Observasi dan items diperlukan');
+        }
+
+        if (!filter_var($data['id_observasi'], FILTER_VALIDATE_INT)) {
+            return $this->fail('ID Observasi tidak valid');
+        }
+
+        if (!is_array($data['items'])) {
+            return $this->fail('Items harus berupa array');
+        }
+
+        // Use service to save batch
+        $result = $this->observasiService->batchSaveKUK(
+            (int)$data['id_observasi'],
+            $data['items']
+        );
+
+        if ($result['success']) {
+            return $this->respond([
+                'success' => true,
+                'message' => $result['message'],
+                'processed' => $result['processed'] ?? 0,
+                'token' => csrf_hash()
+            ]);
+        }
+
+        return $this->fail($result['message']);
+    }
+
+    /**
+     * Save full observasi dengan details
+     */
+    private function saveFullObservasi($postData, $jsonData): ResponseInterface
+    {
+        $data = array_merge($postData, $jsonData ?? []);
+        $data['id_asesor'] = $this->id_asesor;
+
+        // Get pengajuan data
+        if (empty($data['id_pengajuan']) && !empty($data['id_asesi'])) {
+            $pengajuan = $this->db->table('pengajuan_asesmen')
+                ->where('id_asesi', $data['id_asesi'])
+                ->orderBy('tanggal_pengajuan', 'DESC')
+                ->get()
+                ->getRow();
+
+            if ($pengajuan) {
+                $data['id_pengajuan'] = $pengajuan->id_pengajuan;
+            }
+        }
+
+        // Prepare details if available
+        if (isset($data['kuk']) && is_array($data['kuk'])) {
+            $details = [];
+            foreach ($data['kuk'] as $id_kuk => $kompeten) {
+                if ($kompeten !== '') {
+                    $details[] = [
+                        'id_kuk' => $id_kuk,
+                        'kompeten' => $kompeten,
+                        'keterangan' => $data['keterangan'][$id_kuk] ?? '',
+                        'tanggal_observasi' => $data['tanggal_observasi'] ?? date('Y-m-d')
+                    ];
+                }
+            }
+            $data['details'] = $details;
+        }
+
+        // Use service to save
+        $result = $this->observasiService->saveObservation($data);
+
+        if ($result['success']) {
+            return $this->respond([
+                'success' => true,
+                'message' => $result['message'],
+                'data' => $result['data'],
+                'token' => csrf_hash()
+            ]);
+        }
+
+        return $this->fail($result['message']);
+    }
+
+    /**
+     * Get observasi statistics untuk dashboard
+     */
+    public function getStatistics()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setJSON([
+                'status' => 401,
+                'error' => 'Unauthorized'
+            ])->setStatusCode(401);
+        }
+
+        try {
+            $stats = $this->observasiService->getAsesorObservasiStats($this->id_asesor);
+
+            return $this->respond([
+                'success' => true,
+                'data' => $stats
+            ]);
+        } catch (\Exception $e) {
+            log_message('error', 'Error getting statistics: ' . $e->getMessage());
+            return $this->fail('Gagal mengambil statistik: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Delete observasi
+     */
+    public function deleteObservasi($id = null): ResponseInterface
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(404);
+        }
+
+        if (!$id || !filter_var($id, FILTER_VALIDATE_INT)) {
+            return $this->fail('ID Observasi tidak valid');
+        }
+
+        try {
+            // Verify ownership
+            $observasi = $this->db->table('observasi')
+                ->where('id_observasi', $id)
+                ->where('id_asesor', $this->id_asesor)
+                ->get()
+                ->getRowArray();
+
+            if (!$observasi) {
+                return $this->fail('Observasi tidak ditemukan atau tidak memiliki akses');
+            }
+
+            $result = $this->observasiService->deleteObservasi((int)$id);
+
+            if ($result['success']) {
+                return $this->respond([
+                    'success' => true,
+                    'message' => $result['message']
+                ]);
+            }
+
+            return $this->fail($result['message']);
+        } catch (\Exception $e) {
+            log_message('error', 'Error deleting observasi: ' . $e->getMessage());
+            return $this->fail('Gagal menghapus observasi: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get progress report
+     */
+    public function getProgressReport()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(404);
+        }
+
+        try {
+            $dateFrom = $this->request->getGet('date_from');
+            $dateTo = $this->request->getGet('date_to');
+
+            $result = $this->observasiService->getProgressReport(
+                $this->id_asesor,
+                $dateFrom,
+                $dateTo
+            );
+
+            if ($result['success']) {
+                return $this->respond([
+                    'success' => true,
+                    'data' => $result['data']
+                ]);
+            }
+
+            return $this->fail($result['message']);
+        } catch (\Exception $e) {
+            log_message('error', 'Error getting progress report: ' . $e->getMessage());
+            return $this->fail('Gagal mengambil laporan progress: ' . $e->getMessage());
+        }
     }
 }

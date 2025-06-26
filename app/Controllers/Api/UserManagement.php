@@ -478,16 +478,31 @@ class UserManagement extends DataTableController
 
         $data = $this->request->getPost();
 
-        // Validate required fields
-        $required = ['username', 'email', 'nama_lengkap', 'password', 'bidang_kompetensi'];
+        // Debug log
+        log_message('debug', 'Create Asesor User - Raw POST data: ' . json_encode($data));
+
+        // Validate required fields (changed from skema_ids to skema_id)
+        $required = ['username', 'email', 'nama_lengkap', 'password', 'skema_id'];
         foreach ($required as $field) {
             if (empty($data[$field])) {
+                log_message('error', "Create Asesor User - Missing required field: {$field}");
                 return $this->response->setStatusCode(400)->setJSON([
                     'status' => false,
                     'message' => "Field $field is required"
                 ]);
             }
         }
+
+        // Validate skema_id is a valid integer
+        if (!filter_var($data['skema_id'], FILTER_VALIDATE_INT)) {
+            log_message('error', "Create Asesor User - Invalid skema_id: " . $data['skema_id']);
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => false,
+                'message' => "Invalid skema ID"
+            ]);
+        }
+
+        log_message('debug', 'Create Asesor User - Processed skema_id: ' . $data['skema_id']);
 
         try {
             $result = $this->model->createAsesorUser($data);
@@ -506,6 +521,7 @@ class UserManagement extends DataTableController
                 ]);
             }
         } catch (\Exception $e) {
+            log_message('error', 'Create Asesor User - Exception: ' . $e->getMessage());
             return $this->response->setStatusCode(500)->setJSON([
                 'status' => false,
                 'message' => 'Error creating asesor user: ' . $e->getMessage()
@@ -870,8 +886,7 @@ class UserManagement extends DataTableController
             $asesorModel = new \App\Models\AsesorModel();
 
             $updateData = [
-                'nomor_registrasi' => $data['nomor_registrasi'] ?? null,
-                'bidang_kompetensi' => $data['bidang_kompetensi'] ?? null
+                'nomor_registrasi' => $data['nomor_registrasi'] ?? null
             ];
 
             // Remove empty values
@@ -879,27 +894,53 @@ class UserManagement extends DataTableController
                 return $value !== null && $value !== '';
             });
 
-            if (empty($updateData)) {
+            $hasUpdates = !empty($updateData);
+            $skemaUpdated = false;
+
+            // Update asesor basic data if we have any
+            if ($hasUpdates) {
+                $updated = $asesorModel->update($asesorId, $updateData);
+                if (!$updated) {
+                    return $this->response->setStatusCode(400)->setJSON([
+                        'status' => false,
+                        'message' => 'Failed to update asesor data',
+                        'errors' => $asesorModel->errors()
+                    ]);
+                }
+            }
+
+            // Handle skema assignment (single skema)
+            if (isset($data['skema_id'])) {
+                $skemaId = $data['skema_id'];
+
+                // Validate skema_id
+                if (!empty($skemaId) && !filter_var($skemaId, FILTER_VALIDATE_INT)) {
+                    return $this->response->setStatusCode(400)->setJSON([
+                        'status' => false,
+                        'message' => 'Invalid skema ID'
+                    ]);
+                }
+
+                $skemaUpdated = $asesorModel->updateAsesorSkema($asesorId, $skemaId);
+                if (!$skemaUpdated) {
+                    return $this->response->setStatusCode(400)->setJSON([
+                        'status' => false,
+                        'message' => 'Failed to update asesor skema assignment'
+                    ]);
+                }
+            }
+
+            if (!$hasUpdates && !$skemaUpdated) {
                 return $this->response->setStatusCode(400)->setJSON([
                     'status' => false,
                     'message' => 'No data to update'
                 ]);
             }
 
-            $updated = $asesorModel->update($asesorId, $updateData);
-
-            if ($updated) {
-                return $this->response->setJSON([
-                    'status' => true,
-                    'message' => 'Asesor data updated successfully'
-                ]);
-            } else {
-                return $this->response->setStatusCode(400)->setJSON([
-                    'status' => false,
-                    'message' => 'Failed to update asesor data',
-                    'errors' => $asesorModel->errors()
-                ]);
-            }
+            return $this->response->setJSON([
+                'status' => true,
+                'message' => 'Asesor data updated successfully'
+            ]);
         } catch (\Exception $e) {
             return $this->response->setStatusCode(500)->setJSON([
                 'status' => false,

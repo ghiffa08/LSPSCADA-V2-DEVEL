@@ -496,11 +496,11 @@
                                     <i class="fas fa-award"></i>
                                 </div>
                             </div>
-                            <select class="form-control" id="asesor-skema-sertifikasi" name="bidang_kompetensi" required>
-                                <option value="">Memuat skema sertifikasi...</option>
+                            <select class="form-control select2" id="asesor-skema-sertifikasi" name="skema_id" required>
+                                <option value="">Pilih Skema Sertifikasi...</option>
                             </select>
                         </div>
-                        <small class="form-text text-muted">Pilih bidang kompetensi/skema sertifikasi asesor</small>
+                        <small class="form-text text-muted">Pilih satu skema kompetensi untuk asesor</small>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -567,11 +567,19 @@
                     if (response.status && response.data) {
                         let select = $('#asesor-skema-sertifikasi');
                         select.empty();
-                        select.append('<option value="">Pilih Skema Sertifikasi</option>');
 
+                        // Now using id_skema as value instead of nama_skema
                         response.data.forEach(function(skema) {
-                            select.append('<option value="' + skema.nama_skema + '">' + skema.nama_skema + '</option>');
+                            select.append('<option value="' + skema.id_skema + '">' + skema.kode_skema + ' - ' + skema.nama_skema + '</option>');
                         });
+
+                        // Initialize select2 for single selection
+                        if ($.fn.select2) {
+                            select.select2({
+                                placeholder: "Pilih Skema Sertifikasi",
+                                allowClear: true
+                            });
+                        }
                     } else {
                         $('#asesor-skema-sertifikasi').html('<option value="">Gagal memuat skema sertifikasi</option>');
                     }
@@ -615,8 +623,8 @@
                                                 </tr>
                                                 <tr>
                                                     <td><strong>Skema Sertifikasi:</strong></td>
-                                                    <td>
-                                                        <span class="badge badge-info">${asesor.bidang_kompetensi || '-'}</span>
+                                                    <td id="asesor-skema-badges">
+                                                        ${renderAsesorSkemaBadges(asesor)}
                                                     </td>
                                                 </tr>
                                             </table>
@@ -634,6 +642,28 @@
                     // Silent error, asesor details not critical
                 }
             });
+        }
+
+        // Helper function to render asesor skema badges
+        function renderAsesorSkemaBadges(asesor) {
+            if (!asesor.bidang_kompetensi && (!asesor.skema_ids || asesor.skema_ids.length === 0)) {
+                return '<span class="badge badge-secondary">Tidak ada skema</span>';
+            }
+
+            // If using the new schema with skema_ids property
+            if (asesor.skema_ids) {
+                const skemaArray = asesor.bidang_kompetensi ? asesor.bidang_kompetensi.split(', ') : [];
+                let badges = '';
+
+                skemaArray.forEach(skema => {
+                    badges += `<span class="badge badge-info mr-1">${skema}</span>`;
+                });
+
+                return badges;
+            }
+
+            // Fallback for old format
+            return `<span class="badge badge-info">${asesor.bidang_kompetensi}</span>`;
         }
 
         let usersTable = $('#users-table').DataTable({
@@ -1354,7 +1384,29 @@
                 return;
             }
 
-            let formData = $(this).serialize();
+            // Get selected skema values - FIX: formData.serialize() tidak bisa menangkap multiple select dengan benar
+            // Kita perlu meng-handle select2 multiple secara manual
+            let skemaIds = $('#asesor-skema-sertifikasi').val();
+
+            // Validasi skema
+            if (!skemaIds || skemaIds.length === 0) {
+                showAlert('error', 'Pilih minimal satu skema sertifikasi');
+                return;
+            }
+
+            // Get form data sebagai objek untuk dimanipulasi
+            let formData = {};
+            $(this).serializeArray().forEach(function(item) {
+                formData[item.name] = item.value;
+            });
+
+            // Secara eksplisit menambahkan skema_ids ke formData
+            formData['skema_ids'] = skemaIds;
+
+            // Log untuk debugging
+            console.log('Form submission - selected skemas:', skemaIds);
+            console.log('Form data:', formData);
+
             let submitBtn = $(this).find('button[type="submit"]');
             let originalText = submitBtn.html();
 
@@ -1375,8 +1427,14 @@
                         showAlert('error', response.message);
                     }
                 },
-                error: function() {
-                    showAlert('error', 'Terjadi kesalahan saat membuat asesor');
+                error: function(xhr, status, error) {
+                    console.error('Error response:', xhr.responseText);
+                    try {
+                        let errorResponse = JSON.parse(xhr.responseText);
+                        showAlert('error', errorResponse.message || 'Terjadi kesalahan saat membuat asesor');
+                    } catch (e) {
+                        showAlert('error', 'Terjadi kesalahan saat membuat asesor');
+                    }
                 },
                 complete: function() {
                     submitBtn.prop('disabled', false).html(originalText);

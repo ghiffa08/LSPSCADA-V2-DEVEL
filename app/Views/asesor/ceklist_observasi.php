@@ -40,7 +40,16 @@
                                     <h6 class="font-weight-bold mb-1">
                                         <i class="fas fa-bookmark mr-1"></i>Skema Sertifikasi
                                     </h6>
-                                    <p class="mb-0"><?= esc($asesor['bidang_kompetensi']) ?></p>
+                                    <p class="mb-0">
+                                        <?php
+                                        // Skema dari controller (one-to-one relationship)
+                                        if (isset($skema) && is_array($skema)) {
+                                            echo esc($skema['nama_skema']) . ' (' . esc($skema['kode_skema']) . ')';
+                                        } else {
+                                            echo 'Tidak ada skema';
+                                        }
+                                        ?>
+                                    </p>
                                 </div>
                                 <div class="col-md-4">
                                     <h6 class="font-weight-bold mb-1">
@@ -51,21 +60,78 @@
                             </div>
                         </div>
                     </div>
-                </div> <!-- Pilih Asesmen -->
+                </div>
+
+                <!-- Debug Info Panel (Development Only) -->
+                <?php if (ENVIRONMENT === 'development' && isset($debug_info)): ?>
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <h6><i class="fas fa-bug mr-2"></i>Debug Information (Development Mode)</h6>
+                                <div class="row">
+                                    <div class="col-md-3">
+                                        <strong>User ID:</strong> <?= $debug_info['user_id'] ?? 'N/A' ?><br>
+                                        <strong>Asesor ID:</strong> <?= $debug_info['asesor_id'] ?? 'N/A' ?><br>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Skema ID:</strong> <?= $debug_info['id_skema'] ?? 'N/A' ?><br>
+                                        <strong>Method Used:</strong> <?= $debug_info['method_used'] ?? 'N/A' ?><br>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <strong>Asesmen Count:</strong> <?= $debug_info['asesmen_count'] ?? 0 ?><br>
+                                        <strong>Total in DB:</strong> <?= $debug_info['total_asesmen_db'] ?? 0 ?><br>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <?php if (isset($debug_info['error'])): ?>
+                                            <strong style="color: red;">Error:</strong><br>
+                                            <small><?= esc($debug_info['error']) ?></small>
+                                        <?php else: ?>
+                                            <strong style="color: green;">Status: OK</strong>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <!-- Error Message Display -->
+                <?php if (isset($error_message)): ?>
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="alert alert-danger">
+                                <h6><i class="fas fa-exclamation-triangle mr-2"></i>Error</h6>
+                                <p><?= esc($error_message) ?></p>
+                                <small>Silakan hubungi administrator atau coba refresh halaman.</small>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <!-- Pilih Asesmen -->
                 <div class="row mb-4">
                     <div class="col-md-6">
                         <div class="form-group">
                             <label class="font-weight-bold"><i class="fas fa-tasks text-primary mr-1"></i>Pilih Asesmen</label>
                             <select name="id_asesmen" id="id_asesmen" class="form-control select2" required>
                                 <option value="">-- Pilih Asesmen --</option>
-                                <?php foreach ($asesmen as $a): ?>
-                                    <option value="<?= $a['id_asesmen'] ?>"
-                                        data-id-skema="<?= $a['id_skema'] ?>"
-                                        data-kode-skema="<?= $a['kode_skema'] ?? '' ?>"
-                                        data-nama-skema="<?= $a['nama_skema'] ?>">
-                                        <?= esc($a['tujuan']) ?> - <?= esc($a['nama_skema']) ?>
-                                    </option>
-                                <?php endforeach ?>
+                                <?php if (isset($asesmen) && is_array($asesmen) && !empty($asesmen)): ?>
+                                    <?php foreach ($asesmen as $a): ?>
+                                        <?php if (isset($a['id_asesmen']) && !empty($a['id_asesmen'])): ?>
+                                            <option value="<?= $a['id_asesmen'] ?>"
+                                                data-id-skema="<?= $a['id_skema'] ?? '' ?>"
+                                                data-kode-skema="<?= $a['kode_skema'] ?? '' ?>"
+                                                data-nama-skema="<?= $a['nama_skema'] ?? '' ?>">
+                                                <?= esc($a['tujuan'] ?? 'Asesmen') ?> - <?= esc($a['nama_skema'] ?? 'Unknown') ?>
+                                            </option>
+                                        <?php else: ?>
+                                            <!-- Data asesmen tidak lengkap, skip -->
+                                            <?php log_message('warning', 'Skipping asesmen data without id_asesmen: ' . json_encode($a)); ?>
+                                        <?php endif; ?>
+                                    <?php endforeach ?>
+                                <?php else: ?>
+                                    <option value="" disabled>Tidak ada data asesmen</option>
+                                <?php endif; ?>
                             </select>
                         </div>
                     </div>

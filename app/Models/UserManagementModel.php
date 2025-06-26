@@ -436,7 +436,6 @@ class UserManagementModel extends Model
             // Create asesor record
             $asesorData = [
                 'id_user' => $userId,
-                'bidang_kompetensi' => $userData['bidang_kompetensi'],
                 'nomor_registrasi' => $userData['nomor_registrasi'] ?? null
             ];
 
@@ -447,6 +446,32 @@ class UserManagementModel extends Model
                     'errors' => $asesorModel->errors(),
                     'message' => 'Failed to create asesor record'
                 ];
+            }
+
+            // Get the new asesor ID
+            $asesorId = $asesorModel->getInsertID();
+
+            // Handle skema (now single skema instead of multiple)
+            $skema_id = $userData['skema_id'] ?? null;
+
+            if (!empty($skema_id)) {
+                // Log debug info
+                log_message('debug', 'Create Asesor - Handling skema_id: ' . $skema_id);
+
+                // Update asesor with skema
+                $asesorData['id_skema'] = $skema_id;
+
+                // Update the asesor record with skema
+                if (!$asesorModel->update($asesorId, ['id_skema' => $skema_id])) {
+                    log_message('error', 'Failed to assign skema to asesor: ' . $asesorId);
+                    $db->transRollback();
+                    return [
+                        'success' => false,
+                        'message' => 'Failed to assign skema to asesor'
+                    ];
+                }
+
+                log_message('debug', 'Create Asesor - Successfully assigned skema ' . $skema_id . ' to asesor ' . $asesorId);
             }
 
             $db->transCommit();

@@ -14,21 +14,12 @@ class ObservasiModel extends Model
     protected $useAutoIncrement = true;
     protected $returnType       = 'array';
     protected $useSoftDeletes   = false;
-    protected $protectFields    = false;
+    protected $protectFields    = true;
     protected $allowedFields    = [
         'id_asesor',
         'id_asesi',
-        'id_apl1', // Legacy field maintained for database compatibility
-        'id_pengajuan', // For future use when schema is updated
-        'id_asesmen',
-        'id_skema',
-        'id_kuk',
-        'kompeten',
-        'keterangan',
-        'tanggal_observasi',
-        'created_at',
-        'updated_at'
-
+        'id_pengajuan', // Foreign key to pengajuan_asesmen table
+        'tanggal_observasi'
     ];
 
     protected bool $allowEmptyInserts = false;
@@ -70,13 +61,12 @@ class ObservasiModel extends Model
      * @return object
      */    protected function applyDataTableJoins($builder)
     {
-        return $builder->join('asesi', 'CONVERT(asesi.id_asesi USING utf8mb4) = CONVERT(observasi.id_asesi USING utf8mb4)', 'inner', false)
+        return $builder->join('asesi', 'asesi.id_asesi = observasi.id_asesi', 'inner')
             ->join('users as asesi_user', 'asesi_user.id = asesi.id_user')
-            ->join('pengajuan_asesmen', 'CONVERT(pengajuan_asesmen.id_asesi USING utf8mb4) = CONVERT(observasi.id_asesi USING utf8mb4)', 'inner', false)
-            ->join('asesmen', 'asesmen.id_skema = pengajuan_asesmen.id_skema')
-            ->join('tuk', 'tuk.id_tuk = asesmen.id_tuk')
-            ->join('skema', 'skema.id_skema = asesmen.id_skema')
-            ->join('users as asesor', 'asesor.id = observasi.id_asesor');
+            ->join('pengajuan_asesmen', 'pengajuan_asesmen.id_pengajuan = observasi.id_pengajuan', 'inner')
+            ->join('asesor', 'asesor.id_asesor = observasi.id_asesor', 'inner')
+            ->join('users as asesor_user', 'asesor_user.id = asesor.id_user', 'inner')
+            ->join('skema', 'skema.id_skema = pengajuan_asesmen.id_skema');
     }
 
     /**
@@ -88,11 +78,11 @@ class ObservasiModel extends Model
     {
         return $builder->select(
             'observasi.*, 
-            asesor.nama_lengkap AS nama_asesor, 
+            asesor_user.nama_lengkap AS nama_asesor, 
             asesi_user.nama_lengkap AS nama_asesi, 
-            tuk.nama_tuk, 
-            tuk.jenis_tuk, 
-            skema.nama_skema'
+            skema.nama_skema,
+            pengajuan_asesmen.status_pengajuan,
+            pengajuan_asesmen.status'
         );
     }
 
@@ -116,11 +106,13 @@ class ObservasiModel extends Model
         $builder = $this->db->table('pengajuan_asesmen');
         $builder->select('
             asesi.id_asesi, 
-            users.nama_lengkap as nama_lengkap
+            users.nama_lengkap as nama_lengkap,
+            pengajuan_asesmen.status_pengajuan
         ');
         $builder->join('asesi', 'asesi.id_asesi = pengajuan_asesmen.id_asesi', 'inner');
         $builder->join('users', 'users.id = asesi.id_user', 'inner');
         $builder->where('pengajuan_asesmen.id_skema', $id_skema);
+        $builder->where('pengajuan_asesmen.status_pengajuan', 'diterima'); // Only accepted applications
 
         return $builder->get()->getResultArray();
     }
@@ -184,7 +176,7 @@ class ObservasiModel extends Model
         // First get the schema ID from the observation
         $observasiBuilder = $this->db->table('observasi');
         $observasiBuilder->select('pengajuan_asesmen.id_skema');
-        $observasiBuilder->join('pengajuan_asesmen', 'CONVERT(pengajuan_asesmen.id_asesi USING utf8mb4) = CONVERT(observasi.id_asesi USING utf8mb4)', 'inner', false);
+        $observasiBuilder->join('pengajuan_asesmen', 'pengajuan_asesmen.id_pengajuan = observasi.id_pengajuan', 'inner');
         $observasiBuilder->where('observasi.id_observasi', $id_observasi);
 
         $observasiResult = $observasiBuilder->get()->getRowArray();
@@ -196,48 +188,7 @@ class ObservasiModel extends Model
         $id_skema = $observasiResult['id_skema'];
 
         // Now use the schema ID to get the structure
-        $builder = $this->db->table('skema');
-
-        $builder->select([
-            'skema.id_skema',
-            'skema.kode_skema',
-            'skema.nama_skema',
-            'skema.jenis_skema',
-            'unit.id_unit',
-            'unit.kode_unit',
-            'unit.nama_unit',
-            'elemen.id_elemen',
-            'elemen.kode_elemen',
-            'elemen.nama_elemen',
-            'kuk.id_kuk',
-            'kuk.kode_kuk',
-            'kuk.nama_kuk AS kriteria_unjuk_kerja',
-            'kelompok_kerja.id_kelompok',
-            'kelompok_kerja.nama_kelompok',
-            'observasi.id_observasi' // Include observation ID for reference
-        ]);
-
-        // Optimize join order to start with smallest tables and filter early
-        $builder->join('kelompok_kerja', 'kelompok_kerja.id_skema = skema.id_skema', 'inner');
-        $builder->join('kelompok_unit', 'kelompok_unit.id_kelompok = kelompok_kerja.id_kelompok', 'inner');
-        $builder->join('unit', 'unit.id_unit = kelompok_unit.id_unit AND unit.id_skema = skema.id_skema', 'inner');        // Join with observasi to filter by id_observasi
-        $builder->join('observasi', 'observasi.id_observasi = ' . $id_observasi, 'inner');
-        $builder->join('pengajuan_asesmen', 'CONVERT(pengajuan_asesmen.id_asesi USING utf8mb4) = CONVERT(observasi.id_asesi USING utf8mb4) AND pengajuan_asesmen.id_skema = skema.id_skema', 'inner', false);
-
-        // Apply filtering
-        $builder->where('skema.id_skema', $id_skema);
-        $builder->where('skema.status', 'Y');
-        $builder->where('unit.status', 'Y');
-
-        // Now join larger tables after filtering
-        $builder->join('elemen', 'elemen.id_unit = unit.id_unit AND elemen.id_skema = skema.id_skema', 'left');
-        $builder->join('kuk', 'kuk.id_elemen = elemen.id_elemen AND kuk.id_unit = unit.id_unit AND kuk.id_skema = skema.id_skema', 'left');
-
-        $builder->orderBy('unit.kode_unit', 'ASC');
-        $builder->orderBy('elemen.kode_elemen', 'ASC');
-        $builder->orderBy('kuk.kode_kuk', 'ASC');
-
-        return $builder->get()->getResultArray();
+        return $this->getStrukturObservasiSkema($id_skema);
     }
 
 
@@ -255,37 +206,24 @@ class ObservasiModel extends Model
             'observasi.tanggal_observasi',
             'observasi.id_asesi',
             'observasi.id_asesor',
-            'asesor.nama_lengkap AS nama_asesor',
+            'asesor_user.nama_lengkap AS nama_asesor',
             'asesi_user.nama_lengkap AS nama_asesi',
-            'tuk.nama_tuk',
             'skema.nama_skema',
             'skema.kode_skema'
-        ]);        // Join tables
-        $builder->join('asesi', 'CONVERT(asesi.id_asesi USING utf8mb4) = CONVERT(observasi.id_asesi USING utf8mb4)', 'inner', false);
+        ]);
+        // Join tables with new schema
+        $builder->join('asesi', 'asesi.id_asesi = observasi.id_asesi', 'inner');
         $builder->join('users as asesi_user', 'asesi_user.id = asesi.id_user');
-        $builder->join('pengajuan_asesmen', 'CONVERT(pengajuan_asesmen.id_asesi USING utf8mb4) = CONVERT(observasi.id_asesi USING utf8mb4)', 'inner', false);
-        $builder->join('asesmen', 'asesmen.id_skema = pengajuan_asesmen.id_skema');
-        $builder->join('tuk', 'tuk.id_tuk = asesmen.id_tuk');
-        $builder->join('skema', 'skema.id_skema = asesmen.id_skema');
-        $builder->join('users as asesor', 'asesor.id = observasi.id_asesor');
+        $builder->join('pengajuan_asesmen', 'pengajuan_asesmen.id_pengajuan = observasi.id_pengajuan', 'inner');
+        $builder->join('asesor', 'asesor.id_asesor = observasi.id_asesor', 'inner');
+        $builder->join('users as asesor_user', 'asesor_user.id = asesor.id_user', 'inner');
+        $builder->join('skema', 'skema.id_skema = pengajuan_asesmen.id_skema');
 
         // Apply filters
         $builder->where('observasi.id_asesi', $id_asesi);
         $builder->where('skema.id_skema', $id_skema);
 
-        $result = $builder->get()->getRowArray();
-
-        // Convert binary signature to base64 untuk kedua tanda tangan
-        if ($result) {
-            if (!empty($result['ttd_asesi'])) {
-                $result['ttd_asesi_base64'] = 'data:image/png;base64,' . base64_encode($result['ttd_asesi']);
-            }
-            if (!empty($result['ttd_asesor'])) {
-                $result['ttd_asesor_base64'] = 'data:image/png;base64,' . base64_encode($result['ttd_asesor']);
-            }
-        }
-
-        return $result;
+        return $builder->get()->getRowArray();
     }
 
     /**
@@ -302,36 +240,23 @@ class ObservasiModel extends Model
             'observasi.tanggal_observasi',
             'observasi.id_asesi',
             'observasi.id_asesor',
-            'asesor.nama_lengkap AS nama_asesor',
+            'asesor_user.nama_lengkap AS nama_asesor',
             'asesi_user.nama_lengkap AS nama_asesi',
-            'tuk.nama_tuk',
             'skema.nama_skema',
             'skema.kode_skema'
-        ]);        // Join tables
-        $builder->join('asesi', 'CONVERT(asesi.id_asesi USING utf8mb4) = CONVERT(observasi.id_asesi USING utf8mb4)', 'inner', false);
+        ]);
+        // Join tables with new schema
+        $builder->join('asesi', 'asesi.id_asesi = observasi.id_asesi', 'inner');
         $builder->join('users as asesi_user', 'asesi_user.id = asesi.id_user');
-        $builder->join('pengajuan_asesmen', 'CONVERT(pengajuan_asesmen.id_asesi USING utf8mb4) = CONVERT(observasi.id_asesi USING utf8mb4)', 'inner', false);
-        $builder->join('asesmen', 'asesmen.id_skema = pengajuan_asesmen.id_skema');
-        $builder->join('tuk', 'tuk.id_tuk = asesmen.id_tuk');
-        $builder->join('skema', 'skema.id_skema = asesmen.id_skema');
-        $builder->join('users as asesor', 'asesor.id = observasi.id_asesor');
+        $builder->join('pengajuan_asesmen', 'pengajuan_asesmen.id_pengajuan = observasi.id_pengajuan', 'inner');
+        $builder->join('asesor', 'asesor.id_asesor = observasi.id_asesor', 'inner');
+        $builder->join('users as asesor_user', 'asesor_user.id = asesor.id_user', 'inner');
+        $builder->join('skema', 'skema.id_skema = pengajuan_asesmen.id_skema');
 
         // Filter by observation ID
         $builder->where('observasi.id_observasi', $id);
 
-        $result = $builder->get()->getRowArray();
-
-        // Convert binary signatures to base64
-        if ($result) {
-            if (!empty($result['ttd_asesi'])) {
-                $result['ttd_asesi_base64'] = 'data:image/png;base64,' . base64_encode($result['ttd_asesi']);
-            }
-            if (!empty($result['ttd_asesor'])) {
-                $result['ttd_asesor_base64'] = 'data:image/png;base64,' . base64_encode($result['ttd_asesor']);
-            }
-        }
-
-        return $result;
+        return $builder->get()->getRowArray();
     }
 
     /**
@@ -394,10 +319,11 @@ class ObservasiModel extends Model
      * @return array
      */
     public function getWorkGroupsWithUnitsById(int $id_observasi): array
-    {        // First get the schema ID related to this observation
+    {
+        // First get the schema ID related to this observation
         $observasiQuery = $this->db->table('observasi')
             ->select('pengajuan_asesmen.id_skema')
-            ->join('pengajuan_asesmen', 'CONVERT(pengajuan_asesmen.id_asesi USING utf8mb4) = CONVERT(observasi.id_asesi USING utf8mb4)', 'inner', false)
+            ->join('pengajuan_asesmen', 'pengajuan_asesmen.id_pengajuan = observasi.id_pengajuan', 'inner')
             ->where('observasi.id_observasi', $id_observasi)
             ->get()
             ->getRowArray();

@@ -44,8 +44,23 @@ class LSPDummySeeder extends Seeder
             $db->table('asesor')->insert([
                 'id_user' => $id,
                 'nomor_registrasi' => $faker->numerify('REG#####'),
-                'bidang_kompetensi' => $faker->word,
             ]);
+
+            // Get the inserted asesor ID
+            $asesorId = $db->insertID();
+
+            // Assign 1-3 random skemas to this asesor
+            $skemaIds = $db->table('skema')->select('id_skema')
+                ->orderBy('id_skema', 'RANDOM')
+                ->limit(rand(1, 3))
+                ->get()->getResultArray();
+
+            foreach ($skemaIds as $skema) {
+                $db->table('asesor_skema')->insert([
+                    'id_asesor' => $asesorId,
+                    'id_skema' => $skema['id_skema'],
+                ]);
+            }
         }
 
         // ASESII
