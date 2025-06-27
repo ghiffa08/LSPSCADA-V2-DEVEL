@@ -9,6 +9,7 @@ use App\Services\FileUploadService;
 use App\Services\FeedbackService;
 use App\Services\QRCodeService;
 use App\Services\PDFService;
+use App\Services\ObservasiService;
 use CodeIgniter\Cache\CacheFactory;
 
 /**
@@ -195,5 +196,16 @@ class Services extends BaseService
             return static::getSharedInstance('CustomResponseService');
         }
         return new \App\Services\CustomResponseService();
+    }
+
+    /**
+     * ObservasiService factory
+     */
+    public static function observasiService($getShared = true)
+    {
+        if ($getShared) {
+            return static::getSharedInstance('observasiService');
+        }
+        return new \App\Services\ObservasiService();
     }
 }

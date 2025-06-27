@@ -13,6 +13,7 @@
         const state = {
             id_asesmen: '',
             id_skema: '',
+            id_observasi: null,
             totalKUK: 0,
             pendingChanges: false,
             saveQueue: [],
@@ -172,13 +173,45 @@
                 });
 
                 if (response.success) {
-                    if (response.observasi && response.observasi.length > 0) {
+                    console.log('API Response:', response); // Debug log
+
+                    // Check if observasi data exists (could be object or array)
+                    let hasObservasi = false;
+                    let observasiCount = 0;
+
+                    if (response.observasi) {
+                        if (Array.isArray(response.observasi)) {
+                            hasObservasi = response.observasi.length > 0;
+                            observasiCount = response.observasi.length;
+                        } else if (typeof response.observasi === 'object') {
+                            const keys = Object.keys(response.observasi);
+                            hasObservasi = keys.length > 0;
+                            observasiCount = response.totalKUK || 0;
+
+                            // Convert object to array format for rendering
+                            response.observasi = convertObservasiObjectToArray(response.observasi);
+                            console.log('Converted observasi to array:', response.observasi); // Debug log
+                        }
+                    }
+
+                    if (hasObservasi && response.observasi.length > 0) {
                         renderObservasiTable(response.observasi, response.existing_data);
-                        state.totalKUK = response.totalKUK || 0;
+                        state.totalKUK = response.totalKUK || response.observasi.length;
+
+                        // Try to extract id_observasi from existing_data or response
+                        if (response.existing_data && response.existing_data.id_observasi) {
+                            state.id_observasi = response.existing_data.id_observasi;
+                            console.log('Loaded existing id_observasi:', state.id_observasi);
+                        } else if (response.id_observasi) {
+                            state.id_observasi = response.id_observasi;
+                            console.log('Loaded id_observasi from response:', state.id_observasi);
+                        }
+
                         updateProgressBar();
                         $('#formObservasi').show();
-                        showSuccess('Data berhasil dimuat', `${response.totalKUK} unit kompetensi siap untuk observasi`);
+                        showSuccess('Data berhasil dimuat', `${observasiCount} unit kompetensi siap untuk observasi`);
                     } else {
+                        console.warn('No observasi data found or conversion failed'); // Debug log
                         showInfo('Belum Ada Data Observasi', 'Belum ada unit kompetensi yang tersedia untuk asesmen ini.');
                         $('#formObservasi').hide();
                     }
@@ -192,6 +225,50 @@
             } finally {
                 $('#loadingData').hide();
             }
+        }
+
+        /**
+         * Convert observasi object structure to array format for rendering
+         */
+        function convertObservasiObjectToArray(observasiObject) {
+            const observasiArray = [];
+
+            console.log('Converting observasi object:', observasiObject); // Debug log
+
+            Object.keys(observasiObject).forEach(unitKey => {
+                const unit = observasiObject[unitKey];
+                const unitInfo = unit.unit_info;
+
+                console.log('Processing unit:', unitKey, unitInfo); // Debug log
+
+                Object.keys(unit.elements || {}).forEach(elemenKey => {
+                    const element = unit.elements[elemenKey];
+                    const elemenInfo = element.element_info;
+
+                    console.log('Processing element:', elemenKey, elemenInfo); // Debug log
+
+                    (element.kuks || []).forEach(kuk => {
+                        console.log('Processing KUK:', kuk); // Debug log
+
+                        observasiArray.push({
+                            id_kelompok: unitInfo.id_kelompok || 1, // Default kelompok ID
+                            nama_kelompok: unitInfo.nama_kelompok || 'Kelompok Utama', // Default grouping
+                            id_unit: unitInfo.id_unit,
+                            kode_unit: unitInfo.kode_unit,
+                            nama_unit: unitInfo.nama_unit,
+                            id_elemen: elemenInfo.id_elemen,
+                            kode_elemen: elemenInfo.kode_elemen,
+                            nama_elemen: elemenInfo.nama_elemen,
+                            id_kuk: kuk.id_kuk,
+                            kode_kuk: kuk.kode_kuk,
+                            kriteria_unjuk_kerja: kuk.nama_kuk
+                        });
+                    });
+                });
+            });
+
+            console.log('Converted array length:', observasiArray.length); // Debug log
+            return observasiArray;
         }
 
         function renderObservasiTable(observasi, existing_data) {
@@ -334,6 +411,17 @@
 
             $btn.html('<i class="fas fa-spinner fa-spin"></i> Memproses...').attr('disabled', true);
 
+            // Ensure observasi settings are saved first to get id_observasi
+            if (!state.id_observasi) {
+                console.log('No id_observasi found for batch operation, saving settings first...');
+                const settingsResult = await saveSettings();
+                if (!settingsResult || !settingsResult.success || !state.id_observasi) {
+                    showError('Gagal menyimpan pengaturan observasi. Diperlukan sebelum operasi batch.');
+                    $btn.html(originalBtnText).attr('disabled', false);
+                    return;
+                }
+            }
+
             const $checkboxes = $('.kuk-checkbox');
             $checkboxes.prop('checked', checkState);
 
@@ -343,6 +431,7 @@
 
             const batchData = {
                 save_type: 'batch',
+                id_observasi: state.id_observasi,
                 id_asesmen: parseInt(state.id_asesmen),
                 id_skema: parseInt(state.id_skema),
                 id_asesi: $('#form_id_asesi').val(),
@@ -401,17 +490,38 @@
                     dataType: 'json'
                 });
 
+                if (response.success && response.data && response.data.id_observasi) {
+                    // Store the id_observasi for future KUK saves
+                    state.id_observasi = response.data.id_observasi;
+                    console.log('Observasi settings saved with ID:', state.id_observasi);
+                }
+
                 if (response.csrfHash) {
                     state.csrfHash = response.csrfHash;
                 }
+
+                return response;
             } catch (error) {
+                console.error('Error saving settings:', error);
                 showError('Gagal menyimpan pengaturan');
+                return null;
             }
         }
 
         async function saveKUK(id_kuk, kompeten, keterangan) {
+            // Ensure observasi settings are saved first to get id_observasi
+            if (!state.id_observasi) {
+                console.log('No id_observasi found, saving settings first...');
+                const settingsResult = await saveSettings();
+                if (!settingsResult || !settingsResult.success || !state.id_observasi) {
+                    showError('Gagal menyimpan pengaturan observasi. Diperlukan sebelum menyimpan KUK.');
+                    return;
+                }
+            }
+
             const data = {
                 save_type: 'kuk',
+                id_observasi: state.id_observasi,
                 id_asesmen: state.id_asesmen,
                 id_skema: state.id_skema,
                 id_asesi: $('#form_id_asesi').val(),
@@ -433,7 +543,15 @@
                 if (response.csrfHash) {
                     state.csrfHash = response.csrfHash;
                 }
+
+                if (response.success) {
+                    console.log('KUK saved successfully:', id_kuk, kompeten);
+                } else {
+                    console.error('KUK save failed:', response);
+                    showError('Gagal menyimpan data KUK: ' + (response.message || 'Unknown error'));
+                }
             } catch (error) {
+                console.error('Error saving KUK:', error);
                 showError('Gagal menyimpan data KUK');
             }
         }

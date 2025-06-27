@@ -14,6 +14,8 @@ class Elemen extends DataTableController
     {
         parent::__construct();
 
+        helper('auth');
+
         $this->model = $this->elemenModel;
 
         // Optional: Define custom column mapping for complex ordering

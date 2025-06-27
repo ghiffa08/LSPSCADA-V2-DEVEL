@@ -861,6 +861,50 @@
                 $('#form_tanggal_observasi').val(tanggal);
             }
 
+            /**
+             * Convert observasi object structure to array format for rendering
+             */
+            convertObservasiObjectToArray(observasiObject) {
+                const observasiArray = [];
+
+                console.log('Converting observasi object:', observasiObject); // Debug log
+
+                Object.keys(observasiObject).forEach(unitKey => {
+                    const unit = observasiObject[unitKey];
+                    const unitInfo = unit.unit_info;
+
+                    console.log('Processing unit:', unitKey, unitInfo); // Debug log
+
+                    Object.keys(unit.elements || {}).forEach(elemenKey => {
+                        const element = unit.elements[elemenKey];
+                        const elemenInfo = element.element_info;
+
+                        console.log('Processing element:', elemenKey, elemenInfo); // Debug log
+
+                        (element.kuks || []).forEach(kuk => {
+                            console.log('Processing KUK:', kuk); // Debug log
+
+                            observasiArray.push({
+                                id_kelompok: 1, // Default kelompok ID
+                                nama_kelompok: 'Kelompok Utama', // Default grouping
+                                id_unit: unitInfo.id_unit,
+                                kode_unit: unitInfo.kode_unit,
+                                nama_unit: unitInfo.nama_unit,
+                                id_elemen: elemenInfo.id_elemen,
+                                kode_elemen: elemenInfo.kode_elemen,
+                                nama_elemen: elemenInfo.nama_elemen,
+                                id_kuk: kuk.id_kuk,
+                                kode_kuk: kuk.kode_kuk,
+                                kriteria_unjuk_kerja: kuk.nama_kuk
+                            });
+                        });
+                    });
+                });
+
+                console.log('Converted array length:', observasiArray.length); // Debug log
+                return observasiArray;
+            }
+
             async loadObservasiData() {
                 const params = {
                     id_skema: this.state.get('id_skema'),
@@ -878,14 +922,32 @@
 
                     const response = await this.dataManager.loadObservasi(params);
 
-                    if (response.success && response.observasi?.length > 0) {
-                        this.uiManager.renderObservasiTable(response.observasi, response.existing_data || {});
-                        $('#formObservasi').show();
-                        this.notificationManager.showSuccess(
-                            'Data berhasil dimuat',
-                            `${response.totalKUK || 0} unit kompetensi siap untuk observasi`
-                        );
+                    console.log('Full API Response:', response); // Debug log
+
+                    if (response.success && response.observasi && Object.keys(response.observasi).length > 0) {
+                        // Convert object structure to array for rendering
+                        const observasiArray = this.convertObservasiObjectToArray(response.observasi);
+
+                        console.log('Converted observasi array:', observasiArray); // Debug log
+
+                        // Check if we actually have KUKs to display
+                        if (observasiArray.length > 0) {
+                            this.uiManager.renderObservasiTable(observasiArray, response.existing_data || {});
+                            $('#formObservasi').show();
+                            this.notificationManager.showSuccess(
+                                'Data berhasil dimuat',
+                                `${response.totalKUK || observasiArray.length} unit kompetensi siap untuk observasi`
+                            );
+                        } else {
+                            console.warn('No KUKs found in converted array'); // Debug log
+                            this.notificationManager.showInfo(
+                                'Belum Ada Data Observasi',
+                                'Unit kompetensi ditemukan tetapi tidak ada KUK yang dapat ditampilkan.'
+                            );
+                            $('#formObservasi').hide();
+                        }
                     } else {
+                        console.warn('Invalid response or empty observasi data:', response); // Debug log
                         this.notificationManager.showInfo(
                             'Belum Ada Data Observasi',
                             'Belum ada unit kompetensi yang tersedia untuk asesmen ini.'

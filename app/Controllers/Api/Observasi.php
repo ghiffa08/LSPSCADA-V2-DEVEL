@@ -18,6 +18,7 @@ class Observasi extends DataTableController
 {
     private $id_asesor;
     private ObservasiService $observasiService;
+    protected $db;
 
     public function __construct()
     {
@@ -27,6 +28,7 @@ class Observasi extends DataTableController
 
         $this->model = $this->observasiModel;
         $this->observasiService = new ObservasiService();
+        $this->db = Database::connect();
 
         // Get id_asesor from asesor table, not directly from user
         $user_id = user()->id;
@@ -100,6 +102,8 @@ class Observasi extends DataTableController
      */
     public function loadObservasi()
     {
+        $startTime = microtime(true);
+
         if (!$this->request->isAJAX()) {
             return $this->response->setJSON([
                 'status' => 401,
@@ -137,7 +141,7 @@ class Observasi extends DataTableController
                 'totalKUK' => $structureData['totalKUK'],
                 'performance' => [
                     'cached' => true,
-                    'load_time' => microtime(true) - FCPATH
+                    'load_time' => round((microtime(true) - $startTime) * 1000, 2) . 'ms'
                 ]
             ]);
         } catch (\Exception $e) {
@@ -197,16 +201,40 @@ class Observasi extends DataTableController
         $data = array_merge($postData, $jsonData ?? []);
         $data['id_asesor'] = $this->id_asesor;
 
+        // Auto-get pengajuan if not provided but asesi is available
+        if (empty($data['id_pengajuan']) && !empty($data['id_asesi'])) {
+            $pengajuan = $this->db->table('pengajuan_asesmen')
+                ->where('id_asesi', $data['id_asesi'])
+                ->orderBy('tanggal_pengajuan', 'DESC')
+                ->get()
+                ->getRow();
+
+            if ($pengajuan) {
+                $data['id_pengajuan'] = $pengajuan->id_pengajuan;
+            }
+        }
+
         // Validate required fields
-        $required = ['id_asesi', 'id_pengajuan', 'tanggal_observasi'];
+        $required = ['id_asesi', 'tanggal_observasi'];
         foreach ($required as $field) {
             if (empty($data[$field])) {
                 return $this->fail("Field {$field} diperlukan");
             }
         }
 
+        // Validate id_pengajuan separately with better error message
+        if (empty($data['id_pengajuan'])) {
+            return $this->fail("ID Pengajuan diperlukan. Pastikan asesi memiliki pengajuan asesmen yang valid.");
+        }
+
+        // Log input data for debugging
+        log_message('info', 'ObservasiController saveSettings input: ' . json_encode($data));
+
         // Use service to save
         $result = $this->observasiService->saveObservation($data);
+
+        // Log the result for debugging
+        log_message('info', 'ObservasiController saveSettings result: ' . json_encode($result));
 
         if ($result['success']) {
             return $this->respond([
@@ -217,6 +245,8 @@ class Observasi extends DataTableController
             ]);
         }
 
+        // Log the error details for debugging
+        log_message('error', 'ObservasiController saveSettings failed: ' . $result['message']);
         return $this->fail($result['message']);
     }
 
@@ -315,7 +345,7 @@ class Observasi extends DataTableController
         $data = array_merge($postData, $jsonData ?? []);
         $data['id_asesor'] = $this->id_asesor;
 
-        // Get pengajuan data
+        // Auto-get pengajuan if not provided but asesi is available
         if (empty($data['id_pengajuan']) && !empty($data['id_asesi'])) {
             $pengajuan = $this->db->table('pengajuan_asesmen')
                 ->where('id_asesi', $data['id_asesi'])
@@ -326,6 +356,19 @@ class Observasi extends DataTableController
             if ($pengajuan) {
                 $data['id_pengajuan'] = $pengajuan->id_pengajuan;
             }
+        }
+
+        // Validate required fields
+        $required = ['id_asesi', 'tanggal_observasi'];
+        foreach ($required as $field) {
+            if (empty($data[$field])) {
+                return $this->fail("Field {$field} diperlukan");
+            }
+        }
+
+        // Validate id_pengajuan separately with better error message
+        if (empty($data['id_pengajuan'])) {
+            return $this->fail("ID Pengajuan diperlukan. Pastikan asesi memiliki pengajuan asesmen yang valid.");
         }
 
         // Prepare details if available

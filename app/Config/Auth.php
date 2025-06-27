@@ -175,7 +175,7 @@ class Auth extends \Myth\Auth\Config\Auth
      *
      * @var bool
      */
-    public $allowRegistration = false;
+    public $allowRegistration = true;
 
     /**
      * --------------------------------------------------------------------

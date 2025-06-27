@@ -5,10 +5,8 @@ namespace App\Services;
 use App\Models\ObservasiModel;
 use App\Models\DetailObservasiModel;
 use App\Models\SkemaModel;
-use App\Requests\ObservasiRequest;
 use CodeIgniter\Database\BaseConnection;
-use Config\Database;
-use Config\Cache;
+use CodeIgniter\Cache\CacheInterface;
 
 /**
  * ObservasiService - Optimized
@@ -22,17 +20,15 @@ class ObservasiService
     protected DetailObservasiModel $detailModel;
     protected SkemaModel $skemaModel;
     protected BaseConnection $db;
-    protected ObservasiRequest $request;
-    protected $cache;
+    protected CacheInterface $cache;
 
     public function __construct()
     {
         $this->observasiModel = new ObservasiModel();
         $this->detailModel = new DetailObservasiModel();
         $this->skemaModel = new SkemaModel();
-        $this->db = Database::connect();
-        $this->request = new ObservasiRequest();
-        $this->cache = Cache::handler();
+        $this->db = \Config\Database::connect();
+        $this->cache = \Config\Services::cache();
     }
 
     /**
@@ -44,6 +40,7 @@ class ObservasiService
         // Validate and sanitize input
         $validatedData = $this->validateAndSanitizeInput($data);
         if (isset($validatedData['error'])) {
+            log_message('error', 'ObservasiService validation error: ' . $validatedData['error']);
             return [
                 'success' => false,
                 'message' => $validatedData['error'],
@@ -51,9 +48,16 @@ class ObservasiService
             ];
         }
 
+        // Log input data for debugging
+        log_message('info', 'ObservasiService saveObservation input: ' . json_encode($validatedData));
+
         $this->db->transStart();
+        $id_observasi = null;
 
         try {
+            // Validate foreign key constraints before attempting insert/update
+            $this->validateForeignKeys($validatedData);
+
             // Prepare main observation data
             $observationData = [
                 'id_asesor' => $validatedData['id_asesor'],
@@ -62,6 +66,8 @@ class ObservasiService
                 'tanggal_observasi' => $validatedData['tanggal_observasi'],
                 'updated_at' => date('Y-m-d H:i:s')
             ];
+
+            log_message('info', 'ObservasiService observation data: ' . json_encode($observationData));
 
             // Check if observation already exists
             $existingObservation = $this->observasiModel
@@ -73,27 +79,71 @@ class ObservasiService
             if ($existingObservation) {
                 // Update existing observation
                 $id_observasi = $existingObservation['id_observasi'];
-                $this->observasiModel->update($id_observasi, $observationData);
+                log_message('info', 'ObservasiService updating existing observation: ' . $id_observasi);
+
+                $updateResult = $this->observasiModel->update($id_observasi, $observationData);
+                if ($updateResult === false) {
+                    $errors = $this->observasiModel->errors();
+                    log_message('error', 'ObservasiModel update errors: ' . json_encode($errors));
+                    throw new \Exception('Failed to update existing observation: ' . implode(', ', $errors));
+                }
             } else {
                 // Create new observation
                 $observationData['created_at'] = date('Y-m-d H:i:s');
                 $observationData['status'] = 'draft';
+
+                log_message('info', 'ObservasiService creating new observation with data: ' . json_encode($observationData));
                 $id_observasi = $this->observasiModel->insert($observationData);
+
+                if ($id_observasi === false) {
+                    $errors = $this->observasiModel->errors();
+                    log_message('error', 'ObservasiModel insert errors: ' . json_encode($errors));
+                    throw new \Exception('Failed to create new observation: ' . implode(', ', $errors));
+                }
             }
+
+            if (!$id_observasi) {
+                throw new \Exception('Failed to get observation ID');
+            }
+
+            log_message('info', 'ObservasiService observation ID: ' . $id_observasi);
 
             // Enhanced batch upsert for details
             if (isset($validatedData['details']) && !empty($validatedData['details'])) {
+                log_message('info', 'ObservasiService processing details: ' . count($validatedData['details']) . ' items');
                 $this->optimizedUpsertDetails($id_observasi, $validatedData['details']);
             }
 
             // Update progress and status
+            log_message('info', 'ObservasiService updating progress');
             $this->updateObservasiProgress($id_observasi);
+
+            // Check transaction status before completing
+            $transStatus = $this->db->transStatus();
+            log_message('info', 'ObservasiService transaction status before complete: ' . ($transStatus ? 'true' : 'false'));
 
             $this->db->transComplete();
 
-            if ($this->db->transStatus() === false) {
-                throw new \Exception('Transaction failed');
+            $finalTransStatus = $this->db->transStatus();
+            log_message('info', 'ObservasiService final transaction status: ' . ($finalTransStatus ? 'true' : 'false'));
+
+            if ($finalTransStatus === false) {
+                $error = $this->db->error();
+                $errorMessage = 'Unknown database error';
+
+                if (!empty($error['message'])) {
+                    $errorMessage = $error['message'];
+                } elseif (!empty($error['code'])) {
+                    $errorMessage = "Database error code: " . $error['code'];
+                }
+
+                log_message('error', 'ObservasiService transaction failed - DB Error: ' . json_encode($error));
+                log_message('error', 'ObservasiService last query: ' . $this->db->getLastQuery());
+
+                throw new \Exception('Transaction failed: ' . $errorMessage);
             }
+
+            log_message('info', 'ObservasiService transaction completed successfully');
 
             // Clear related caches
             $this->clearObservasiCaches($validatedData['id_asesi'], $validatedData['id_asesor']);
@@ -110,8 +160,13 @@ class ObservasiService
                 ]
             ];
         } catch (\Exception $e) {
-            $this->db->transRollback();
+            // Ensure transaction is rolled back
+            if ($this->db->transStatus() !== false) {
+                $this->db->transRollback();
+            }
+
             log_message('error', 'ObservasiService saveObservation Error: ' . $e->getMessage());
+            log_message('error', 'ObservasiService saveObservation Stack trace: ' . $e->getTraceAsString());
 
             return [
                 'success' => false,
@@ -572,6 +627,37 @@ class ObservasiService
     }
 
     /**
+     * Validate foreign key constraints before save
+     */
+    private function validateForeignKeys(array $data): void
+    {
+        // Check if asesor exists
+        $asesor = $this->db->table('asesor')->where('id_asesor', $data['id_asesor'])->get()->getRowArray();
+        if (!$asesor) {
+            throw new \Exception("Asesor dengan ID {$data['id_asesor']} tidak ditemukan");
+        }
+
+        // Check if asesi exists
+        $asesi = $this->db->table('asesi')->where('id_asesi', $data['id_asesi'])->get()->getRowArray();
+        if (!$asesi) {
+            throw new \Exception("Asesi dengan ID {$data['id_asesi']} tidak ditemukan");
+        }
+
+        // Check if pengajuan exists
+        $pengajuan = $this->db->table('pengajuan_asesmen')->where('id_pengajuan', $data['id_pengajuan'])->get()->getRowArray();
+        if (!$pengajuan) {
+            throw new \Exception("Pengajuan asesmen dengan ID {$data['id_pengajuan']} tidak ditemukan");
+        }
+
+        // Validate that pengajuan belongs to the asesi
+        if ($pengajuan['id_asesi'] !== $data['id_asesi']) {
+            throw new \Exception("Pengajuan asesmen tidak sesuai dengan asesi yang dipilih");
+        }
+
+        log_message('info', 'ObservasiService foreign key validation passed');
+    }
+
+    /**
      * Optimized batch upsert for detail observasi
      */
     private function optimizedUpsertDetails(int $idObservasi, array $details): void
@@ -591,10 +677,29 @@ class ObservasiService
             $existingMap[$detail['id_kuk']] = $detail;
         }
 
+        // Get KUK details to get id_skema for each KUK
+        $kukIds = array_column($details, 'id_kuk');
+        $kukDetails = $this->db->table('kuk')
+            ->select('id_kuk, id_skema')
+            ->whereIn('id_kuk', $kukIds)
+            ->get()
+            ->getResultArray();
+
+        $kukSkemaMap = [];
+        foreach ($kukDetails as $kuk) {
+            $kukSkemaMap[$kuk['id_kuk']] = $kuk['id_skema'];
+        }
+
         $toInsert = [];
         $toUpdate = [];
 
         foreach ($details as $detail) {
+            // Skip if we can't find the id_skema for this KUK
+            if (!isset($kukSkemaMap[$detail['id_kuk']])) {
+                log_message('warning', "KUK ID {$detail['id_kuk']} not found or missing id_skema, skipping");
+                continue;
+            }
+
             $detailData = [
                 'kompeten' => $detail['kompeten'],
                 'keterangan' => $detail['keterangan'],
@@ -610,19 +715,34 @@ class ObservasiService
                 // Insert new
                 $toInsert[] = array_merge($detailData, [
                     'id_observasi' => $idObservasi,
-                    'id_kuk' => $detail['id_kuk']
+                    'id_kuk' => $detail['id_kuk'],
+                    'id_skema' => $kukSkemaMap[$detail['id_kuk']]
                 ]);
             }
         }
 
         // Execute batch operations
         if (!empty($toUpdate)) {
-            $this->db->table('detail_observasi')->updateBatch($toUpdate, 'id');
+            log_message('info', 'ObservasiService updating ' . count($toUpdate) . ' detail records');
+            $updateResult = $this->db->table('detail_observasi')->updateBatch($toUpdate, 'id');
+            if ($updateResult === false) {
+                $error = $this->db->error();
+                log_message('error', 'Failed to update detail_observasi batch: ' . json_encode($error));
+                throw new \Exception('Failed to update detail observasi: ' . ($error['message'] ?? 'Unknown error'));
+            }
         }
 
         if (!empty($toInsert)) {
-            $this->db->table('detail_observasi')->insertBatch($toInsert);
+            log_message('info', 'ObservasiService inserting ' . count($toInsert) . ' detail records');
+            $insertResult = $this->db->table('detail_observasi')->insertBatch($toInsert);
+            if ($insertResult === false) {
+                $error = $this->db->error();
+                log_message('error', 'Failed to insert detail_observasi batch: ' . json_encode($error));
+                throw new \Exception('Failed to insert detail observasi: ' . ($error['message'] ?? 'Unknown error'));
+            }
         }
+
+        log_message('info', 'ObservasiService optimizedUpsertDetails completed successfully');
     }
 
     /**
@@ -631,6 +751,8 @@ class ObservasiService
     private function updateObservasiProgress(int $idObservasi): void
     {
         try {
+            log_message('info', "ObservasiService updateObservasiProgress for ID: {$idObservasi}");
+
             $stats = $this->db->table('detail_observasi')
                 ->select('
                     COUNT(*) as total_kuk,
@@ -640,8 +762,10 @@ class ObservasiService
                 ->get()
                 ->getRowArray();
 
+            log_message('info', 'ObservasiService stats: ' . json_encode($stats));
+
             $progress = 0;
-            if ($stats['total_kuk'] > 0) {
+            if ($stats && $stats['total_kuk'] > 0) {
                 $progress = ($stats['kompeten_count'] / $stats['total_kuk']) * 100;
             }
 
@@ -653,17 +777,31 @@ class ObservasiService
                 $status = 'completed';
             }
 
-            $this->db->table('observasi')
+            $updateData = [
+                'total_kuk' => $stats['total_kuk'] ?? 0,
+                'kompeten_count' => $stats['kompeten_count'] ?? 0,
+                'progress_percentage' => round($progress, 2),
+                'status' => $status,
+                'updated_at' => date('Y-m-d H:i:s')
+            ];
+
+            log_message('info', 'ObservasiService updating observasi with data: ' . json_encode($updateData));
+
+            $updateResult = $this->db->table('observasi')
                 ->where('id_observasi', $idObservasi)
-                ->update([
-                    'total_kuk' => $stats['total_kuk'],
-                    'kompeten_count' => $stats['kompeten_count'],
-                    'progress_percentage' => round($progress, 2),
-                    'status' => $status,
-                    'updated_at' => date('Y-m-d H:i:s')
-                ]);
+                ->update($updateData);
+
+            if ($updateResult === false) {
+                $error = $this->db->error();
+                log_message('error', 'Failed to update observasi progress: ' . json_encode($error));
+                throw new \Exception('Failed to update observasi progress: ' . ($error['message'] ?? 'Unknown error'));
+            }
+
+            log_message('info', 'ObservasiService progress updated successfully');
         } catch (\Exception $e) {
             log_message('error', 'Error updating observasi progress: ' . $e->getMessage());
+            // Re-throw the exception to fail the transaction
+            throw $e;
         }
     }
 
@@ -726,11 +864,20 @@ class ObservasiService
     private function clearObservasiCaches(string $idAsesi, int $idAsesor): void
     {
         try {
-            // Clear specific caches
-            $this->cache->deleteMatching("observasi_structure_*_{$idAsesi}");
-            $this->cache->deleteMatching("observasi_summary_*");
-            $this->cache->delete("asesor_stats_{$idAsesor}");
-            $this->cache->deleteMatching("asesi_by_skema_*");
+            // Clear specific caches - since deleteMatching doesn't exist, we clear individual keys
+            $keysToDelete = [
+                "observasi_structure_asesi_{$idAsesi}",
+                "observasi_structure_kuk_{$idAsesi}",
+                "observasi_summary_{$idAsesi}",
+                "observasi_summary_{$idAsesor}",
+                "asesor_stats_{$idAsesor}",
+                "asesi_by_skema_{$idAsesor}",
+                "kuk_structure_asesi_{$idAsesi}"
+            ];
+
+            foreach ($keysToDelete as $key) {
+                $this->cache->delete($key);
+            }
         } catch (\Exception $e) {
             log_message('error', 'Error clearing caches: ' . $e->getMessage());
         }
@@ -818,11 +965,30 @@ class ObservasiService
             $existingMap[$record['id_kuk']] = $record;
         }
 
+        // Get KUK details to get id_skema for each KUK
+        $kukIds = array_keys($items);
+        $kukDetails = $this->db->table('kuk')
+            ->select('id_kuk, id_skema')
+            ->whereIn('id_kuk', $kukIds)
+            ->get()
+            ->getResultArray();
+
+        $kukSkemaMap = [];
+        foreach ($kukDetails as $kuk) {
+            $kukSkemaMap[$kuk['id_kuk']] = $kuk['id_skema'];
+        }
+
         $toUpdate = [];
         $toInsert = [];
         $timestamp = date('Y-m-d');
 
         foreach ($items as $idKuk => $item) {
+            // Skip if we can't find the id_skema for this KUK
+            if (!isset($kukSkemaMap[$idKuk])) {
+                log_message('warning', "KUK ID {$idKuk} not found or missing id_skema, skipping");
+                continue;
+            }
+
             $data = [
                 'kompeten' => $item['kompeten'],
                 'keterangan' => $item['keterangan'],
@@ -834,7 +1000,8 @@ class ObservasiService
             } else {
                 $toInsert[] = array_merge($data, [
                     'id_observasi' => $idObservasi,
-                    'id_kuk' => $idKuk
+                    'id_kuk' => $idKuk,
+                    'id_skema' => $kukSkemaMap[$idKuk]
                 ]);
             }
         }
@@ -972,9 +1139,24 @@ class ObservasiService
                     ->where('id', $existing['id'])
                     ->update($saveData);
             } else {
+                // Get id_skema for this KUK
+                $kukDetail = $this->db->table('kuk')
+                    ->select('id_skema')
+                    ->where('id_kuk', $idKuk)
+                    ->get()
+                    ->getRowArray();
+
+                if (!$kukDetail) {
+                    return [
+                        'success' => false,
+                        'message' => 'KUK tidak ditemukan'
+                    ];
+                }
+
                 // Insert new
                 $saveData['id_observasi'] = $idObservasi;
                 $saveData['id_kuk'] = $idKuk;
+                $saveData['id_skema'] = $kukDetail['id_skema'];
                 $this->db->table('detail_observasi')->insert($saveData);
             }
 
@@ -1061,16 +1243,20 @@ class ObservasiService
     public function clearAllCaches(): bool
     {
         try {
-            $patterns = [
-                'observasi_*',
-                'kuk_structure_*',
-                'asesi_by_skema_*',
-                'asesor_observasi_stats_*'
+            // Since deleteMatching doesn't exist, we'll use clean() to clear all cache
+            // or manually delete known cache keys
+            $knownCacheKeys = [
+                'observasi_structure_asesi_',
+                'observasi_structure_kuk_',
+                'observasi_summary_',
+                'kuk_structure_',
+                'asesi_by_skema_',
+                'asesor_observasi_stats_'
             ];
 
-            foreach ($patterns as $pattern) {
-                $this->cache->deleteMatching($pattern);
-            }
+            // For production, we could implement a more sophisticated approach
+            // For now, we'll clear the entire cache as it's safer
+            $this->cache->clean();
 
             return true;
         } catch (\Exception $e) {
