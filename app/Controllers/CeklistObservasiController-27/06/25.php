@@ -50,10 +50,14 @@ class CeklistObservasiController extends ResourceController
         try {
             // Get current user ID
             $userId = user()->id ?? 0;
+            log_message('debug', 'CeklistObservasi::create - User ID: ' . $userId);
 
             // Get asesor info with their skema (one-to-one)
             $asesorModel = model('AsesorModel');
             $asesorInfo = $asesorModel->getWithSkema($this->getCurrentAsesorId());
+
+            log_message('debug', 'CeklistObservasi::create - Current asesor ID: ' . $this->getCurrentAsesorId());
+            log_message('debug', 'CeklistObservasi::create - Asesor info: ' . json_encode($asesorInfo));
 
             if (!$asesorInfo) {
                 throw new \Exception('Data asesor tidak ditemukan untuk user ID: ' . $userId);
@@ -65,10 +69,13 @@ class CeklistObservasiController extends ResourceController
             }
 
             $id_skema = $asesorInfo['id_skema'];
+            log_message('debug', 'CeklistObservasi::create - ID Skema: ' . $id_skema);
 
             // Get skema data
             $skemaModel = model('SkemaModel');
             $skema = $skemaModel->find($id_skema);
+
+            log_message('debug', 'CeklistObservasi::create - Skema data: ' . json_encode($skema));
 
             if (!$skema) {
                 throw new \Exception('Skema sertifikasi dengan ID ' . $id_skema . ' tidak ditemukan dalam database');
@@ -89,6 +96,7 @@ class CeklistObservasiController extends ResourceController
                     ->getResultArray();
 
                 $method_used = 'JOIN Query';
+                log_message('debug', 'CeklistObservasi::create - Method 1 (JOIN) found: ' . count($asesmen) . ' records');
             } catch (\Exception $e) {
                 log_message('error', 'CeklistObservasi::create - Method 1 failed: ' . $e->getMessage());
             }
@@ -101,6 +109,7 @@ class CeklistObservasiController extends ResourceController
                         ->findAll();
 
                     $method_used = 'Simple Query + Manual Join';
+                    log_message('debug', 'CeklistObservasi::create - Method 2 (Simple) found: ' . count($asesmen) . ' records');
 
                     // Manually add skema info
                     foreach ($asesmen as &$item) {
@@ -115,10 +124,11 @@ class CeklistObservasiController extends ResourceController
             // Method 3: Check total asesmen in database
             if (empty($asesmen)) {
                 $totalAsesmen = $this->asesmenModel->countAll();
+                log_message('warning', 'CeklistObservasi::create - No asesmen found for skema ' . $id_skema . '. Total asesmen in DB: ' . $totalAsesmen);
                 $method_used = 'No Data Found';
 
                 if ($totalAsesmen == 0) {
-                    log_message('error', 'CeklistObservasi::create - Asesmen table is completely empty');
+                    log_message('warning', 'CeklistObservasi::create - Asesmen table is completely empty');
                 }
             }
 
@@ -130,8 +140,13 @@ class CeklistObservasiController extends ResourceController
                     if (!isset($a['nama_skema'])) $a['nama_skema'] = $skema['nama_skema'];
                     if (!isset($a['kode_skema'])) $a['kode_skema'] = $skema['kode_skema'];
                     $validAsesmen[] = $a;
+                } else {
+                    log_message('warning', 'CeklistObservasi::create - Skipping invalid asesmen: ' . json_encode($a));
                 }
             }
+
+            log_message('debug', 'CeklistObservasi::create - Valid asesmen count: ' . count($validAsesmen));
+            log_message('debug', 'CeklistObservasi::create - Method used: ' . $method_used);
 
             // Prepare data for view
             $data = [
@@ -146,6 +161,28 @@ class CeklistObservasiController extends ResourceController
                 'asesmen' => $validAsesmen
             ];
 
+            // Add debug info for development
+            if (ENVIRONMENT === 'development') {
+                $data['debug_info'] = [
+                    'user_id' => $userId,
+                    'asesor_id' => $this->getCurrentAsesorId(),
+                    'id_skema' => $id_skema,
+                    'asesmen_count' => count($validAsesmen),
+                    'total_asesmen_db' => $this->asesmenModel->countAll(),
+                    'method_used' => $method_used,
+                    'raw_asesmen_count' => count($asesmen)
+                ];
+            }
+
+            log_message('debug', 'CeklistObservasi::create - Final summary: ' . json_encode([
+                'user_id' => $userId,
+                'asesor_found' => !empty($asesorInfo),
+                'skema_id' => $id_skema,
+                'skema_found' => !empty($skema),
+                'asesmen_count' => count($validAsesmen),
+                'method_used' => $method_used
+            ]));
+
             return view('asesor/ceklist_observasi', $data);
         } catch (\Exception $e) {
             log_message('error', 'CeklistObservasi::create - Exception: ' . $e->getMessage());
@@ -157,7 +194,13 @@ class CeklistObservasiController extends ResourceController
                 'asesor' => $asesorInfo ?? [],
                 'skema' => [],
                 'asesmen' => [],
-                'error_message' => $e->getMessage()
+                'error_message' => $e->getMessage(),
+                'debug_info' => [
+                    'user_id' => user()->id ?? 0,
+                    'error' => $e->getMessage(),
+                    'has_asesor_model' => class_exists('\App\Models\AsesorModel'),
+                    'has_asesmen_model' => class_exists('\App\Models\AsesmenModel')
+                ]
             ]);
         }
     }

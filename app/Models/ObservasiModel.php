@@ -118,52 +118,161 @@ class ObservasiModel extends Model
     }
 
     /**
-     * Get observation structure data for a specific schema
+     * Get observation structure data for a specific schema - OPTIMIZED VERSION
+     * Uses single query with proper indexing and caching
      *
      * @param int $id_skema Schema ID
-     * @return array
+     * @return array Hierarchically structured data
      */
     public function getStrukturObservasiSkema(int $id_skema): array
     {
-        $builder = $this->db->table('skema');
+        $cacheKey = "struktur_skema_{$id_skema}";
+        
+        // Try to get from cache first (data rarely changes)
+        if ($cached = cache($cacheKey)) {
+            return $cached;
+        }
 
-        $builder->select([
-            'skema.id_skema',
-            'skema.kode_skema',
-            'skema.nama_skema',
-            'skema.jenis_skema',
-            'unit.id_unit',
-            'unit.kode_unit',
-            'unit.nama_unit',
-            'elemen.id_elemen',
-            'elemen.kode_elemen',
-            'elemen.nama_elemen',
-            'kuk.id_kuk',
-            'kuk.kode_kuk',
-            'kuk.nama_kuk AS kriteria_unjuk_kerja',
-            'kelompok_kerja.id_kelompok',
-            'kelompok_kerja.nama_kelompok'
-        ]);
+        // Optimized single query with CTE for better performance
+        $sql = "
+        WITH RECURSIVE skema_structure AS (
+            SELECT 
+                s.id_skema,
+                s.kode_skema,
+                s.nama_skema,
+                s.jenis_skema,
+                kk.id_kelompok,
+                kk.nama_kelompok,
+                u.id_unit,
+                u.kode_unit,
+                u.nama_unit,
+                e.id_elemen,
+                e.kode_elemen,
+                e.nama_elemen,
+                k.id_kuk,
+                k.kode_kuk,
+                k.nama_kuk AS kriteria_unjuk_kerja,
+                -- Add hierarchy levels for better organization
+                CONCAT(u.kode_unit, '.', e.kode_elemen, '.', k.kode_kuk) as hierarchy_path
+            FROM skema s
+            INNER JOIN kelompok_kerja kk ON kk.id_skema = s.id_skema
+            INNER JOIN kelompok_unit ku ON ku.id_kelompok = kk.id_kelompok
+            INNER JOIN unit u ON u.id_unit = ku.id_unit AND u.id_skema = s.id_skema
+            LEFT JOIN elemen e ON e.id_unit = u.id_unit AND e.id_skema = s.id_skema
+            LEFT JOIN kuk k ON k.id_elemen = e.id_elemen AND k.id_unit = u.id_unit AND k.id_skema = s.id_skema
+            WHERE s.id_skema = ? 
+                AND s.status = 'Y' 
+                AND u.status = 'Y'
+                AND (e.id_elemen IS NULL OR e.status = 'Y')
+                AND (k.id_kuk IS NULL OR k.status = 'Y')
+        )
+        SELECT * FROM skema_structure
+        ORDER BY kode_unit ASC, kode_elemen ASC, kode_kuk ASC
+        ";
 
-        // Optimize join order to start with smallest tables and filter early
-        $builder->join('kelompok_kerja', 'kelompok_kerja.id_skema = skema.id_skema', 'inner');
-        $builder->join('kelompok_unit', 'kelompok_unit.id_kelompok = kelompok_kerja.id_kelompok', 'inner');
-        $builder->join('unit', 'unit.id_unit = kelompok_unit.id_unit AND unit.id_skema = skema.id_skema', 'inner');
+        $query = $this->db->query($sql, [$id_skema]);
+        $rawData = $query->getResultArray();
 
-        // Apply early filtering to reduce data before joining large tables
-        $builder->where('skema.id_skema', $id_skema);
-        $builder->where('skema.status', 'Y');
-        $builder->where('unit.status', 'Y');
+        // Transform flat data into hierarchical structure for better frontend performance
+        $structuredData = $this->transformToHierarchicalStructure($rawData);
 
-        // Now join larger tables after filtering
-        $builder->join('elemen', 'elemen.id_unit = unit.id_unit AND elemen.id_skema = skema.id_skema', 'left');
-        $builder->join('kuk', 'kuk.id_elemen = elemen.id_elemen AND kuk.id_unit = unit.id_unit AND kuk.id_skema = skema.id_skema', 'left');
+        // Cache for 1 hour (data doesn't change frequently)
+        cache()->save($cacheKey, $structuredData, 3600);
 
-        $builder->orderBy('unit.kode_unit', 'ASC');
-        $builder->orderBy('elemen.kode_elemen', 'ASC');
-        $builder->orderBy('kuk.kode_kuk', 'ASC');
+        return $structuredData;
+    }
 
-        return $builder->get()->getResultArray();
+    /**
+     * Transform flat query result into hierarchical structure
+     * Eliminates need for multiple loops in frontend
+     */
+    private function transformToHierarchicalStructure(array $rawData): array
+    {
+        $structure = [
+            'skema' => null,
+            'kelompok_kerja' => [],
+            'statistics' => [
+                'total_units' => 0,
+                'total_elemen' => 0,
+                'total_kuk' => 0
+            ]
+        ];
+
+        $unitTracker = [];
+        $elemenTracker = [];
+
+        foreach ($rawData as $row) {
+            // Set skema info once
+            if (!$structure['skema']) {
+                $structure['skema'] = [
+                    'id_skema' => $row['id_skema'],
+                    'kode_skema' => $row['kode_skema'],
+                    'nama_skema' => $row['nama_skema'],
+                    'jenis_skema' => $row['jenis_skema']
+                ];
+            }
+
+            $kelompokId = $row['id_kelompok'];
+            $unitId = $row['id_unit'];
+            $elemenId = $row['id_elemen'];
+
+            // Initialize kelompok if not exists
+            if (!isset($structure['kelompok_kerja'][$kelompokId])) {
+                $structure['kelompok_kerja'][$kelompokId] = [
+                    'id_kelompok' => $kelompokId,
+                    'nama_kelompok' => $row['nama_kelompok'],
+                    'units' => []
+                ];
+            }
+
+            // Initialize unit if not exists
+            if (!isset($structure['kelompok_kerja'][$kelompokId]['units'][$unitId])) {
+                $structure['kelompok_kerja'][$kelompokId]['units'][$unitId] = [
+                    'id_unit' => $unitId,
+                    'kode_unit' => $row['kode_unit'],
+                    'nama_unit' => $row['nama_unit'],
+                    'elemen' => []
+                ];
+                $unitTracker[$unitId] = true;
+            }
+
+            // Add elemen if exists and not already added
+            if ($elemenId && !isset($structure['kelompok_kerja'][$kelompokId]['units'][$unitId]['elemen'][$elemenId])) {
+                $structure['kelompok_kerja'][$kelompokId]['units'][$unitId]['elemen'][$elemenId] = [
+                    'id_elemen' => $elemenId,
+                    'kode_elemen' => $row['kode_elemen'],
+                    'nama_elemen' => $row['nama_elemen'],
+                    'kuk' => []
+                ];
+                $elemenTracker[$elemenId] = true;
+            }
+
+            // Add KUK if exists
+            if ($row['id_kuk']) {
+                $structure['kelompok_kerja'][$kelompokId]['units'][$unitId]['elemen'][$elemenId]['kuk'][] = [
+                    'id_kuk' => $row['id_kuk'],
+                    'kode_kuk' => $row['kode_kuk'],
+                    'kriteria_unjuk_kerja' => $row['kriteria_unjuk_kerja'],
+                    'hierarchy_path' => $row['hierarchy_path']
+                ];
+                $structure['statistics']['total_kuk']++;
+            }
+        }
+
+        // Calculate statistics
+        $structure['statistics']['total_units'] = count($unitTracker);
+        $structure['statistics']['total_elemen'] = count($elemenTracker);
+
+        // Convert associative arrays to indexed arrays for easier iteration
+        $structure['kelompok_kerja'] = array_values($structure['kelompok_kerja']);
+        foreach ($structure['kelompok_kerja'] as &$kelompok) {
+            $kelompok['units'] = array_values($kelompok['units']);
+            foreach ($kelompok['units'] as &$unit) {
+                $unit['elemen'] = array_values($unit['elemen']);
+            }
+        }
+
+        return $structure;
     }
 
     /**
@@ -593,5 +702,356 @@ class ObservasiModel extends Model
             ->where('id_skema', $id_skema)
             ->get()
             ->getResultArray();
+    }
+
+    /**
+     * EAGER LOADING: Get observation data with all related information in single query
+     * Eliminates N+1 problem when loading observation details
+     *
+     * @param int $id_observasi Observation ID
+     * @return array|null Complete observation data with relationships
+     */
+    public function getObservasiWithAllDetails(int $id_observasi): ?array
+    {
+        $cacheKey = "observasi_details_{$id_observasi}";
+        
+        if ($cached = cache($cacheKey)) {
+            return $cached;
+        }
+
+        $sql = "
+        SELECT 
+            -- Observasi data
+            o.id_observasi,
+            o.tanggal_observasi,
+            o.id_asesor,
+            o.id_asesi,
+            o.id_pengajuan,
+            
+            -- Asesor data
+            asesor.nomor_registrasi as asesor_nomor_registrasi,
+            asesor_user.nama_lengkap as asesor_nama,
+            asesor_user.email as asesor_email,
+            
+            -- Asesi data
+            asesi.nik as asesi_nik,
+            asesi_user.nama_lengkap as asesi_nama,
+            asesi_user.email as asesi_email,
+            
+            -- Skema data
+            s.id_skema,
+            s.kode_skema,
+            s.nama_skema,
+            s.jenis_skema,
+            
+            -- Pengajuan data
+            pa.status_pengajuan,
+            pa.status as pengajuan_status,
+            pa.tanggal_pengajuan,
+            
+            -- Aggregated statistics
+            (SELECT COUNT(*) FROM detail_observasi do1 WHERE do1.id_observasi = o.id_observasi) as total_kuk,
+            (SELECT COUNT(*) FROM detail_observasi do2 WHERE do2.id_observasi = o.id_observasi AND do2.kompeten = 'Ya') as kompeten_count,
+            (SELECT COUNT(*) FROM detail_observasi do3 WHERE do3.id_observasi = o.id_observasi AND do3.kompeten = 'Tidak') as tidak_kompeten_count
+            
+        FROM observasi o
+        INNER JOIN asesor ON asesor.id_asesor = o.id_asesor
+        INNER JOIN users asesor_user ON asesor_user.id = asesor.id_user
+        INNER JOIN asesi ON asesi.id_asesi = o.id_asesi
+        INNER JOIN users asesi_user ON asesi_user.id = asesi.id_user
+        INNER JOIN pengajuan_asesmen pa ON pa.id_pengajuan = o.id_pengajuan
+        INNER JOIN skema s ON s.id_skema = pa.id_skema
+        WHERE o.id_observasi = ?
+        ";
+
+        $query = $this->db->query($sql, [$id_observasi]);
+        $result = $query->getRowArray();
+
+        if (!$result) {
+            return null;
+        }
+
+        // Get detailed KUK data in separate optimized query
+        $detailSql = "
+        SELECT 
+            do.id_kuk,
+            do.kompeten,
+            do.keterangan,
+            k.kode_kuk,
+            k.nama_kuk,
+            e.kode_elemen,
+            e.nama_elemen,
+            u.kode_unit,
+            u.nama_unit
+        FROM detail_observasi do
+        INNER JOIN kuk k ON k.id_kuk = do.id_kuk
+        INNER JOIN elemen e ON e.id_elemen = k.id_elemen
+        INNER JOIN unit u ON u.id_unit = e.id_unit
+        WHERE do.id_observasi = ?
+        ORDER BY u.kode_unit, e.kode_elemen, k.kode_kuk
+        ";
+
+        $detailQuery = $this->db->query($detailSql, [$id_observasi]);
+        $result['details'] = $detailQuery->getResultArray();
+
+        // Calculate completion percentage
+        $result['completion_percentage'] = $result['total_kuk'] > 0 
+            ? round(($result['kompeten_count'] + $result['tidak_kompeten_count']) / $result['total_kuk'] * 100, 1)
+            : 0;
+
+        // Cache for 30 minutes
+        cache()->save($cacheKey, $result, 1800);
+
+        return $result;
+    }
+
+    /**
+     * EAGER LOADING: Get asesor with all competency schemas in single query
+     * Eliminates N+1 when loading asesor competencies
+     *
+     * @param int $id_asesor Asesor ID
+     * @return array|null Asesor data with all competency schemas
+     */
+    public function getAsesorWithAllSkema(int $id_asesor): ?array
+    {
+        $cacheKey = "asesor_skema_{$id_asesor}";
+        
+        if ($cached = cache($cacheKey)) {
+            return $cached;
+        }
+
+        $sql = "
+        SELECT 
+            a.id_asesor,
+            a.nomor_registrasi,
+            u.nama_lengkap,
+            u.email,
+            u.active,
+            
+            -- Aggregate all skemas into JSON for easy handling
+            JSON_ARRAYAGG(
+                JSON_OBJECT(
+                    'id_skema', s.id_skema,
+                    'kode_skema', s.kode_skema,
+                    'nama_skema', s.nama_skema,
+                    'jenis_skema', s.jenis_skema,
+                    'status', s.status
+                )
+            ) as skemas,
+            
+            -- Statistics
+            COUNT(DISTINCT s.id_skema) as total_skemas,
+            COUNT(DISTINCT CASE WHEN s.status = 'Y' THEN s.id_skema END) as active_skemas
+            
+        FROM asesor a
+        INNER JOIN users u ON u.id = a.id_user
+        LEFT JOIN asesor_skema ask ON ask.id_asesor = a.id_asesor
+        LEFT JOIN skema s ON s.id_skema = ask.id_skema
+        WHERE a.id_asesor = ?
+        GROUP BY a.id_asesor, a.nomor_registrasi, u.nama_lengkap, u.email, u.active
+        ";
+
+        $query = $this->db->query($sql, [$id_asesor]);
+        $result = $query->getRowArray();
+
+        if (!$result) {
+            return null;
+        }
+
+        // Decode JSON skemas
+        $result['skemas'] = $result['skemas'] ? json_decode($result['skemas'], true) : [];
+
+        // Cache for 1 hour
+        cache()->save($cacheKey, $result, 3600);
+
+        return $result;
+    }
+
+    /**
+     * OPTIMIZED: Get DataTable data with eager loading
+     * Single query with all joins to eliminate N+1 problem
+     *
+     * @param array $params DataTable parameters
+     * @return array DataTable response
+     */
+    public function getOptimizedDataTableData(array $params): array
+    {
+        $draw = $params['draw'] ?? 1;
+        $start = $params['start'] ?? 0;
+        $length = $params['length'] ?? 10;
+        $search = $params['search']['value'] ?? '';
+
+        // Build optimized query with all necessary joins
+        $sql = "
+        SELECT 
+            o.id_observasi,
+            o.tanggal_observasi,
+            
+            -- Asesor info
+            asesor_user.nama_lengkap as nama_asesor,
+            asesor.nomor_registrasi as reg_asesor,
+            
+            -- Asesi info  
+            asesi_user.nama_lengkap as nama_asesi,
+            asesi.nik as nik_asesi,
+            
+            -- Skema info
+            s.kode_skema,
+            s.nama_skema,
+            
+            -- Status info
+            pa.status_pengajuan,
+            pa.status as pengajuan_status,
+            
+            -- Progress calculation
+            COALESCE(progress.total_kuk, 0) as total_kuk,
+            COALESCE(progress.filled_kuk, 0) as filled_kuk,
+            CASE 
+                WHEN COALESCE(progress.total_kuk, 0) = 0 THEN 0
+                ELSE ROUND(COALESCE(progress.filled_kuk, 0) / progress.total_kuk * 100, 1)
+            END as completion_percentage
+            
+        FROM observasi o
+        INNER JOIN asesor ON asesor.id_asesor = o.id_asesor
+        INNER JOIN users asesor_user ON asesor_user.id = asesor.id_user
+        INNER JOIN asesi ON asesi.id_asesi = o.id_asesi  
+        INNER JOIN users asesi_user ON asesi_user.id = asesi.id_user
+        INNER JOIN pengajuan_asesmen pa ON pa.id_pengajuan = o.id_pengajuan
+        INNER JOIN skema s ON s.id_skema = pa.id_skema
+        LEFT JOIN (
+            SELECT 
+                do.id_observasi,
+                COUNT(*) as total_kuk,
+                SUM(CASE WHEN do.kompeten IS NOT NULL THEN 1 ELSE 0 END) as filled_kuk
+            FROM detail_observasi do
+            GROUP BY do.id_observasi
+        ) progress ON progress.id_observasi = o.id_observasi
+        ";
+
+        // Add search conditions if search term provided
+        $whereConditions = [];
+        $searchParams = [];
+        
+        if (!empty($search)) {
+            $whereConditions[] = "(
+                asesor_user.nama_lengkap LIKE ? OR
+                asesi_user.nama_lengkap LIKE ? OR  
+                asesi.nik LIKE ? OR
+                s.kode_skema LIKE ? OR
+                s.nama_skema LIKE ?
+            )";
+            $searchTerm = "%{$search}%";
+            $searchParams = array_fill(0, 5, $searchTerm);
+        }
+
+        // Add WHERE clause if conditions exist
+        if (!empty($whereConditions)) {
+            $sql .= " WHERE " . implode(' AND ', $whereConditions);
+        }
+
+        // Count total records for pagination
+        $countSql = "SELECT COUNT(*) as total FROM (" . $sql . ") as count_query";
+        $totalQuery = $this->db->query($countSql, $searchParams);
+        $totalRecords = $totalQuery->getRowArray()['total'];
+
+        // Add ORDER BY and LIMIT for pagination
+        $sql .= " ORDER BY o.tanggal_observasi DESC LIMIT ? OFFSET ?";
+        $searchParams[] = (int)$length;
+        $searchParams[] = (int)$start;
+
+        // Execute main query
+        $query = $this->db->query($sql, $searchParams);
+        $data = $query->getResultArray();
+
+        return [
+            'draw' => (int)$draw,
+            'recordsTotal' => $totalRecords,
+            'recordsFiltered' => $totalRecords,
+            'data' => $data
+        ];
+    }
+
+    /**
+     * BATCH LOADING: Get multiple observations with details in single query
+     * Useful for reports and bulk operations
+     *
+     * @param array $observationIds Array of observation IDs
+     * @return array Grouped observation data
+     */
+    public function getBatchObservationsWithDetails(array $observationIds): array
+    {
+        if (empty($observationIds)) {
+            return [];
+        }
+
+        $placeholders = str_repeat('?,', count($observationIds) - 1) . '?';
+        
+        $sql = "
+        SELECT 
+            o.id_observasi,
+            o.tanggal_observasi,
+            asesor_user.nama_lengkap as asesor_nama,
+            asesi_user.nama_lengkap as asesi_nama,
+            s.kode_skema,
+            s.nama_skema,
+            
+            -- Detail observasi
+            do.id_kuk,
+            do.kompeten,
+            do.keterangan,
+            k.kode_kuk,
+            k.nama_kuk,
+            e.kode_elemen,
+            u.kode_unit
+            
+        FROM observasi o
+        INNER JOIN asesor ON asesor.id_asesor = o.id_asesor
+        INNER JOIN users asesor_user ON asesor_user.id = asesor.id_user
+        INNER JOIN asesi ON asesi.id_asesi = o.id_asesi
+        INNER JOIN users asesi_user ON asesi_user.id = asesi.id_user
+        INNER JOIN pengajuan_asesmen pa ON pa.id_pengajuan = o.id_pengajuan
+        INNER JOIN skema s ON s.id_skema = pa.id_skema
+        LEFT JOIN detail_observasi do ON do.id_observasi = o.id_observasi
+        LEFT JOIN kuk k ON k.id_kuk = do.id_kuk
+        LEFT JOIN elemen e ON e.id_elemen = k.id_elemen
+        LEFT JOIN unit u ON u.id_unit = e.id_unit
+        WHERE o.id_observasi IN ({$placeholders})
+        ORDER BY o.id_observasi, u.kode_unit, e.kode_elemen, k.kode_kuk
+        ";
+
+        $query = $this->db->query($sql, $observationIds);
+        $rawData = $query->getResultArray();
+
+        // Group data by observation ID
+        $groupedData = [];
+        foreach ($rawData as $row) {
+            $observasiId = $row['id_observasi'];
+            
+            if (!isset($groupedData[$observasiId])) {
+                $groupedData[$observasiId] = [
+                    'id_observasi' => $observasiId,
+                    'tanggal_observasi' => $row['tanggal_observasi'],
+                    'asesor_nama' => $row['asesor_nama'],
+                    'asesi_nama' => $row['asesi_nama'],
+                    'kode_skema' => $row['kode_skema'],
+                    'nama_skema' => $row['nama_skema'],
+                    'details' => []
+                ];
+            }
+
+            if ($row['id_kuk']) {
+                $groupedData[$observasiId]['details'][] = [
+                    'id_kuk' => $row['id_kuk'],
+                    'kompeten' => $row['kompeten'],
+                    'keterangan' => $row['keterangan'],
+                    'kode_kuk' => $row['kode_kuk'],
+                    'nama_kuk' => $row['nama_kuk'],
+                    'kode_elemen' => $row['kode_elemen'],
+                    'kode_unit' => $row['kode_unit']
+                ];
+            }
+        }
+
+        return array_values($groupedData);
     }
 }

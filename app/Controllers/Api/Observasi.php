@@ -97,8 +97,8 @@ class Observasi extends DataTableController
 
     /**
     /**
-     * Load observation data via AJAX - OPTIMIZED
-     * Enhanced dengan service layer dan caching
+     * Load observation data via AJAX - NO CACHE
+     * Always return fresh data from database
      */
     public function loadObservasi()
     {
@@ -110,6 +110,11 @@ class Observasi extends DataTableController
                 'error' => 'Unauthorized: Direct access not allowed'
             ])->setStatusCode(401);
         }
+
+        // Add no-cache headers to prevent browser caching
+        $this->response->setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        $this->response->setHeader('Pragma', 'no-cache');
+        $this->response->setHeader('Expires', '0');
 
         $id_skema = $this->request->getGet('id_skema');
         $id_asesi = $this->request->getGet('id_asesi');
@@ -125,7 +130,12 @@ class Observasi extends DataTableController
         }
 
         try {
-            // Get observasi structure menggunakan service dengan caching
+            // CLEAR ANY EXISTING CACHE for this data
+            $cache = \Config\Services::cache();
+            $cache->deleteMatching("observasi_{$id_asesmen}_{$id_asesi}_*");
+            $cache->deleteMatching("kuk_structure_{$id_skema}_*");
+
+            // Get fresh observasi structure from service
             $result = $this->observasiService->getKukStructureForSchema($id_skema, $id_asesi);
 
             if (!$result['success']) {
@@ -140,7 +150,7 @@ class Observasi extends DataTableController
                 'existing_data' => $structureData['existingData'],
                 'totalKUK' => $structureData['totalKUK'],
                 'performance' => [
-                    'cached' => true,
+                    'cached' => false, // Always fresh data
                     'load_time' => round((microtime(true) - $startTime) * 1000, 2) . 'ms'
                 ]
             ]);
@@ -289,6 +299,11 @@ class Observasi extends DataTableController
         );
 
         if ($result['success']) {
+            // CLEAR CACHE after successful save
+            $cache = \Config\Services::cache();
+            $cache->deleteMatching("observasi_*");
+            $cache->deleteMatching("kuk_structure_*");
+
             return $this->respond([
                 'success' => true,
                 'message' => $result['message'],
@@ -326,6 +341,11 @@ class Observasi extends DataTableController
         );
 
         if ($result['success']) {
+            // CLEAR CACHE after successful batch save
+            $cache = \Config\Services::cache();
+            $cache->deleteMatching("observasi_*");
+            $cache->deleteMatching("kuk_structure_*");
+
             return $this->respond([
                 'success' => true,
                 'message' => $result['message'],

@@ -3,6 +3,36 @@
     $(document).ready(function() {
         'use strict';
 
+        // CLEAR ALL CACHES ON PAGE LOAD
+        try {
+            // Clear localStorage related to observasi
+            Object.keys(localStorage).forEach(key => {
+                if (key.includes('observasi') || key.includes('kuk')) {
+                    localStorage.removeItem(key);
+                }
+            });
+
+            // Clear sessionStorage related to observasi
+            Object.keys(sessionStorage).forEach(key => {
+                if (key.includes('observasi') || key.includes('kuk')) {
+                    sessionStorage.removeItem(key);
+                }
+            });
+
+            // Clear browser cache if available
+            if ('caches' in window) {
+                caches.keys().then(function(names) {
+                    names.forEach(function(name) {
+                        if (name.includes('observasi') || name.includes('api')) {
+                            caches.delete(name);
+                        }
+                    });
+                });
+            }
+        } catch (error) {
+            // Silent error handling for cache clearing
+        }
+
         // Configuration constants
         const CONFIG = {
             DEBOUNCE_DELAY: 500,
@@ -254,19 +284,28 @@
             }
 
             async loadObservasi(params) {
-                const cacheKey = `observasi_${params.id_skema}_${params.id_asesmen}_${params.id_asesi}`;
+                // FORCE FRESH DATA - Clear any existing cache
+                this.invalidateCache();
 
                 try {
-                    const queryString = new URLSearchParams(params).toString();
-                    const data = await this.request(`${API.loadObservasi}?${queryString}`);
+                    // Add timestamp for cache busting
+                    const timestamp = Date.now();
+                    const queryString = new URLSearchParams({
+                        ...params,
+                        _t: timestamp
+                    }).toString();
 
-                    if (data.success) {
-                        this.requestCache.set(cacheKey, data);
-                    }
+                    const data = await this.request(`${API.loadObservasi}?${queryString}`, {
+                        headers: {
+                            'Cache-Control': 'no-cache, no-store, must-revalidate',
+                            'Pragma': 'no-cache',
+                            'Expires': '0'
+                        }
+                    });
 
+                    // DO NOT CACHE - Always return fresh data
                     return data;
                 } catch (error) {
-                    console.error('Error loading observasi:', error);
                     throw error;
                 }
             }
@@ -867,22 +906,22 @@
             convertObservasiObjectToArray(observasiObject) {
                 const observasiArray = [];
 
-                console.log('Converting observasi object:', observasiObject); // Debug log
+
 
                 Object.keys(observasiObject).forEach(unitKey => {
                     const unit = observasiObject[unitKey];
                     const unitInfo = unit.unit_info;
 
-                    console.log('Processing unit:', unitKey, unitInfo); // Debug log
+
 
                     Object.keys(unit.elements || {}).forEach(elemenKey => {
                         const element = unit.elements[elemenKey];
                         const elemenInfo = element.element_info;
 
-                        console.log('Processing element:', elemenKey, elemenInfo); // Debug log
+
 
                         (element.kuks || []).forEach(kuk => {
-                            console.log('Processing KUK:', kuk); // Debug log
+
 
                             observasiArray.push({
                                 id_kelompok: 1, // Default kelompok ID
@@ -901,7 +940,7 @@
                     });
                 });
 
-                console.log('Converted array length:', observasiArray.length); // Debug log
+
                 return observasiArray;
             }
 
@@ -922,13 +961,13 @@
 
                     const response = await this.dataManager.loadObservasi(params);
 
-                    console.log('Full API Response:', response); // Debug log
+
 
                     if (response.success && response.observasi && Object.keys(response.observasi).length > 0) {
                         // Convert object structure to array for rendering
                         const observasiArray = this.convertObservasiObjectToArray(response.observasi);
 
-                        console.log('Converted observasi array:', observasiArray); // Debug log
+
 
                         // Check if we actually have KUKs to display
                         if (observasiArray.length > 0) {
@@ -1002,10 +1041,42 @@
 
                 try {
                     await this.dataManager.saveSingle(id_kuk, kompeten, keterangan);
+
+                    // FORCE REFRESH after successful save
+                    setTimeout(() => {
+                        this.forceRefreshData();
+                    }, 300);
+
                 } catch (error) {
-                    console.error('Error saving KUK:', error);
                     // Add back to pending if failed
                     this.state.addPendingChange(id_kuk);
+                }
+            }
+
+            /**
+             * Force refresh data from database
+             */
+            async forceRefreshData() {
+                // Clear all caches
+                this.dataManager.invalidateCache();
+
+                // Clear localStorage
+                try {
+                    Object.keys(localStorage).forEach(key => {
+                        if (key.includes('observasi') || key.includes('kuk')) {
+                            localStorage.removeItem(key);
+                        }
+                    });
+                } catch (error) {
+                    // Silent error handling
+                }
+
+                // Reload current data if we have the necessary IDs
+                const id_asesmen = this.state.get('id_asesmen');
+                const id_asesi = this.state.get('id_asesi');
+
+                if (id_asesmen && id_asesi) {
+                    await this.loadObservasiData();
                 }
             }
 
@@ -1207,7 +1278,7 @@
                     // Initialize performance monitoring
                     this.setupPerformanceMonitoring();
 
-                    console.log('Observasi application initialized successfully');
+
                 } catch (error) {
                     console.error('Failed to initialize application:', error);
                     this.notificationManager.showError(
@@ -1280,9 +1351,9 @@
                 // Monitor page visibility for performance tracking
                 document.addEventListener('visibilitychange', () => {
                     if (document.visibilityState === 'visible') {
-                        console.log('Page became visible');
+
                     } else {
-                        console.log('Page became hidden');
+
                     }
                 });
             }

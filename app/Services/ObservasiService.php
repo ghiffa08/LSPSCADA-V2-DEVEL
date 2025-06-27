@@ -177,19 +177,12 @@ class ObservasiService
     }
 
     /**
-     * Get observation with details using eager loading - OPTIMIZED
-     * Enhanced dengan caching dan optimasi query
+     * Get observation with details using eager loading - NO CACHE
+     * Always fetch fresh data from database
      */
     public function getObservationWithDetails(int $id_observasi): array
     {
-        $cacheKey = "observasi_details_{$id_observasi}";
-
-        // Try cache first
-        $cached = $this->cache->get($cacheKey);
-        if ($cached !== null) {
-            return $cached;
-        }
-
+        // REMOVED CACHING - Always get fresh data
         try {
             // Optimized query dengan single JOIN
             $observation = $this->db->table('observasi o')
@@ -238,9 +231,7 @@ class ObservasiService
                 ]
             ];
 
-            // Cache for 10 minutes
-            $this->cache->save($cacheKey, $result, 600);
-
+            // REMOVED CACHING - Always return fresh data
             return $result;
         } catch (\Exception $e) {
             log_message('error', 'ObservasiService getObservationWithDetails Error: ' . $e->getMessage());
@@ -283,19 +274,12 @@ class ObservasiService
     }
 
     /**
-     * Get KUK structure for observation form - OPTIMIZED
-     * Enhanced dengan caching dan optimasi query
+     * Get KUK structure for observation form - NO CACHE
+     * Always return fresh data from database
      */
     public function getKukStructureForSchema(int $id_skema, ?string $id_asesi = null): array
     {
-        $cacheKey = "kuk_structure_{$id_skema}" . ($id_asesi ? "_{$id_asesi}" : '');
-
-        // Try cache first
-        $cached = $this->cache->get($cacheKey);
-        if ($cached !== null) {
-            return $cached;
-        }
-
+        // REMOVED CACHING - Always get fresh data
         try {
             // Optimized query dengan subquery untuk existing data
             $builder = $this->db->table('skema s');
@@ -362,9 +346,7 @@ class ObservasiService
                 'data' => $groupedStructure
             ];
 
-            // Cache for 30 minutes
-            $this->cache->save($cacheKey, $result, 1800);
-
+            // REMOVED CACHING - Always return fresh data
             return $result;
         } catch (\Exception $e) {
             log_message('error', 'ObservasiService getKukStructureForSchema Error: ' . $e->getMessage());
