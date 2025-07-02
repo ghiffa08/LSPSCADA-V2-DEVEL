@@ -127,7 +127,7 @@ class ObservasiModel extends Model
     public function getStrukturObservasiSkema(int $id_skema): array
     {
         $cacheKey = "struktur_skema_{$id_skema}";
-        
+
         // Try to get from cache first (data rarely changes)
         if ($cached = cache($cacheKey)) {
             return $cached;
@@ -163,8 +163,7 @@ class ObservasiModel extends Model
             WHERE s.id_skema = ? 
                 AND s.status = 'Y' 
                 AND u.status = 'Y'
-                AND (e.id_elemen IS NULL OR e.status = 'Y')
-                AND (k.id_kuk IS NULL OR k.status = 'Y')
+                -- Note: elemen and kuk tables don't have status fields based on actual database structure
         )
         SELECT * FROM skema_structure
         ORDER BY kode_unit ASC, kode_elemen ASC, kode_kuk ASC
@@ -714,7 +713,7 @@ class ObservasiModel extends Model
     public function getObservasiWithAllDetails(int $id_observasi): ?array
     {
         $cacheKey = "observasi_details_{$id_observasi}";
-        
+
         if ($cached = cache($cacheKey)) {
             return $cached;
         }
@@ -795,7 +794,7 @@ class ObservasiModel extends Model
         $result['details'] = $detailQuery->getResultArray();
 
         // Calculate completion percentage
-        $result['completion_percentage'] = $result['total_kuk'] > 0 
+        $result['completion_percentage'] = $result['total_kuk'] > 0
             ? round(($result['kompeten_count'] + $result['tidak_kompeten_count']) / $result['total_kuk'] * 100, 1)
             : 0;
 
@@ -815,7 +814,7 @@ class ObservasiModel extends Model
     public function getAsesorWithAllSkema(int $id_asesor): ?array
     {
         $cacheKey = "asesor_skema_{$id_asesor}";
-        
+
         if ($cached = cache($cacheKey)) {
             return $cached;
         }
@@ -931,7 +930,7 @@ class ObservasiModel extends Model
         // Add search conditions if search term provided
         $whereConditions = [];
         $searchParams = [];
-        
+
         if (!empty($search)) {
             $whereConditions[] = "(
                 asesor_user.nama_lengkap LIKE ? OR
@@ -985,7 +984,7 @@ class ObservasiModel extends Model
         }
 
         $placeholders = str_repeat('?,', count($observationIds) - 1) . '?';
-        
+
         $sql = "
         SELECT 
             o.id_observasi,
@@ -1026,7 +1025,7 @@ class ObservasiModel extends Model
         $groupedData = [];
         foreach ($rawData as $row) {
             $observasiId = $row['id_observasi'];
-            
+
             if (!isset($groupedData[$observasiId])) {
                 $groupedData[$observasiId] = [
                     'id_observasi' => $observasiId,

@@ -45,6 +45,7 @@ class CeklistObservasiController extends ResourceController
 
         return view('admin/observasi', $data);
     }
+
     public function create()
     {
         try {
@@ -274,7 +275,6 @@ class CeklistObservasiController extends ResourceController
             $asesiData = $pengajuanModel->getAsesiByAsesmen($id_asesmen);
 
             $count = count($asesiData);
-            log_message('info', "Loaded " . $count . " asesi for asesmen ID: " . $id_asesmen);
 
             // Provide informative messages based on data availability
             $message = '';

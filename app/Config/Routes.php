@@ -220,6 +220,7 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->get('getSkemaDetails', 'RekamanAsesmenController::getSkemaDetails');
             $routes->get('pdf/(:num)', 'RekamanAsesmenController::pdf/$1');
             $routes->delete('(:num)', 'RekamanAsesmenController::delete/$1');
+            $routes->get('getAsesiByAsesmen', 'RekamanAsesmenController::getAsesiByAsesmen');
 
             // AJAX Auto-save endpoints
             $routes->post('saveMethod', 'RekamanAsesmenController::saveMethod');

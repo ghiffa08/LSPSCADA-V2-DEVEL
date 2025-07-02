@@ -32,14 +32,14 @@ class Database extends Config
         'database'     => 'lsp_scada_app_devel',
         'DBDriver'     => 'MySQLi',
         'DBPrefix'     => '',
-        'pConnect'     => false,
+        'pConnect'     => true, // Persistent connections
         'DBDebug'      => true,
         'charset'      => 'utf8mb4',
         'DBCollat'     => 'utf8mb4_general_ci',
         'swapPre'      => '',
         'encrypt'      => false,
-        'compress'     => false,
-        'strictOn'     => false,
+        'compress'     => true,
+        'strictOn'     => true,
         'failover'     => [],
         'port'         => 3306,
         'numberNative' => false,
@@ -48,6 +48,11 @@ class Database extends Config
             'datetime' => 'Y-m-d H:i:s',
             'time'     => 'H:i:s',
         ],
+        'pool' => [
+            'min_connections' => 5,
+            'max_connections' => 20,
+            'idle_timeout' => 300
+        ]
     ];
 
     //    /**

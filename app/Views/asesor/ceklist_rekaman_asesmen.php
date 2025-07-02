@@ -1,5 +1,41 @@
 <?= $this->extend("layouts/admin/layout-admin"); ?>
 <?= $this->section("content"); ?>
+<!-- Informasi Asesor & Skema -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-info border-left-info">
+            <div class="row">
+                <div class="col-md-4">
+                    <h6 class="font-weight-bold mb-1">
+                        <i class="fas fa-user-tie mr-1"></i>Asesor
+                    </h6>
+                    <p class="mb-0"><?= esc($asesor['nama_lengkap']) ?></p>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="font-weight-bold mb-1">
+                        <i class="fas fa-bookmark mr-1"></i>Skema Sertifikasi
+                    </h6>
+                    <p class="mb-0">
+                        <?php
+                        if (isset($skema) && is_array($skema)) {
+                            echo esc($skema['nama_skema']) . ' (' . esc($skema['kode_skema']) . ')';
+                        } else {
+                            echo 'Tidak ada skema';
+                        }
+                        ?>
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <h6 class="font-weight-bold mb-1">
+                        <i class="fas fa-id-badge mr-1"></i>Nomor Registrasi
+                    </h6>
+                    <p class="mb-0"><?= esc($asesor['nomor_registrasi'] ?? 'Tidak ada') ?></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row">
     <div class="col-12">
         <div class="card shadow">
@@ -11,7 +47,6 @@
                     </button>
                 </div>
             </div>
-
             <div class="collapse" id="collapseInfo">
                 <div class="card-body bg-light border-top border-bottom">
                     <div class="alert alert-info mb-0">
@@ -26,34 +61,43 @@
                 </div>
             </div>
 
-            <div class="card-body">
-                <!-- Informasi Asesi & Skema -->
+            <!-- Error Message Display -->
+            <?php if (isset($error_message)): ?>
                 <div class="row mb-4">
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label class="font-weight-bold"><i class="fas fa-bookmark text-primary mr-1"></i>Nama Skema</label>
-                            <select name="id_skema" id="id_skema" class="form-control select2" required>
-                                <option value="">-- Pilih Skema --</option>
-                                <?php foreach ($skema as $s): ?>
-                                    <option value="<?= $s['id_skema'] ?>" data-id-asesmen="<?= $s['id_asesmen'] ?>" data-kode-skema="<?= $s['kode_skema'] ?>"><?= $s['nama_skema'] ?></option>
-                                <?php endforeach ?>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="form-group">
-                            <label class="font-weight-bold"><i class="fas fa-hashtag text-primary mr-1"></i>Nomor Skema</label>
-                            <input type="text" class="form-control bg-light" id="kode_skema" value="" readonly>
+                    <div class="col-12">
+                        <div class="alert alert-danger">
+                            <h6><i class="fas fa-exclamation-triangle mr-2"></i>Error</h6>
+                            <p><?= esc($error_message) ?></p>
+                            <small>Silakan hubungi administrator atau coba refresh halaman.</small>
                         </div>
                     </div>
                 </div>
+            <?php endif; ?>
 
+            <div class="card-body">
+                <!-- Pilih Asesmen (as ROOT filter, get asesi BY asesmen!) -->
                 <div class="row mb-4">
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label class="font-weight-bold"><i class="fas fa-user text-primary mr-1"></i>Nama Asesi</label>
-                            <select name="id_asesi" id="id_asesi" class="form-control select2" required disabled>
-                                <option value="">-- Pilih Skema Terlebih Dahulu --</option>
+                            <label class="font-weight-bold"><i class="fas fa-tasks text-primary mr-1"></i>Pilih Asesmen</label>
+                            <select name="id_asesmen" id="id_asesmen" class="form-control select2" required>
+                                <option value="">-- Pilih Asesmen --</option>
+                                <?php if (isset($asesmen) && is_array($asesmen) && !empty($asesmen)): ?>
+                                    <?php foreach ($asesmen as $a): ?>
+                                        <?php if (isset($a['id_asesmen']) && !empty($a['id_asesmen'])): ?>
+                                            <option value="<?= $a['id_asesmen'] ?>"
+                                                data-id-skema="<?= $a['id_skema'] ?? '' ?>"
+                                                data-kode-skema="<?= $a['kode_skema'] ?? '' ?>"
+                                                data-nama-skema="<?= $a['nama_skema'] ?? '' ?>">
+                                                <?= esc($a['tujuan'] ?? 'Asesmen') ?> - <?= esc($a['nama_skema'] ?? 'Unknown') ?>
+                                            </option>
+                                        <?php else: ?>
+                                            <?php log_message('warning', 'Skipping asesmen data without id_asesmen: ' . json_encode($a)); ?>
+                                        <?php endif; ?>
+                                    <?php endforeach ?>
+                                <?php else: ?>
+                                    <option value="" disabled>Tidak ada data asesmen</option>
+                                <?php endif; ?>
                             </select>
                         </div>
                     </div>
@@ -61,6 +105,24 @@
                         <div class="form-group">
                             <label class="font-weight-bold"><i class="fas fa-calendar-alt text-primary mr-1"></i>Tanggal Asesmen</label>
                             <input type="date" class="form-control" name="tanggal_asesmen" id="tanggal_asesmen" value="<?= date('Y-m-d') ?>">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pilih Asesi (populated by AJAX getAsesiByAsesmen) -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="font-weight-bold"><i class="fas fa-user text-primary mr-1"></i>Nama Asesi</label>
+                            <select name="id_asesi" id="id_asesi" class="form-control select2" required disabled>
+                                <option value="">-- Pilih Asesmen Terlebih Dahulu --</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label class="font-weight-bold"><i class="fas fa-hashtag text-primary mr-1"></i>Kode Skema</label>
+                            <input type="text" class="form-control bg-light" id="kode_skema" value="" readonly>
                         </div>
                     </div>
                 </div>
@@ -84,11 +146,31 @@
                 </div>
 
                 <!-- Loading Indicator -->
-                <div id="loadingState" class="text-center py-5">
+                <div id="loadingState" class="text-center py-5" style="display: none;">
                     <div class="spinner-border text-primary" role="status">
                         <span class="sr-only">Loading...</span>
                     </div>
                     <p class="mt-3 text-muted">Memuat data rekaman asesmen...</p>
+                </div>
+
+                <!-- Initial Instructions -->
+                <div id="initialInstructions" class="alert alert-info text-center py-4">
+                    <i class="fas fa-info-circle fa-2x text-info mb-3"></i>
+                    <h5 class="alert-heading">Instruksi Penggunaan</h5>
+                    <p class="mb-2">Untuk memulai rekaman asesmen, silakan ikuti langkah berikut:</p>
+                    <ol class="list-unstyled mb-0">
+                        <li class="mb-2"><strong>1.</strong> Pilih <strong>Asesmen</strong> dari dropdown di atas</li>
+                        <li class="mb-2"><strong>2.</strong> Pilih <strong>Asesi</strong> yang akan dinilai</li>
+                        <li class="mb-0"><strong>3.</strong> Rekaman unit kompetensi akan dimuat otomatis</li>
+                    </ol>
+                </div>
+
+                <!-- Empty Data Message -->
+                <div id="emptyDataMessage" class="alert alert-warning text-center py-4" style="display: none;">
+                    <i class="fas fa-exclamation-triangle fa-2x text-warning mb-3"></i>
+                    <h5 class="alert-heading">Belum Ada Data Asesi</h5>
+                    <p class="mb-2">Belum ada asesi yang terdaftar untuk asesmen yang dipilih.</p>
+                    <p class="mb-0">Pastikan asesi sudah mengajukan permohonan dan statusnya telah disetujui.</p>
                 </div>
 
                 <!-- Form Rekaman Asesmen -->
@@ -167,13 +249,16 @@
                     </small>
                 </div>
             </div>
+            <div class="card-footer bg-white">
+                <div class="text-muted text-center">
+                    <i class="fas fa-shield-alt mr-1"></i> Pastikan semua data rekaman asesmen telah diisi dengan benar sebelum menyimpan.
+                </div>
+            </div>
         </div>
     </div>
 </div>
-
 <?= $this->endSection(); ?>
-<?= $this->section('js'); ?>
-<!-- Include JavaScript -->
-<?= $this->include("asesor/utility/rekaman-asesmen-js"); ?>
 
+<?= $this->section('js'); ?>
+<?= $this->include("asesor/utility/rekaman-asesmen-js"); ?>
 <?= $this->endSection(); ?>

@@ -62,39 +62,6 @@
                     </div>
                 </div>
 
-                <!-- Debug Info Panel (Development Only) -->
-                <?php if (ENVIRONMENT === 'development' && isset($debug_info)): ?>
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <div class="alert alert-info">
-                                <h6><i class="fas fa-bug mr-2"></i>Debug Information (Development Mode)</h6>
-                                <div class="row">
-                                    <div class="col-md-3">
-                                        <strong>User ID:</strong> <?= $debug_info['user_id'] ?? 'N/A' ?><br>
-                                        <strong>Asesor ID:</strong> <?= $debug_info['asesor_id'] ?? 'N/A' ?><br>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <strong>Skema ID:</strong> <?= $debug_info['id_skema'] ?? 'N/A' ?><br>
-                                        <strong>Method Used:</strong> <?= $debug_info['method_used'] ?? 'N/A' ?><br>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <strong>Asesmen Count:</strong> <?= $debug_info['asesmen_count'] ?? 0 ?><br>
-                                        <strong>Total in DB:</strong> <?= $debug_info['total_asesmen_db'] ?? 0 ?><br>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <?php if (isset($debug_info['error'])): ?>
-                                            <strong style="color: red;">Error:</strong><br>
-                                            <small><?= esc($debug_info['error']) ?></small>
-                                        <?php else: ?>
-                                            <strong style="color: green;">Status: OK</strong>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                <?php endif; ?>
-
                 <!-- Error Message Display -->
                 <?php if (isset($error_message)): ?>
                     <div class="row mb-4">
