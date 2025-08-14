@@ -195,4 +195,54 @@ class AsesorSkema extends ResourceController
             ]);
         }
     }
+
+    /**
+     * Get skema for current asesor
+     */
+    public function getSkemaAsesor()
+    {
+        try {
+            if (!$this->request->isAJAX()) {
+                return $this->response->setJSON([
+                    'status' => 'error',
+                    'message' => 'Unauthorized: Direct access not allowed'
+                ])->setStatusCode(401);
+            }
+
+            // Get asesor's assigned skema
+            $asesorModel = model('AsesorModel');
+            $asesorInfo = $asesorModel->getWithSkema($this->asesorId);
+
+            if (!$asesorInfo || empty($asesorInfo['id_skema'])) {
+                return $this->response->setJSON([
+                    'status' => 'error',
+                    'message' => 'Asesor belum memiliki skema yang ditetapkan'
+                ]);
+            }
+
+            // Get skema details
+            $skema = $this->skemaModel->find($asesorInfo['id_skema']);
+
+            if (!$skema) {
+                return $this->response->setJSON([
+                    'status' => 'error',
+                    'message' => 'Skema tidak ditemukan'
+                ]);
+            }
+
+            return $this->response->setJSON([
+                'status' => 'success',
+                'data' => [
+                    'skema' => $skema,
+                    'asesor' => $asesorInfo
+                ]
+            ]);
+        } catch (\Exception $e) {
+            log_message('error', 'Error getting skema asesor: ' . $e->getMessage());
+            return $this->response->setJSON([
+                'status' => 'error',
+                'message' => 'Terjadi kesalahan sistem'
+            ]);
+        }
+    }
 }

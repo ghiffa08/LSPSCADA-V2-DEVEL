@@ -16,6 +16,17 @@ class CustomResponseService
     use ResponseTrait;
 
     /**
+     * @var ResponseInterface
+     */
+    protected $response;
+
+    public function __construct()
+    {
+        // Inisialisasi response dari service() 
+        $this->response = service('response');
+    }
+
+    /**
      * Success response with data
      *
      * @param mixed $data Response data

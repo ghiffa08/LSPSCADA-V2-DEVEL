@@ -180,8 +180,13 @@ function setFormValue($field, $applicantData = null)
     }
 
     // If we have existing data from database, use that
-    if ($applicantData && isset($applicantData[$field])) {
-        return $applicantData[$field];
+    if ($applicantData) {
+        // Handle both array and object access
+        if (is_array($applicantData) && isset($applicantData[$field])) {
+            return $applicantData[$field];
+        } elseif (is_object($applicantData) && property_exists($applicantData, $field)) {
+            return $applicantData->$field;
+        }
     }
 
     // Otherwise return empty
@@ -208,9 +213,14 @@ if (!function_exists('isSelected')) {
 
         // If we have existing data from database
         if ($existingData) {
-            if (is_object($existingData) && isset($existingData->$field)) {
-                return $existingData->$field == $value ? 'selected' : '';
-            } elseif (is_array($existingData) && isset($existingData[$field])) {
+            // Handle object access
+            if (is_object($existingData)) {
+                if (property_exists($existingData, $field)) {
+                    return $existingData->$field == $value ? 'selected' : '';
+                }
+            }
+            // Handle array access
+            elseif (is_array($existingData) && isset($existingData[$field])) {
                 return $existingData[$field] == $value ? 'selected' : '';
             }
         }

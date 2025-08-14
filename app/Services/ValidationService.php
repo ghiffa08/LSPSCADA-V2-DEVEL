@@ -34,8 +34,9 @@ class ValidationService
     public function validatePengajuanAsesmen(array $data): ApiResponseDTO
     {
         $rules = $this->validationRules['pengajuan_asesmen'];
+        $this->validation->setRules($rules);
 
-        if (!$this->validation->run($data, $rules)) {
+        if (!$this->validation->run($data)) {
             return ApiResponseDTO::error(
                 'Validasi form gagal',
                 $this->validation->getErrors(),
@@ -64,9 +65,11 @@ class ValidationService
      */
     public function validateAsesi(array $data): ApiResponseDTO
     {
+        // Set rules first, then run validation with data
         $rules = $this->validationRules['asesi'];
+        $this->validation->setRules($rules);
 
-        if (!$this->validation->run($data, $rules)) {
+        if (!$this->validation->run($data)) {
             return ApiResponseDTO::error(
                 'Validasi asesi gagal',
                 $this->validation->getErrors(),
@@ -273,19 +276,16 @@ class ValidationService
             }
         }
 
-        // Validate phone number format
-        if (isset($data['no_hp'])) {
-            if (!preg_match('/^(\+62|62|0)[0-9]{9,12}$/', $data['no_hp'])) {
-                $errors['no_hp'] = 'Format nomor HP tidak valid (contoh: 08123456789)';
-            }
-        }
+        // Phone number validation has been moved to user update process
 
         // Validate educational background
         if (isset($data['pendidikan_terakhir']) && isset($data['nama_sekolah'])) {
-            $validEducationLevels = ['SD', 'SMP', 'SMA/SMK', 'D1', 'D2', 'D3', 'D4', 'S1', 'S2', 'S3'];
+            // Menggunakan nilai dari AsesiEntity untuk konsistensi
+            $validEducationLevels = \App\Entities\AsesiEntity::getValidEducationLevels();
 
             if (!in_array($data['pendidikan_terakhir'], $validEducationLevels)) {
-                $errors['pendidikan_terakhir'] = 'Tingkat pendidikan tidak valid';
+                log_message('error', 'Invalid education level: ' . $data['pendidikan_terakhir'] . ', valid levels: ' . implode(',', $validEducationLevels));
+                $errors['pendidikan_terakhir'] = 'Tingkat pendidikan tidak valid (pilih: ' . implode(', ', $validEducationLevels) . ')';
             }
         }
 
@@ -326,7 +326,7 @@ class ValidationService
                 'nik' => 'required|numeric|max_length[16]',
                 'tempat_lahir' => 'required|max_length[255]',
                 'tanggal_lahir' => 'required|valid_date',
-                'jenis_kelamin' => 'required|in_list[L,P]',
+                'jenis_kelamin' => 'required|in_list[Laki-Laki,Perempuan]',
                 'pendidikan_terakhir' => 'required|max_length[50]',
                 'nama_sekolah' => 'required|max_length[255]',
                 'jurusan' => 'required|max_length[255]',
@@ -350,18 +350,20 @@ class ValidationService
                 'id_asesmen' => 'required|numeric'
             ],
             'asesi' => [
-                'user_id' => 'required|numeric',
-                'nik' => 'required|numeric|max_length[16]',
-                'nama' => 'required|max_length[255]',
-                'tempat_lahir' => 'required|max_length[255]',
+                'id_user' => 'required|numeric',
+                'nik' => 'required|max_length[20]',
+                'tempat_lahir' => 'required|max_length[30]',
                 'tanggal_lahir' => 'required|valid_date',
-                'jenis_kelamin' => 'required|in_list[L,P]',
-                'pendidikan_terakhir' => 'required|max_length[50]',
-                'nama_sekolah' => 'required|max_length[255]',
-                'jurusan' => 'required|max_length[255]',
-                'kebangsaan' => 'required|max_length[100]',
-                'email' => 'required|valid_email|max_length[255]',
-                'no_hp' => 'required|numeric'
+                'jenis_kelamin' => 'required|in_list[Laki-Laki,Perempuan]',
+                'pendidikan_terakhir' => 'required|in_list[SD,SMP,SMA/SMK,D3,S1,S2,S3]',
+                'nama_sekolah' => 'required|max_length[100]',
+                'jurusan' => 'required|max_length[100]',
+                'kebangsaan' => 'required|max_length[50]',
+                'provinsi' => 'required',
+                'kabupaten' => 'required',
+                'kecamatan' => 'required',
+                'kelurahan' => 'required',
+                'email' => 'required|valid_email|max_length[50]'
             ],
             'file_uploads' => [
                 'pas_foto' => [

@@ -148,4 +148,41 @@ class RekamanAsesmenKompetensiModel extends Model
     {
         return $this->where('id_rekaman', $id_rekaman)->delete();
     }
+
+    /**
+     * Batch upsert kompetensi data (optimized for batchUpdateKompetensi)
+     * @param int $id_rekaman
+     * @param array $kompetensiData
+     * @return bool
+     */
+    public function batchUpsertKompetensi(int $id_rekaman, array $kompetensiData): bool
+    {
+        $db = \Config\Database::connect();
+        $db->transStart();
+        try {
+            $this->where('id_rekaman', $id_rekaman)->delete();
+            $result = $this->insertBatch($kompetensiData);
+            $db->transComplete();
+            return $result !== false;
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            log_message('error', 'Batch upsert kompetensi gagal: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get kompetensi data for progress calculation (optimized)
+     * @param int $id_rekaman
+     * @return array
+     */
+    public function getKompetensiStats(int $id_rekaman): array
+    {
+        $total = $this->where('id_rekaman', $id_rekaman)->countAllResults();
+        $kompeten = $this->where(['id_rekaman' => $id_rekaman, 'metode_observasi' => 1])->countAllResults();
+        return [
+            'total' => $total,
+            'kompeten' => $kompeten
+        ];
+    }
 }

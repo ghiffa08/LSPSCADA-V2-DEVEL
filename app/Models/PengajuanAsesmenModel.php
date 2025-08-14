@@ -695,8 +695,7 @@ class PengajuanAsesmenModel extends Model
 
     /**
      * Get asesi data by asesmen ID for observation checklist
-     * Since pengajuan_asesmen schema changed, we now get assessees
-     * from the same scheme as the assessment session
+     * PERBAIKAN: Sesuai struktur database aktual - pengajuan_asesmen tidak memiliki id_skema
      *
      * @param int $id_asesmen
      * @return array
@@ -704,38 +703,38 @@ class PengajuanAsesmenModel extends Model
     public function getAsesiByAsesmen(int $id_asesmen): array
     {
         try {
-            // First get the id_skema from asesmen table
-            $asesmenQuery = $this->db->table('asesmen')
-                ->where('id_asesmen', $id_asesmen)
-                ->select('id_skema')
-                ->get()
-                ->getRowArray();
-
-            if (!$asesmenQuery) {
-                log_message('warning', 'No asesmen found with ID: ' . $id_asesmen);
-                return [];
-            }
-
-            $id_skema = $asesmenQuery['id_skema'];
-            log_message('info', 'Found asesmen with scheme ID: ' . $id_skema);
-
-            // Get pengajuan_asesmen for that skema with accepted status
+            // PERBAIKAN: Query tanpa menggunakan id_skema dari pengajuan_asesmen
             $result = $this->db->table('pengajuan_asesmen pa')
-                ->join('asesi a', 'a.id_asesi = pa.id_asesi', 'left')
-                ->join('users u', 'u.id = a.id_user', 'left')
-                ->where('pa.id_skema', $id_skema)
+                ->select('
+                    pa.id_pengajuan,
+                    pa.id_asesi,
+                    pa.id_asesmen,
+                    pa.status_pengajuan,
+                    a.nik,
+                    u.nama_lengkap as nama,
+                    u.nama_lengkap as nama_asesi,
+                    u.nama_lengkap as nama_lengkap,
+                    a.nik as username,
+                    u.email,
+                    s.nama_skema,
+                    s.kode_skema
+                ')
+                ->join('asesi a', 'a.id_asesi = pa.id_asesi', 'inner')
+                ->join('users u', 'u.id = a.id_user', 'inner')
+                ->join('asesmen asm', 'asm.id_asesmen = pa.id_asesmen', 'left')
+                ->join('skema s', 's.id_skema = asm.id_skema', 'left')
+                ->where('pa.id_asesmen', $id_asesmen)
                 ->where('pa.status_pengajuan', 'diterima')
-                ->select('a.id_asesi, a.nik, a.email, u.nama_lengkap as nama, u.username, pa.id_pengajuan, pa.status_pengajuan, pa.status')
                 ->orderBy('u.nama_lengkap', 'ASC')
                 ->get()
                 ->getResultArray();
 
-            log_message('info', 'Found ' . count($result) . ' assessees for scheme ID: ' . $id_skema);
+            log_message('info', 'Found ' . count($result) . ' asesi for asesmen ' . $id_asesmen);
+            
             return $result;
         } catch (\Exception $e) {
-            log_message('error', 'Query failed in getAsesiByAsesmen: ' . $e->getMessage());
-            log_message('error', 'Stack trace: ' . $e->getTraceAsString());
-            throw $e;
+            log_message('error', 'Error in getAsesiByAsesmen: ' . $e->getMessage());
+            return [];
         }
     }
 }

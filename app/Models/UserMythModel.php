@@ -19,6 +19,7 @@ class UserMythModel extends Model
     protected $deletedField   = 'deleted_at';
     protected $allowedFields  = [
         'email',
+        'no_hp',
         'username',
         'nama_lengkap',
         'password_hash',

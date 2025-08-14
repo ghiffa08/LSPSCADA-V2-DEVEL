@@ -163,10 +163,12 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
     // Manajemen Asesi
     $routes->group('asesi', function ($routes) {
         $routes->get('/', 'AsesiController::index');
-        $routes->get('dashboard', 'AsesiController::dashboard');
+        $routes->get('dashboard', 'AsesiController::index');
+        $routes->get('profile', 'AsesiController::profile');
         $routes->post('store', 'AsesiController::store');
         $routes->post('import', 'AsesiController::import');
         $routes->post('save', 'AsesiController::save');
+        $routes->post('update-user-info', 'AsesiController::updateUserInfo');
         $routes->post('delete', 'AsesiController::delete');
 
         // Fitur Umpan Balik Asesi
@@ -486,4 +488,7 @@ $routes->group('api', function ($routes) {
         // Skema routes
         $routes->get('get-active-skemas', 'Api\UserManagement::getActiveSkemas');
     });
+
+    // Add this new route for asesor skema
+    $routes->get('get-skema-asesor', 'Api\AsesorSkema::getSkemaAsesor');
 });

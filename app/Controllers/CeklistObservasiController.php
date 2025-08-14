@@ -176,18 +176,40 @@ class CeklistObservasiController extends ResourceController
     }
 
     /**
-     * Generate PDF for observation data
-     *
-     * @param int $id_observasi Observasi ID
-     * @return void
+     * Generate PDF for observation data - PERBAIKAN ERROR HANDLING
      */
-    public function pdf(int $id_observasi): void
+    public function pdf(int $id_observasi)
     {
         try {
-            // Reuse the same data preparation method as loadObservasi
-            $data = $this->getObservasiData($id_observasi);
+            log_message('info', 'CeklistObservasiController: Starting PDF generation for observasi ID: ' . $id_observasi);
 
-            // Generate QR codes
+            // Validate input
+            if (!$id_observasi || !filter_var($id_observasi, FILTER_VALIDATE_INT)) {
+                throw new \Exception('ID Observasi tidak valid');
+            }
+
+            // PERBAIKAN: Gunakan method yang sudah diperbaiki di model
+            $result = $this->observasiModel->getObservasiForPDF($id_observasi);
+
+            if (!$result['success']) {
+                throw new \Exception($result['message'] ?? 'Data observasi tidak ditemukan');
+            }
+
+            $data = $result['data'];
+            
+            // Validasi data yang diperlukan untuk PDF
+            if (empty($data['observasi'])) {
+                throw new \Exception('Data observasi kosong');
+            }
+
+            // Debug: Log data structure
+            log_message('info', 'CeklistObservasiController: observasi data: ' . json_encode($data['observasi']));
+            log_message('info', 'CeklistObservasiController: detailObservasi count: ' . count($data['detailObservasi'] ?? []));
+
+            // Ensure helper is loaded
+            helper('observasi');
+
+            // Generate QR codes jika ada signature
             if (!empty($data['observasi']['ttd_asesi'])) {
                 $data['qr_asesi'] = $this->qrCodeService->generate(
                     base_url('/scan-tanda-tangan-asesi/' . $data['observasi']['ttd_asesi']),
@@ -202,12 +224,19 @@ class CeklistObservasiController extends ResourceController
                 );
             }
 
-            // Generate PDF with the prepared data 
+            // Generate PDF dengan data yang sudah diperbaiki
             $this->generatePdf($data);
+
         } catch (\Exception $e) {
-            log_message('error', 'Error generating PDF: ' . $e->getMessage());
-            // Redirect with error message or handle error appropriately
-            return;
+            log_message('error', 'CeklistObservasiController PDF Error: ' . $e->getMessage());
+            log_message('error', 'Stack trace: ' . $e->getTraceAsString());
+            
+            // PERBAIKAN: Set flash message dan redirect tanpa return
+            session()->setFlashdata('error', 'Gagal generate PDF: ' . $e->getMessage());
+            
+            // Redirect ke halaman sebelumnya
+            header('Location: ' . previous_url());
+            exit();
         }
     }
 

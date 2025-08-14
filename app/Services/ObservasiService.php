@@ -182,9 +182,8 @@ class ObservasiService
      */
     public function getObservationWithDetails(int $id_observasi): array
     {
-        // REMOVED CACHING - Always get fresh data
         try {
-            // Optimized query dengan single JOIN
+            // PERBAIKAN: Query dengan relasi yang benar sesuai struktur database
             $observation = $this->db->table('observasi o')
                 ->select([
                     'o.*',
@@ -199,7 +198,8 @@ class ObservasiService
                 ->join('asesor', 'asesor.id_asesor = o.id_asesor', 'inner')
                 ->join('users as asesor_user', 'asesor_user.id = asesor.id_user', 'inner')
                 ->join('pengajuan_asesmen pa', 'pa.id_pengajuan = o.id_pengajuan', 'inner')
-                ->join('skema', 'skema.id_skema = pa.id_skema', 'inner')
+                ->join('asesmen asm', 'asm.id_asesmen = pa.id_asesmen', 'inner') // PERBAIKAN: JOIN ke asesmen
+                ->join('skema', 'skema.id_skema = asm.id_skema', 'inner') // PERBAIKAN: JOIN dari asesmen ke skema
                 ->where('o.id_observasi', $id_observasi)
                 ->get()
                 ->getRowArray();
@@ -215,8 +215,8 @@ class ObservasiService
             // Get details dengan optimized query
             $details = $this->getOptimizedDetails($id_observasi, $observation['id_skema']);
 
-            // Get summary from cache or calculate
-            $summary = $this->getObservationSummary($id_observasi);
+            // Get summary - PERBAIKAN: calculation langsung tanpa cache
+            $summary = $this->calculateObservationSummary($id_observasi);
 
             // Group details by unit untuk UX yang lebih baik
             $groupedDetails = $this->groupDetailsByUnit($details);
@@ -231,10 +231,10 @@ class ObservasiService
                 ]
             ];
 
-            // REMOVED CACHING - Always return fresh data
             return $result;
         } catch (\Exception $e) {
             log_message('error', 'ObservasiService getObservationWithDetails Error: ' . $e->getMessage());
+            log_message('error', 'Stack trace: ' . $e->getTraceAsString());
 
             return [
                 'success' => false,
@@ -243,6 +243,103 @@ class ObservasiService
             ];
         }
     }
+
+    /**
+     * Calculate observation summary langsung dari database
+     */
+    private function calculateObservationSummary(int $idObservasi): array
+    {
+        try {
+            // Get summary langsung dari database tanpa cache
+            $summary = $this->db->table('detail_observasi do')
+                ->select('
+                    COUNT(*) as total_kuk,
+                    COUNT(CASE WHEN do.kompeten = "Y" THEN 1 END) as kompeten_count,
+                    COUNT(CASE WHEN do.kompeten = "N" THEN 1 END) as tidak_kompeten_count
+                ')
+                ->where('do.id_observasi', $idObservasi)
+                ->get()
+                ->getRowArray();
+
+            if (!$summary) {
+                return [
+                    'total_kuk' => 0,
+                    'kompeten_count' => 0,
+                    'tidak_kompeten_count' => 0,
+                    'progress_percentage' => 0,
+                    'status' => 'draft'
+                ];
+            }
+
+            // Calculate progress percentage
+            $progress = $summary['total_kuk'] > 0 ?
+                ($summary['kompeten_count'] / $summary['total_kuk']) * 100 : 0;
+
+            // Determine status
+            $status = 'draft';
+            if ($progress > 0 && $progress < 100) {
+                $status = 'in_progress';
+            } elseif ($progress >= 100) {
+                $status = 'completed';
+            }
+
+            $summary['progress_percentage'] = round($progress, 2);
+            $summary['status'] = $status;
+
+            return $summary;
+        } catch (\Exception $e) {
+            log_message('error', 'Error calculating observation summary: ' . $e->getMessage());
+            return [
+                'total_kuk' => 0,
+                'kompeten_count' => 0,
+                'tidak_kompeten_count' => 0,
+                'progress_percentage' => 0,
+                'status' => 'draft'
+            ];
+        }
+    }
+
+    /**
+     * Group details by unit untuk display yang lebih baik
+     */
+    private function groupDetailsByUnit(array $details): array
+    {
+        $grouped = [];
+
+        foreach ($details as $detail) {
+            $unitKey = $detail['kode_unit'];
+
+            if (!isset($grouped[$unitKey])) {
+                $grouped[$unitKey] = [
+                    'kode_unit' => $detail['kode_unit'],
+                    'nama_unit' => $detail['nama_unit'],
+                    'elements' => []
+                ];
+            }
+
+            $elemenKey = $detail['kode_elemen'];
+
+            if (!isset($grouped[$unitKey]['elements'][$elemenKey])) {
+                $grouped[$unitKey]['elements'][$elemenKey] = [
+                    'kode_elemen' => $detail['kode_elemen'],
+                    'nama_elemen' => $detail['nama_elemen'],
+                    'kuks' => []
+                ];
+            }
+
+            $grouped[$unitKey]['elements'][$elemenKey]['kuks'][] = [
+                'id' => $detail['id'],
+                'id_kuk' => $detail['id_kuk'],
+                'kode_kuk' => $detail['kode_kuk'],
+                'nama_kuk' => $detail['nama_kuk'],
+                'kompeten' => $detail['kompeten'],
+                'keterangan' => $detail['keterangan']
+            ];
+        }
+
+        return $grouped;
+    }
+
 
     /**
      * Get optimized details untuk observasi
@@ -277,196 +374,167 @@ class ObservasiService
      * Get KUK structure for observation form - NO CACHE
      * Always return fresh data from database
      */
-    public function getKukStructureForSchema(int $id_skema, ?string $id_asesi = null): array
+    public function getKukStructureForSchema(int $id_skema, string $id_asesi, ?int $id_observasi = null): array
     {
-        // REMOVED CACHING - Always get fresh data
         try {
-            // Optimized query dengan subquery untuk existing data
-            $builder = $this->db->table('skema s');
+            // PERBAIKAN: Build structure dengan query yang benar
+            $result = $this->buildKukStructure($id_skema, $id_asesi, $id_observasi);
 
-            if ($id_asesi) {
-                // Include existing observasi data
-                $builder->select([
-                    'u.id_unit',
-                    'u.kode_unit',
-                    'u.nama_unit',
-                    'e.id_elemen',
-                    'e.kode_elemen',
-                    'e.nama_elemen',
-                    'k.id_kuk',
-                    'k.kode_kuk',
-                    'k.nama_kuk',
-                    'COALESCE(do.kompeten, "") as existing_kompeten',
-                    'COALESCE(do.keterangan, "") as existing_keterangan'
-                ]);
-
-                $builder->join('kelompok_kerja kk', 'kk.id_skema = s.id_skema', 'inner')
-                    ->join('kelompok_unit ku', 'ku.id_kelompok = kk.id_kelompok', 'inner')
-                    ->join('unit u', 'u.id_unit = ku.id_unit AND u.id_skema = s.id_skema', 'inner')
-                    ->join('elemen e', 'e.id_unit = u.id_unit AND e.id_skema = s.id_skema', 'inner')
-                    ->join('kuk k', 'k.id_elemen = e.id_elemen AND k.id_unit = u.id_unit AND k.id_skema = s.id_skema', 'inner')
-                    ->join('observasi o', 'o.id_asesi = "' . $this->db->escapeString($id_asesi) . '"', 'left')
-                    ->join('detail_observasi do', 'do.id_observasi = o.id_observasi AND do.id_kuk = k.id_kuk', 'left');
-            } else {
-                // Basic structure without existing data
-                $builder->select([
-                    'u.id_unit',
-                    'u.kode_unit',
-                    'u.nama_unit',
-                    'e.id_elemen',
-                    'e.kode_elemen',
-                    'e.nama_elemen',
-                    'k.id_kuk',
-                    'k.kode_kuk',
-                    'k.nama_kuk'
-                ]);
-
-                $builder->join('kelompok_kerja kk', 'kk.id_skema = s.id_skema', 'inner')
-                    ->join('kelompok_unit ku', 'ku.id_kelompok = kk.id_kelompok', 'inner')
-                    ->join('unit u', 'u.id_unit = ku.id_unit AND u.id_skema = s.id_skema', 'inner')
-                    ->join('elemen e', 'e.id_unit = u.id_unit AND e.id_skema = s.id_skema', 'inner')
-                    ->join('kuk k', 'k.id_elemen = e.id_elemen AND k.id_unit = u.id_unit AND k.id_skema = s.id_skema', 'inner');
+            // Get existing observasi data if id_observasi provided
+            $existingData = [];
+            if ($id_observasi) {
+                $existingData = $this->getExistingObservasiData($id_asesi, $id_skema, $id_observasi);
             }
-
-            $structure = $builder
-                ->where('s.id_skema', $id_skema)
-                ->where('s.status', 'Y')
-                ->where('u.status', 'Y')
-                ->orderBy('u.kode_unit')
-                ->orderBy('e.kode_elemen')
-                ->orderBy('k.kode_kuk')
-                ->get()
-                ->getResultArray();
-
-            $groupedStructure = $this->groupKukStructure($structure, $id_asesi !== null);
-
-            $result = [
-                'success' => true,
-                'message' => 'Struktur KUK berhasil diambil',
-                'data' => $groupedStructure
-            ];
-
-            // REMOVED CACHING - Always return fresh data
-            return $result;
-        } catch (\Exception $e) {
-            log_message('error', 'ObservasiService getKukStructureForSchema Error: ' . $e->getMessage());
 
             return [
+                'success' => true,
+                'observasi' => $result['observasi'],
+                'existing_data' => $existingData,
+                'totalKUK' => $result['totalKUK'],
+                'id_observasi' => $id_observasi
+            ];
+        } catch (\Exception $e) {
+            log_message('error', 'ObservasiService::getKukStructureForSchema error: ' . $e->getMessage());
+            return [
                 'success' => false,
-                'message' => 'Gagal mengambil struktur KUK: ' . $e->getMessage(),
-                'data' => null
+                'message' => 'Gagal memuat struktur observasi: ' . $e->getMessage()
             ];
         }
     }
 
     /**
-     * Group details by unit for better presentation
+     * Build KUK structure dengan relasi yang benar
      */
-    private function groupDetailsByUnit(array $details): array
+    private function buildKukStructure(int $id_skema, string $id_asesi, ?int $id_observasi = null): array
     {
-        $grouped = [];
+        // Query untuk mengambil struktur KUK dengan relasi yang benar
+        $sql = "
+            SELECT 
+                COALESCE(kk.id_kelompok, 1) as id_kelompok,
+                COALESCE(kk.nama_kelompok, 'Kelompok Utama') as nama_kelompok,
+                u.id_unit,
+                u.kode_unit,
+                u.nama_unit,
+                e.id_elemen,
+                e.kode_elemen,
+                e.nama_elemen,
+                k.id_kuk,
+                k.kode_kuk,
+                k.nama_kuk as kriteria_unjuk_kerja
+            FROM skema s
+            INNER JOIN unit u ON u.id_skema = s.id_skema AND u.status = 'Y'
+            LEFT JOIN kelompok_unit ku ON ku.id_unit = u.id_unit
+            LEFT JOIN kelompok_kerja kk ON kk.id_kelompok = ku.id_kelompok AND kk.id_skema = s.id_skema
+            LEFT JOIN elemen e ON e.id_unit = u.id_unit
+            LEFT JOIN kuk k ON k.id_elemen = e.id_elemen
+            WHERE s.id_skema = ? AND s.status = 'Y'
+            ORDER BY 
+                COALESCE(kk.id_kelompok, 1), 
+                u.kode_unit, 
+                e.kode_elemen, 
+                k.kode_kuk
+        ";
 
-        foreach ($details as $detail) {
-            $unitKey = $detail['kode_unit'];
+        $rawData = $this->db->query($sql, [$id_skema])->getResultArray();
 
-            if (!isset($grouped[$unitKey])) {
-                $grouped[$unitKey] = [
-                    'unit_info' => [
-                        'kode_unit' => $detail['kode_unit'],
-                        'nama_unit' => $detail['nama_unit']
-                    ],
-                    'elements' => []
-                ];
-            }
-
-            $elemenKey = $detail['kode_elemen'];
-            if (!isset($grouped[$unitKey]['elements'][$elemenKey])) {
-                $grouped[$unitKey]['elements'][$elemenKey] = [
-                    'element_info' => [
-                        'kode_elemen' => $detail['kode_elemen'],
-                        'nama_elemen' => $detail['nama_elemen']
-                    ],
-                    'kuks' => []
-                ];
-            }
-
-            $grouped[$unitKey]['elements'][$elemenKey]['kuks'][] = [
-                'id' => $detail['id'],
-                'id_kuk' => $detail['id_kuk'],
-                'kode_kuk' => $detail['kode_kuk'],
-                'nama_kuk' => $detail['nama_kuk'],
-                'kompeten' => $detail['kompeten'],
-                'keterangan' => $detail['keterangan']
-            ];
+        if (empty($rawData)) {
+            throw new \Exception('Tidak ada unit kompetensi ditemukan untuk skema ini');
         }
 
-        return $grouped;
-    }
-
-    /**
-     * Group KUK structure for form display - ENHANCED
-     */
-    private function groupKukStructure(array $structure, bool $includeExisting = false): array
-    {
-        $grouped = [];
-        $totalKUK = 0;
-        $existingData = [];
-
-        foreach ($structure as $item) {
-            $unitKey = $item['kode_unit'];
-            $totalKUK++;
-
-            if (!isset($grouped[$unitKey])) {
-                $grouped[$unitKey] = [
-                    'unit_info' => [
-                        'id_unit' => $item['id_unit'],
-                        'kode_unit' => $item['kode_unit'],
-                        'nama_unit' => $item['nama_unit']
-                    ],
-                    'elements' => []
-                ];
-            }
-
-            $elemenKey = $item['kode_elemen'];
-            if (!isset($grouped[$unitKey]['elements'][$elemenKey])) {
-                $grouped[$unitKey]['elements'][$elemenKey] = [
-                    'element_info' => [
-                        'id_elemen' => $item['id_elemen'],
-                        'kode_elemen' => $item['kode_elemen'],
-                        'nama_elemen' => $item['nama_elemen']
-                    ],
-                    'kuks' => []
-                ];
-            }
-
-            $kukData = [
-                'id_kuk' => $item['id_kuk'],
-                'kode_kuk' => $item['kode_kuk'],
-                'nama_kuk' => $item['nama_kuk']
-            ];
-
-            // Add existing data jika ada
-            if ($includeExisting) {
-                $kukData['existing_kompeten'] = $item['existing_kompeten'] ?? '';
-                $kukData['existing_keterangan'] = $item['existing_keterangan'] ?? '';
-
-                // Store existing data untuk keperluan lain
-                if (!empty($item['existing_kompeten'])) {
-                    $existingData[$item['id_kuk']] = [
-                        'kompeten' => $item['existing_kompeten'],
-                        'keterangan' => $item['existing_keterangan']
-                    ];
-                }
-            }
-
-            $grouped[$unitKey]['elements'][$elemenKey]['kuks'][] = $kukData;
-        }
+        // Transform ke hierarchical structure
+        $structuredData = $this->transformToHierarchicalStructure($rawData);
 
         return [
-            'structure' => $grouped,
-            'totalKUK' => $totalKUK,
-            'existingData' => $existingData
+            'observasi' => $structuredData,
+            'totalKUK' => count(array_filter($rawData, function ($item) {
+                return !empty($item['id_kuk']);
+            }))
         ];
+    }
+
+    /**
+     * Transform flat data to hierarchical structure
+     */
+    private function transformToHierarchicalStructure(array $rawData): array
+    {
+        $structure = [];
+        $unitTracker = [];
+        $elemenTracker = [];
+
+        foreach ($rawData as $row) {
+            $kelompokId = $row['id_kelompok'] ?? 1;
+            $unitId = $row['id_unit'] ?? 0;
+            $elemenId = $row['id_elemen'] ?? 0;
+
+            // Initialize kelompok if not exists
+            if (!isset($structure[$kelompokId])) {
+                $structure[$kelompokId] = [
+                    'id_kelompok' => $kelompokId,
+                    'nama_kelompok' => $row['nama_kelompok'] ?? 'Kelompok Utama',
+                    'units' => []
+                ];
+            }
+
+            // Initialize unit if not exists and unitId is valid
+            if ($unitId && !isset($structure[$kelompokId]['units'][$unitId])) {
+                $structure[$kelompokId]['units'][$unitId] = [
+                    'id_unit' => $row['id_unit'],
+                    'kode_unit' => $row['kode_unit'],
+                    'nama_unit' => $row['nama_unit'],
+                    'elements' => []
+                ];
+                $unitTracker[$unitId] = true;
+            }
+
+            // Add elemen if exists and not already added
+            if ($elemenId && $unitId && !isset($structure[$kelompokId]['units'][$unitId]['elements'][$elemenId])) {
+                $structure[$kelompokId]['units'][$unitId]['elements'][$elemenId] = [
+                    'id_elemen' => $row['id_elemen'],
+                    'kode_elemen' => $row['kode_elemen'],
+                    'nama_elemen' => $row['nama_elemen'],
+                    'kuks' => []
+                ];
+                $elemenTracker[$elemenId] = true;
+            }
+
+            // Add KUK if exists
+            if (!empty($row['id_kuk']) && $elemenId && $unitId) {
+                $structure[$kelompokId]['units'][$unitId]['elements'][$elemenId]['kuks'][] = [
+                    'id_kuk' => $row['id_kuk'],
+                    'kode_kuk' => $row['kode_kuk'],
+                    'nama_kuk' => $row['kriteria_unjuk_kerja']
+                ];
+            }
+        }
+
+        return $structure;
+    }
+
+    /**
+     * Get existing observasi data
+     */
+    private function getExistingObservasiData(string $id_asesi, int $id_skema, ?int $id_observasi = null): array
+    {
+        if (!$id_observasi) {
+            return [];
+        }
+
+        $existing = $this->db->table('detail_observasi do')
+            ->select('do.id_kuk, do.kompeten, do.keterangan')
+            ->join('observasi o', 'o.id_observasi = do.id_observasi', 'inner')
+            ->where('do.id_observasi', $id_observasi)
+            ->get()
+            ->getResultArray();
+
+        $existingData = [];
+        foreach ($existing as $item) {
+            $existingData[$item['id_kuk']] = [
+                'kompeten' => $item['kompeten'],
+                'keterangan' => $item['keterangan']
+            ];
+        }
+
+        return $existingData;
     }
 
     /**
@@ -480,12 +548,17 @@ class ObservasiService
                     'observasi.*',
                     'asesi_user.nama_lengkap as nama_asesi',
                     'asesor_user.nama_lengkap as nama_asesor',
-                    'skema.nama_skema'
-                ])->join('asesi', 'asesi.id_asesi = observasi.id_asesi', 'inner')
+                    'skema.nama_skema',
+                    'skema.kode_skema',
+                    'skema.id_skema'
+                ])
+                ->join('asesi', 'asesi.id_asesi = observasi.id_asesi', 'inner')
                 ->join('users as asesi_user', 'asesi_user.id = asesi.id_user', 'inner')
-                ->join('users as asesor_user', 'asesor_user.id = observasi.id_asesor', 'inner')
-                ->join('pengajuan_asesmen', 'pengajuan_asesmen.id_pengajuan = observasi.id_pengajuan', 'inner')
-                ->join('skema', 'skema.id_skema = pengajuan_asesmen.id_skema', 'inner');
+                ->join('asesor', 'asesor.id_asesor = observasi.id_asesor', 'inner')
+                ->join('users as asesor_user', 'asesor_user.id = asesor.id_user', 'inner')
+                ->join('pengajuan_asesmen pa', 'pa.id_pengajuan = observasi.id_pengajuan', 'inner')
+                ->join('asesmen asm', 'asm.id_asesmen = pa.id_asesmen', 'inner') // PERBAIKAN: JOIN ke asesmen
+                ->join('skema', 'skema.id_skema = asm.id_skema', 'inner'); // PERBAIKAN: JOIN dari asesmen ke skema
 
             // Apply filters
             if (!empty($filters['search'])) {
@@ -659,11 +732,13 @@ class ObservasiService
             $existingMap[$detail['id_kuk']] = $detail;
         }
 
-        // Get KUK details to get id_skema for each KUK
+        // PERBAIKAN: Get KUK details dengan JOIN ke skema
         $kukIds = array_column($details, 'id_kuk');
-        $kukDetails = $this->db->table('kuk')
-            ->select('id_kuk, id_skema')
-            ->whereIn('id_kuk', $kukIds)
+        $kukDetails = $this->db->table('kuk k')
+            ->select('k.id_kuk, u.id_skema')
+            ->join('elemen e', 'e.id_elemen = k.id_elemen', 'inner')
+            ->join('unit u', 'u.id_unit = e.id_unit', 'inner')
+            ->whereIn('k.id_kuk', $kukIds)
             ->get()
             ->getResultArray();
 
@@ -674,6 +749,7 @@ class ObservasiService
 
         $toInsert = [];
         $toUpdate = [];
+        $timestamp = date('Y-m-d');
 
         foreach ($details as $detail) {
             // Skip if we can't find the id_skema for this KUK
@@ -684,8 +760,8 @@ class ObservasiService
 
             $detailData = [
                 'kompeten' => $detail['kompeten'],
-                'keterangan' => $detail['keterangan'],
-                'tanggal_observasi' => $detail['tanggal_observasi'] ?? date('Y-m-d')
+                'keterangan' => $detail['keterangan'] ?? '',
+                'tanggal_observasi' => $detail['tanggal_observasi'] ?? $timestamp
             ];
 
             if (isset($existingMap[$detail['id_kuk']])) {
@@ -728,17 +804,19 @@ class ObservasiService
     }
 
     /**
-     * Update observasi progress and status
+     * Update observasi progress and status - PERBAIKAN
      */
     private function updateObservasiProgress(int $idObservasi): void
     {
         try {
             log_message('info', "ObservasiService updateObservasiProgress for ID: {$idObservasi}");
 
+            // Get fresh stats dari detail_observasi
             $stats = $this->db->table('detail_observasi')
                 ->select('
                     COUNT(*) as total_kuk,
-                    COUNT(CASE WHEN kompeten = "Y" THEN 1 END) as kompeten_count
+                    COUNT(CASE WHEN kompeten = "Y" THEN 1 END) as kompeten_count,
+                    COUNT(CASE WHEN kompeten = "N" THEN 1 END) as tidak_kompeten_count
                 ')
                 ->where('id_observasi', $idObservasi)
                 ->get()
@@ -782,7 +860,6 @@ class ObservasiService
             log_message('info', 'ObservasiService progress updated successfully');
         } catch (\Exception $e) {
             log_message('error', 'Error updating observasi progress: ' . $e->getMessage());
-            // Re-throw the exception to fail the transaction
             throw $e;
         }
     }

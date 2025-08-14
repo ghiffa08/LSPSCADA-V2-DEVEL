@@ -7,7 +7,6 @@ use App\Controllers\BaseController;
 use App\Services\AsesiService;
 use App\Services\ValidationService;
 use App\Services\CustomResponseService;
-use App\DTOs\ApiResponseDTO;
 use CodeIgniter\I18n\Time;
 use Exception;
 use Config\Services;
@@ -20,6 +19,7 @@ class AsesiController extends BaseController
     private $dependent;
     private $usermodel;
     private int $userId;
+
     public function __construct()
     {
         helper('auth');
@@ -29,55 +29,39 @@ class AsesiController extends BaseController
         $this->responseService = service('CustomResponseService');
         $this->dependent = new \App\Models\DynamicDependent();
         $this->usermodel = new \App\Models\UserMythModel();
-
-        // Get user ID using Myth/Auth helper with fallback
         $this->userId = user() ? user()->id : 0;
     }
 
+    /**
+     * Display asesi dashboard with statistics
+     */
     public function index()
     {
         try {
-            // Get asesi by user id
+            // Get asesi data by user id
             $result = $this->asesiService->getAsesiByUserId($this->userId);
+
+            // If asesi profile doesn't exist yet, redirect to profile page to create it
             if (!$result->success) {
-                return $this->responseService->error($result->message, $result->code, $result->errors);
+                log_message('info', 'User ID ' . $this->userId . ' does not have an asesi profile yet. Redirecting to profile page.');
+                session()->setFlashdata('info', 'Silakan lengkapi profil Anda terlebih dahulu untuk mengakses dashboard.');
+                return redirect()->to('asesi/profile');
             }
+
             $asesi = $result->data;
 
-            // Ambil statistik nyata dari pengajuan sertifikasi user ini
-            $pengajuanModel = new \App\Models\PengajuanAsesmenModel();
-            $apl1Stats = $pengajuanModel->getAPL1Stats();
+            // Get asesi's application statistics
+            // Entity already casts id_asesi to integer
+            $idAsesi = $asesi->id_asesi ?? 0;
 
-            // Ambil data pengajuan user ini
-            $userApl1 = $pengajuanModel->where('id_asesi', $asesi->id_asesi ?? 0)->findAll();
-            $totalPengajuan = count($userApl1);
-            $statusCounts = [
-                'proses' => 0,
-                'menunggu' => 0,
-                'selesai' => 0
-            ];
-            $dokumenCount = 0;
-            $progress = 0;
-            foreach ($userApl1 as $row) {
-                if ($row['status'] === 'pending') $statusCounts['menunggu']++;
-                elseif ($row['status'] === 'approved') $statusCounts['selesai']++;
-                else $statusCounts['proses']++;
-            }
-            // Hitung dokumen dari dokumen_apl1 jika ada
-            $db = \Config\Database::connect();
-            $dokumenCount = $db->table('dokumen_apl1')->whereIn('id_apl1', array_column($userApl1, 'id_apl1'))->countAllResults();
-            // Progress: misal % pengajuan selesai dari total
-            $progress = $totalPengajuan > 0 ? round(($statusCounts['selesai'] / $totalPengajuan) * 100) : 0;
+            log_message('debug', 'AsesiController::index - idAsesi resolved to: ' . $idAsesi . ' (type: ' . gettype($idAsesi) . ')');
+
+            $stats = $this->getAsesiStatistics($idAsesi);
 
             $data = [
                 'siteTitle' => 'Dashboard',
                 'asesi' => $asesi,
-                'stat' => [
-                    'total_pengajuan' => $totalPengajuan,
-                    'status' => $statusCounts,
-                    'dokumen' => $dokumenCount,
-                    'progress' => $progress
-                ]
+                'stat' => $stats
             ];
             return view('asesi/dashboard', $data);
         } catch (Exception $e) {
@@ -86,106 +70,383 @@ class AsesiController extends BaseController
         }
     }
 
-    public function profile()
+    /**
+     * Calculate statistics for asesi dashboard
+     */
+    private function getAsesiStatistics(int $idAsesi): array
     {
-        try {
-            $result = $this->asesiService->getAsesiByUserId($this->userId);
-            if (!$result->success) {
-                return $this->responseService->error($result->message, $result->code, $result->errors);
-            }
-            $data = [
-                'siteTitle' => 'Profile Asesi',
-                'siteSubtitle' => 'Pada bagian ini, masukan data pribadi, data pendidikan formal, data pekerjaan Anda pada saat ini, serta dokumen pendukung.',
-                'provinsi' => $this->dependent->AllProvinsi(),
-                'asesi' => $result->data,
+        // Add validation for idAsesi
+        if ($idAsesi <= 0) {
+            log_message('warning', 'getAsesiStatistics called with invalid idAsesi: ' . $idAsesi);
+            return [
+                'total_pengajuan' => 0,
+                'status' => ['proses' => 0, 'menunggu' => 0, 'selesai' => 0],
+                'dokumen' => 0,
+                'progress' => 0
             ];
-            return view('asesi/profile', $data);
-        } catch (Exception $e) {
-            log_message('error', 'Error loading asesi profile: ' . $e->getMessage());
-            return $this->responseService->error('Terjadi kesalahan saat memuat profile');
         }
-    }
 
-    public function save()
-    {
         try {
-            // Validate form input data
-            $validationResult = $this->validationService->validateAsesi($this->request->getPost());
-            if (!$validationResult->success) {
-                return $this->responseService->validationError($validationResult->errors);
+            $pengajuanModel = new \App\Models\PengajuanAsesmenModel();
+            $db = \Config\Database::connect();
+
+            // Get asesi's applications
+            $userApplications = $pengajuanModel->where('id_asesi', $idAsesi)->findAll();
+            $totalPengajuan = count($userApplications);
+
+            // Initialize counters
+            $statusCounts = [
+                'proses' => 0,
+                'menunggu' => 0,
+                'selesai' => 0
+            ];
+
+            // Count applications by status
+            foreach ($userApplications as $row) {
+                if ($row['status'] === 'pending') $statusCounts['menunggu']++;
+                elseif ($row['status'] === 'approved') $statusCounts['selesai']++;
+                else $statusCounts['proses']++;
             }
-            // Check if this is an update (ID exists) or new entry
-            $id = $this->request->getVar('id_asesi');
-            $isUpdate = !empty($id);
-            $data = $this->request->getPost();
-            $data['user_id'] = $data['user_id'] ?? $this->userId;
-            if ($isUpdate) {
-                $result = $this->asesiService->updateAsesi($id, $data);
-            } else {
-                $result = $this->asesiService->createAsesi($data);
-            }
-            if ($result->success) {
-                session()->setFlashdata('pesan', $isUpdate ? 'Data berhasil diperbarui!' : 'Data berhasil disimpan!');
-                return $this->responseService->success($result->data, $result->message);
-            } else {
-                return $this->responseService->error($result->message, $result->code, $result->errors);
-            }
-        } catch (Exception $e) {
-            log_message('error', 'Error saving asesi data: ' . $e->getMessage());
-            session()->setFlashdata('error', 'Terjadi kesalahan saat menyimpan data: ' . $e->getMessage());
-            return $this->responseService->error('Terjadi kesalahan saat menyimpan data', 500, ['error' => $e->getMessage()]);
+
+            // Count documents
+            $applicationIds = array_column($userApplications, 'id_apl1');
+            $dokumenCount = empty($applicationIds) ? 0 :
+                $db->table('dokumen_apl1')
+                ->whereIn('id_apl1', $applicationIds)
+                ->countAllResults();
+
+            // Calculate progress percentage
+            $progress = $totalPengajuan > 0 ?
+                round(($statusCounts['selesai'] / $totalPengajuan) * 100) : 0;
+
+            return [
+                'total_pengajuan' => $totalPengajuan,
+                'status' => $statusCounts,
+                'dokumen' => $dokumenCount,
+                'progress' => $progress
+            ];
+        } catch (\Exception $e) {
+            log_message('error', 'Error in getAsesiStatistics for idAsesi ' . $idAsesi . ': ' . $e->getMessage());
+            return [
+                'total_pengajuan' => 0,
+                'status' => ['proses' => 0, 'menunggu' => 0, 'selesai' => 0],
+                'dokumen' => 0,
+                'progress' => 0
+            ];
         }
     }
 
     /**
-     * Update user data including signature handling
-     *
-     * @param int $userId
-     * @return bool
-     * @throws \Exception
+     * Display asesi profile page
      */
-    private function updateUserData(int $userId): bool
+    public function profile()
     {
-        $userData = [
-            'nama_lengkap' => $this->request->getVar('fullname'),
-            'no_telp'  => $this->request->getVar('no_telp'),
+        try {
+            $currentUser = user();
+            if (!$currentUser) {
+                return redirect()->to('/login');
+            }
+
+            // Get existing asesi data if available
+            $asesiData = null;
+            $hasAsesiData = false;
+
+            $result = $this->asesiService->getAsesiByUserId($this->userId);
+            if ($result->success && $result->data) {
+                $asesiData = $result->data;
+                $hasAsesiData = true;
+            }
+
+            $data = [
+                'siteTitle' => 'Profile Asesi',
+                'siteSubtitle' => 'Pada bagian ini, masukan data pribadi, data pendidikan formal, data pekerjaan Anda pada saat ini, serta dokumen pendukung.',
+                'provinsi' => $this->dependent->AllProvinsi(),
+                'user' => $currentUser,
+                'asesi' => $asesiData,
+                'hasAsesiData' => $hasAsesiData
+            ];
+
+            return view('asesi/profile', $data);
+        } catch (Exception $e) {
+            log_message('error', 'Error loading asesi profile: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat memuat profile');
+        }
+    }
+
+    /**
+     * Save detailed asesi profile data
+     */
+    public function save()
+    {
+        try {
+            // Check if the user wants to insert detailed asesi data
+            if (empty($this->request->getVar('nik'))) {
+                session()->setFlashdata('error', 'Form detail profil harus diisi.');
+                return redirect()->back()->withInput();
+            }
+
+            // Update user's phone number if provided
+            $no_telp = $this->request->getVar('no_hp');
+            if (!empty($no_telp)) {
+                $phoneRules = [
+                    'no_hp' => 'required|max_length[20]|regex_match[/^(\+62|62|0)[0-9]{9,12}$/]'
+                ];
+                $phoneCustomErrors = [
+                    'no_hp' => [
+                        'regex_match' => 'Format nomor telepon tidak valid. Gunakan format: 08123456789'
+                    ]
+                ];
+
+                $validationPhone = \Config\Services::validation();
+                $validationPhone->setRules($phoneRules, $phoneCustomErrors);
+
+                if (!$validationPhone->run(['no_hp' => $no_telp])) {
+                    return redirect()->back()->withInput()->with('errors', $validationPhone->getErrors());
+                }
+
+                // Update user's phone number in users table
+                $this->usermodel->update($this->userId, ['no_hp' => $no_telp]);
+                log_message('info', 'Updated user phone number during asesi profile save: ' . $no_telp);
+            }
+
+            // Prepare and sanitize data
+            $data = $this->prepareAsesiData();
+
+            // Validate form input data
+            $validationResult = $this->validationService->validateAsesi($data);
+            if (!$validationResult->success) {
+                return redirect()->back()->withInput()->with('errors', $validationResult->errors);
+            }
+
+            // Check if this is an update (ID exists) or new entry
+            $id = $this->request->getVar('id_asesi');
+            $isUpdate = !empty($id);
+
+            // Log full data before saving for debugging
+            log_message('debug', 'Data to be saved: ' . json_encode($data));
+
+            // Save or update asesi data
+            $result = $isUpdate ?
+                $this->asesiService->updateAsesi($id, $data) :
+                $this->asesiService->createAsesi($data);
+
+            if ($result->success) {
+                $message = $isUpdate ? 'Data profil berhasil diperbarui!' : 'Data profil berhasil disimpan!';
+                session()->setFlashdata('pesan', $message);
+                log_message('info', ($isUpdate ? 'Updated' : 'Created') . ' asesi profile for user_id: ' . $this->userId);
+                return redirect()->to('asesi/profile')->with('success', $message);
+            } else {
+                $errorMsg = $result->message;
+                $errors = $result->errors ?? [];
+
+                log_message('error', 'Error ' . ($isUpdate ? 'updating' : 'creating') . ' asesi: ' . $errorMsg);
+                log_message('error', 'Full result: ' . json_encode($result));
+
+                if (!empty($errors)) {
+                    log_message('error', 'Validation errors: ' . json_encode($errors));
+                }
+
+                // Debug database errors
+                $db = \Config\Database::connect();
+                if ($db->error()['code'] !== 0) {
+                    log_message('error', 'DB Error Code: ' . $db->error()['code'] . ', Message: ' . $db->error()['message']);
+                }
+
+                // Additional detailed logging
+                log_message('error', 'Input data causing error: ' . json_encode($data));
+                log_message('error', 'Error context: ' . ($isUpdate ? 'Update' : 'Create') . ' operation for asesi ID: ' . ($id ?? 'new'));
+
+                session()->setFlashdata('error', $errorMsg);
+                return redirect()->back()->withInput()->with('errors', $errors);
+            }
+        } catch (Exception $e) {
+            log_message('error', 'Error saving asesi data: ' . $e->getMessage());
+            session()->setFlashdata('error', 'Terjadi kesalahan saat menyimpan data: ' . $e->getMessage());
+            return redirect()->back()->withInput();
+        }
+    }
+
+    /**
+     * Prepare and sanitize asesi data from form submission
+     * 
+     * @return array
+     */
+    private function prepareAsesiData(): array
+    {
+        $currentUser = user();
+
+        // Mapping antara nama field di form dan nama field di database
+        $fieldMap = [
+            // Basic information
+            'id_asesi' => 'id_asesi',
+            'id_user' => 'id_user',
+            'nik' => 'nik',
+            'tempat_lahir' => 'tempat_lahir',
+            'tanggal_lahir' => 'tanggal_lahir',
+            'jenis_kelamin' => 'jenis_kelamin',
+            'kebangsaan' => 'kebangsaan',
+
+            // Education
+            'pendidikan_terakhir' => 'pendidikan_terakhir',
+            'nama_sekolah' => 'nama_sekolah',
+            'jurusan' => 'jurusan',
+
+            // Contact
+            'telpon_rumah' => 'telpon_rumah',
+            'email' => 'email',
+
+            // Location
+            'provinsi' => 'provinsi',
+            'kabupaten' => 'kabupaten',
+            'kecamatan' => 'kecamatan',
+            'kelurahan' => 'kelurahan',
+            'rt' => 'rt',
+            'rw' => 'rw',
+            'kode_pos' => 'kode_pos',
+
+            // Employment
+            'pekerjaan' => 'pekerjaan',
+            'nama_lembaga' => 'nama_lembaga',
+            'jabatan' => 'jabatan',
+            'alamat_perusahaan' => 'alamat_perusahaan',
+            'email_perusahaan' => 'email_perusahaan',
+            'no_telp_perusahaan' => 'no_telp_perusahaan',
         ];
 
-        // Handle signature - check if it has been updated
-        $signatureData = $this->request->getVar('tanda_tangan');
-        $signatureFile = $this->request->getFile('tanda_tangan');
-        $signatureDir = WRITEPATH . 'uploads/user/signatures/';
+        $data = [];
 
-        if (!is_dir($signatureDir)) {
-            mkdir($signatureDir, 0755, true);
+        // Get data based on field mapping
+        foreach ($fieldMap as $formField => $dbField) {
+            $data[$dbField] = $this->request->getPost($formField);
         }
 
-        $newSignatureName = null;
-        $user = $this->usermodel->find($userId);
+        // Add special fields handling
+        $data['id_user'] = $data['id_user'] ?? $this->userId;
 
-        // Handle base64 signature data (from canvas)
-        if (!empty($signatureData) && strpos($signatureData, 'data:image') === 0) {
-            list(, $encodedData) = explode(',', $signatureData);
-            $decodedData = base64_decode($encodedData);
-            $newSignatureName = uniqid('sig_') . '.png';
-            $savePath = $signatureDir . $newSignatureName;
+        // Update user's no_telp if provided in the form
+        $no_telp = $this->request->getPost('no_hp');
+        if (!empty($no_telp) && $currentUser) {
+            $this->usermodel->update($currentUser->id, ['no_hp' => $no_telp]);
+            log_message('info', 'Updated user phone number: ' . $no_telp);
+        }
 
-            if (!file_put_contents($savePath, $decodedData)) {
-                throw new \Exception('Gagal menyimpan tanda tangan.');
+        // Verifikasi field-field penting
+        $requiredFields = [
+            'id_user',
+            'nik',
+            'tempat_lahir',
+            'tanggal_lahir',
+            'jenis_kelamin',
+            'pendidikan_terakhir',
+            'nama_sekolah',
+            'jurusan',
+            'kebangsaan',
+            'email',
+            'provinsi',
+            'kabupaten',
+            'kecamatan',
+            'kelurahan'
+        ];
+
+        $missingFields = [];
+        foreach ($requiredFields as $field) {
+            if (empty($data[$field])) {
+                $missingFields[] = $field;
             }
         }
-        // Handle file upload signature
-        else if ($signatureFile && $signatureFile->isValid() && !$signatureFile->hasMoved()) {
-            $newSignatureName = $signatureFile->getRandomName();
 
-            if (!$signatureFile->move($signatureDir, $newSignatureName)) {
-                throw new \Exception('Gagal mengupload tanda tangan.');
-            }
+        if (!empty($missingFields)) {
+            log_message('warning', 'Missing required fields: ' . implode(', ', $missingFields));
         }
 
-        // Update signature in user data if there's a new one
-        if ($newSignatureName) {
-            // Remove old signature file if exists
+        // Log data setelah diproses
+        log_message('debug', 'Prepared asesi data: ' . json_encode($data));
+
+        return $data;
+    }
+
+    /**
+     * Update basic user information without detailed asesi data
+     */
+    public function updateUserInfo()
+    {
+        try {
+            $userData = [
+                'no_hp' => $this->request->getVar('no_hp'),
+            ];
+
+            // Enhanced validation for user data
+            $rules = [
+                'no_hp' => 'required|max_length[20]|regex_match[/^(\+62|62|0)[0-9]{9,12}$/]'
+            ];
+
+            $customErrors = [
+                'no_hp' => [
+                    'regex_match' => 'Format nomor telepon tidak valid. Gunakan format: 08123456789'
+                ]
+            ];
+
+            if (!$this->validate($rules, $customErrors)) {
+                return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
+            }
+
+            log_message('debug', 'Updating user info: ' . json_encode($userData));
+
+            // Update user data
+            if ($this->usermodel->update($this->userId, $userData)) {
+                session()->setFlashdata('pesan', 'Informasi akun berhasil diperbarui!');
+            } else {
+                session()->setFlashdata('error', 'Gagal memperbarui informasi akun.');
+            }
+
+            return redirect()->to('asesi/profile');
+        } catch (Exception $e) {
+            log_message('error', 'Error updating user info: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Terjadi kesalahan saat memperbarui informasi akun');
+        }
+    }
+
+    /**
+     * Update user's signature
+     */
+    public function updateSignature()
+    {
+        try {
+            $signatureData = $this->request->getVar('tanda_tangan');
+            $signatureFile = $this->request->getFile('tanda_tangan');
+
+            if (empty($signatureData) && (!$signatureFile || !$signatureFile->isValid())) {
+                return redirect()->back()->with('error', 'Tidak ada tanda tangan yang dikirimkan');
+            }
+
+            $signatureDir = WRITEPATH . 'uploads/user/signatures/';
+            if (!is_dir($signatureDir)) {
+                mkdir($signatureDir, 0755, true);
+            }
+
+            $user = $this->usermodel->find($this->userId);
+            $newSignatureName = null;
+
+            // Handle signature from canvas
+            if (!empty($signatureData) && strpos($signatureData, 'data:image') === 0) {
+                list(, $encodedData) = explode(',', $signatureData);
+                $decodedData = base64_decode($encodedData);
+                $newSignatureName = uniqid('sig_') . '.png';
+
+                if (!file_put_contents($signatureDir . $newSignatureName, $decodedData)) {
+                    return redirect()->back()->with('error', 'Gagal menyimpan tanda tangan');
+                }
+            }
+            // Handle uploaded signature file
+            else if ($signatureFile && $signatureFile->isValid()) {
+                $newSignatureName = $signatureFile->getRandomName();
+
+                if (!$signatureFile->move($signatureDir, $newSignatureName)) {
+                    return redirect()->back()->with('error', 'Gagal mengupload tanda tangan');
+                }
+            }
+
+            // Remove old signature if exists
             if (!empty($user['tanda_tangan'])) {
                 $oldSignaturePath = $signatureDir . $user['tanda_tangan'];
                 if (file_exists($oldSignaturePath)) {
@@ -193,261 +454,13 @@ class AsesiController extends BaseController
                 }
             }
 
-            $userData['tanda_tangan'] = $newSignatureName;
+            // Update user with new signature
+            $this->usermodel->update($this->userId, ['tanda_tangan' => $newSignatureName]);
+
+            return redirect()->to('asesi/profile')->with('success', 'Tanda tangan berhasil diperbarui');
+        } catch (Exception $e) {
+            log_message('error', 'Error updating signature: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal memperbarui tanda tangan: ' . $e->getMessage());
         }
-
-        // Update user data
-        if (!$this->usermodel->update($userId, $userData)) {
-            throw new \Exception('Gagal mengupdate data user.');
-        }
-
-        return true;
-    }
-
-
-    /**
-     * Validate form input data
-     *
-     * @param bool $isUpdate Whether this is an update operation
-     * @return bool
-     */
-    private function validateFormData(bool $isUpdate = false): bool
-    {
-        $rules = [
-            'nik' => [
-                'label' => 'Nomor KTP/NIK/Paspor',
-                'rules' => 'required|numeric|max_length[16]' . ($isUpdate ? '' : '|is_unique[asesi.nik]'),
-                'errors' => [
-                    'required' => 'Kolom {field} harus diisi.',
-                    'numeric' => 'Nomor {field} harus berupa angka.',
-                    'is_unique' => 'Nomor {field} sudah digunakan, silakan gunakan nomor {field} lain.',
-                    'max_length' => 'Nomor {field} tidak boleh lebih dari 16 digit.'
-                ],
-            ],
-            'tempat_lahir' => [
-                'label' => 'Tempat Lahir',
-                'rules' => 'required|max_length[255]',
-                'errors' => [
-                    'required' => 'Kolom {field} harus diisi.',
-                    'max_length' => '{field} tidak boleh melebihi 255 karakter.',
-                ],
-            ],
-            'tanggal_lahir' => [
-                'label' => 'Tanggal Lahir',
-                'rules' => 'required|valid_date',
-                'errors' => [
-                    'required' => 'Kolom {field} harus diisi.',
-                    'valid_date' => 'Format {field} tidak valid.',
-                ],
-            ],
-            'jenis_kelamin' => [
-                'label' => 'Jenis Kelamin',
-                'rules' => 'required',
-                'errors' => ['required' => 'Kolom {field} harus dipilih.'],
-            ],
-            'pendidikan_terakhir' => [
-                'label' => 'Pendidikan Terakhir',
-                'rules' => 'required',
-                'errors' => ['required' => 'Kolom {field} harus dipilih.'],
-            ],
-            'nama_sekolah' => [
-                'label' => 'Nama Sekolah',
-                'rules' => 'required',
-                'errors' => ['required' => 'Kolom {field} harus dipilih.'],
-            ],
-            'jurusan' => [
-                'label' => 'Jurusan',
-                'rules' => 'required|max_length[255]',
-                'errors' => [
-                    'required' => 'Kolom {field} harus diisi.',
-                    'max_length' => 'Panjang teks {field} tidak boleh melebihi 255 karakter.',
-                ],
-            ],
-            'kebangsaan' => [
-                'label' => 'Kebangsaan',
-                'rules' => 'required',
-                'errors' => ['required' => 'Kolom {field} harus dipilih.'],
-            ],
-            'provinsi' => [
-                'label' => 'Provinsi',
-                'rules' => 'required',
-                'errors' => ['required' => 'Kolom {field} harus diisi.'],
-            ],
-            'kabupaten' => [
-                'label' => 'Kabupaten',
-                'rules' => 'required',
-                'errors' => ['required' => 'Kolom {field} harus diisi.'],
-            ],
-            'kecamatan' => [
-                'label' => 'Kecamatan',
-                'rules' => 'required',
-                'errors' => ['required' => 'Kolom {field} harus diisi.'],
-            ],
-            'kelurahan' => [
-                'label' => 'Kelurahan',
-                'rules' => 'required',
-                'errors' => ['required' => 'Kolom {field} harus diisi.'],
-            ],
-            'rt' => [
-                'label' => 'RT',
-                'rules' => 'required',
-                'errors' => ['required' => 'Kolom {field} harus diisi.'],
-            ],
-            'rw' => [
-                'label' => 'RW',
-                'rules' => 'required',
-                'errors' => ['required' => 'Kolom {field} harus diisi.'],
-            ],
-            'kode_pos' => [
-                'label' => 'Kode Pos',
-                'rules' => 'required',
-                'errors' => ['required' => 'Kolom {field} harus diisi.'],
-            ],
-            'telpon_rumah' => [
-                'label' => 'Telepon Rumah',
-                'rules' => 'permit_empty|numeric',
-                'errors' => ['numeric' => 'Kolom {field} harus berupa angka.'],
-            ],
-            'email' => [
-                'label' => 'Email',
-                'rules' => 'required|valid_email' . ($isUpdate ? '' : '|is_unique[asesi.email]'),
-                'errors' => [
-                    'required' => 'Kolom {field} harus diisi.',
-                    'valid_email' => 'Format {field} harus valid.',
-                    'is_unique' => 'Kolom {field} sudah terdaftar. Silakan pilih email lain.',
-                ],
-            ],
-            'pekerjaan' => [
-                'label' => 'Pekerjaan',
-                'rules' => 'required',
-                'errors' => ['required' => 'Kolom {field} harus diisi.'],
-            ],
-        ];
-
-        $this->validator = Services::validation();
-        return $this->validate($rules);
-    }
-
-    /**
-     * Prepare asesi data for database insertion or update
-     *
-     * @param string $idAsesi
-     * @param int $userId
-     * @return array
-     */
-    private function prepareAsesiData(string $idAsesi, int $userId): array
-    {
-        $data = [
-            'id_asesi'             => $idAsesi,
-            'user_id'              => $userId,
-            'nik'                  => $this->request->getVar('nik'),
-            'tempat_lahir'         => $this->request->getVar('tempat_lahir'),
-            'tanggal_lahir'        => $this->request->getVar('tanggal_lahir'),
-            'jenis_kelamin'        => $this->request->getVar('jenis_kelamin'),
-            'pendidikan_terakhir'  => $this->request->getVar('pendidikan_terakhir'),
-            'nama_sekolah'         => $this->request->getVar('nama_sekolah'),
-            'jurusan'              => $this->request->getVar('jurusan'),
-            'kebangsaan'           => $this->request->getVar('kebangsaan'),
-            'provinsi'             => $this->request->getVar('provinsi'),
-            'kabupaten'            => $this->request->getVar('kabupaten'),
-            'kecamatan'            => $this->request->getVar('kecamatan'),
-            'kelurahan'            => $this->request->getVar('kelurahan'),
-            'rt'                   => $this->request->getVar('rt'),
-            'rw'                   => $this->request->getVar('rw'),
-            'kode_pos'             => $this->request->getVar('kode_pos'),
-            'telpon_rumah'         => $this->request->getVar('telpon_rumah'),
-            'email'                => $this->request->getVar('email'),
-            'pekerjaan'            => $this->request->getVar('pekerjaan'),
-            'nama_lembaga'         => $this->request->getVar('nama_lembaga'),
-            'jabatan'              => $this->request->getVar('jabatan'),
-            'alamat_perusahaan'    => $this->request->getVar('alamat_perusahaan'),
-            'email_perusahaan'     => $this->request->getVar('email_perusahaan'),
-            'no_telp_perusahaan'   => $this->request->getVar('no_telp_perusahaan'),
-        ];
-
-        // For new entries, add created_at timestamp
-        if (!$this->request->getVar('id_asesi')) {
-            $data['created_at'] = Time::now();
-        } else {
-            // For updates, add updated_at timestamp
-            $data['updated_at'] = Time::now();
-        }
-
-        return $data;
-    }
-
-    /**
-     * Handle file uploads for the form
-     *
-     * @param bool $isUpdate Whether this is an update operation
-     * @return array File paths or error message
-     */
-    private function handleFileUploads(bool $isUpdate = false): array
-    {
-        $result = [];
-
-        // Handle signature (assuming this might be part of your form)
-        $signatureData = $this->request->getVar('tanda_tangan');
-
-        if (!empty($signatureData) && strpos($signatureData, 'data:image') === 0) {
-            $signatureDir = WRITEPATH . 'uploads/user/signatures/';
-            if (!is_dir($signatureDir)) {
-                mkdir($signatureDir, 0755, true);
-            }
-
-            // Process base64 signature
-            list(, $encodedData) = explode(',', $signatureData);
-            $decodedData = base64_decode($encodedData);
-            $newSignatureName = uniqid('sig_') . '.png';
-            $savePath = $signatureDir . $newSignatureName;
-
-            if (!file_put_contents($savePath, $decodedData)) {
-                return ['error' => 'Gagal menyimpan tanda tangan.'];
-            }
-
-            $result['tanda_tangan'] = $newSignatureName;
-
-            // If updating, remove old signature
-            if ($isUpdate) {
-                $oldData = $this->asesiModel->find($this->request->getVar('id_asesi'));
-                if (!empty($oldData['tanda_tangan'])) {
-                    $oldSignaturePath = $signatureDir . $oldData['tanda_tangan'];
-                    if (file_exists($oldSignaturePath)) {
-                        unlink($oldSignaturePath);
-                    }
-                }
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * Handle failed form submission
-     *
-     * @param string $type Alert type (warning, error, etc.)
-     * @param string $message Alert message
-     * @return ResponseInterface
-     */
-    private function failedResponse(string $type, string $message): ResponseInterface
-    {
-        session()->setFlashdata($type, $message);
-        $errors = $this->validator ? $this->validator->getErrors() : [];
-
-        return redirect()->back()->withInput()->with('errors', $errors);
-    }
-
-    public function dashboard()
-    {
-        // Dashboard utama untuk asesi
-        $userEntity = user();
-        if (!($userEntity instanceof \App\Entities\User ? $userEntity->isAsesi() : (new \App\Entities\User((array)$userEntity))->isAsesi())) {
-            return redirect()->to(site_url('/dashboard'));
-        }
-
-        $data = [
-            'siteTitle' => 'Dashboard Asesi',
-        ];
-        return view('asesi/dashboard', $data);
     }
 }

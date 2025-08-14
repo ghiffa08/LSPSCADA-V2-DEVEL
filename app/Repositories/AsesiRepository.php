@@ -3,7 +3,6 @@
 namespace App\Repositories;
 
 use App\Models\AsesiModel;
-use App\Entities\AsesiEntity;
 
 /**
  * AsesiRepository
@@ -24,48 +23,44 @@ class AsesiRepository
      * Find asesi by ID
      *
      * @param string $id
-     * @return AsesiEntity|null
+     * @return mixed
      */
-    public function findById(string $id): ?AsesiEntity
+    public function findById(string $id)
     {
-        $result = $this->model->find($id);
-        return $result ? new AsesiEntity($result) : null;
+        return $this->model->find($id);
     }
 
     /**
      * Find asesi by user ID
      *
      * @param int $userId
-     * @return AsesiEntity|null
+     * @return mixed
      */
-    public function findByUserId(int $userId): ?AsesiEntity
+    public function findByUserId(int $userId)
     {
-        $result = $this->model->where('user_id', $userId)->first();
-        return $result ? new AsesiEntity($result) : null;
+        return $this->model->getByUserId($userId);
     }
 
     /**
      * Find asesi by NIK
      *
      * @param string $nik
-     * @return AsesiEntity|null
+     * @return mixed
      */
-    public function findByNIK(string $nik): ?AsesiEntity
+    public function findByNIK(string $nik)
     {
-        $result = $this->model->where('nik', $nik)->first();
-        return $result ? new AsesiEntity($result) : null;
+        return $this->model->where('nik', $nik)->first();
     }
 
     /**
      * Find asesi by email
      *
      * @param string $email
-     * @return AsesiEntity|null
+     * @return mixed
      */
-    public function findByEmail(string $email): ?AsesiEntity
+    public function findByEmail(string $email)
     {
-        $result = $this->model->where('email', $email)->first();
-        return $result ? new AsesiEntity($result) : null;
+        return $this->model->where('email', $email)->first();
     }
 
     /**
@@ -76,7 +71,21 @@ class AsesiRepository
      */
     public function create(array $data): bool
     {
-        return $this->model->insert($data) !== false;
+        try {
+            // Log the data being inserted for debugging
+            log_message('debug', 'Attempting to insert asesi data: ' . json_encode($data));
+
+            $result = $this->model->insert($data) !== false;
+
+            if (!$result) {
+                log_message('error', 'Failed to insert asesi data. Error: ' . print_r($this->model->errors(), true));
+            }
+
+            return $result;
+        } catch (\Exception $e) {
+            log_message('error', 'Exception when creating asesi: ' . $e->getMessage());
+            return false;
+        }
     }
 
     /**

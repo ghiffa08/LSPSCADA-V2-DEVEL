@@ -14,7 +14,7 @@ class AsesiEntity extends Entity
 {
     protected $datamap = [
         'id'      => 'id_asesi',
-        'user_id' => 'user_id'
+        'user_id' => 'id_user'
     ];
 
     protected $dates = ['tanggal_lahir', 'created_at', 'updated_at'];
@@ -31,15 +31,14 @@ class AsesiEntity extends Entity
         'nama_sekolah'         => 'string',
         'jurusan'              => 'string',
         'kebangsaan'           => 'string',
-        'provinsi'             => 'integer',
-        'kabupaten'            => 'integer',
-        'kecamatan'            => 'integer',
-        'kelurahan'            => 'integer',
+        'provinsi'             => 'string',
+        'kabupaten'            => 'string',
+        'kecamatan'            => 'string',
+        'kelurahan'            => 'string',
         'rt'                   => 'string',
         'rw'                   => 'string',
         'kode_pos'             => 'string',
         'telpon_rumah'         => '?string',
-        'no_hp'                => 'string',
         'email'                => 'string',
         'pekerjaan'            => 'string',
         'nama_lembaga'         => '?string',
@@ -52,7 +51,7 @@ class AsesiEntity extends Entity
     ];
 
     // Gender constants
-    public const GENDER_MALE = 'Laki-laki';
+    public const GENDER_MALE = 'Laki-Laki';
     public const GENDER_FEMALE = 'Perempuan';
 
     // Education level constants
@@ -162,9 +161,13 @@ class AsesiEntity extends Entity
      */
     public function getContactInfo(): array
     {
+        // Get user data to retrieve no_telp
+        $userModel = new \App\Models\UserMythModel();
+        $user = $userModel->find($this->user_id);
+
         return [
-            'email' => $this->email,
-            'no_hp' => $this->no_hp,
+            'email' => $this->email ?? $user->email,
+            'no_telp' => $user->no_telp ?? '',
             'telpon_rumah' => $this->telpon_rumah
         ];
     }

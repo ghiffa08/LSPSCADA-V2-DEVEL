@@ -75,7 +75,7 @@
             <?php endif; ?>
 
             <div class="card-body">
-                <!-- Pilih Asesmen (as ROOT filter, get asesi BY asesmen!) -->
+                <!-- Pilih Asesmen -->
                 <div class="row mb-4">
                     <div class="col-md-6">
                         <div class="form-group">
@@ -92,6 +92,7 @@
                                                 <?= esc($a['tujuan'] ?? 'Asesmen') ?> - <?= esc($a['nama_skema'] ?? 'Unknown') ?>
                                             </option>
                                         <?php else: ?>
+                                            <!-- Data asesmen tidak lengkap, skip -->
                                             <?php log_message('warning', 'Skipping asesmen data without id_asesmen: ' . json_encode($a)); ?>
                                         <?php endif; ?>
                                     <?php endforeach ?>
@@ -122,7 +123,7 @@
                     <div class="col-md-6">
                         <div class="form-group">
                             <label class="font-weight-bold"><i class="fas fa-hashtag text-primary mr-1"></i>Kode Skema</label>
-                            <input type="text" class="form-control bg-light" id="kode_skema" value="" readonly>
+                            <input type="text" class="form-control bg-light" id="kode_skema" value="<?= esc($skema['kode_skema'] ?? '') ?>" readonly>
                         </div>
                     </div>
                 </div>

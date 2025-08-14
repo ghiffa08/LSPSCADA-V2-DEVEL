@@ -212,9 +212,32 @@ class AsesorController extends BaseController
     {
         // Dashboard utama untuk asesor
         $userEntity = user();
+        $asesorId = $userEntity->id ?? null;
+
+        // Cek role
         if (!($userEntity instanceof \App\Entities\User ? $userEntity->isAsesor() : (new \App\Entities\User((array)$userEntity))->isAsesor())) {
             return redirect()->to(site_url('/dashboard'));
         }
-        return view('asesor/dashboard');
+
+        // Ambil statistik dari model (menggunakan nama method yang benar)
+        $totalAPL2Pending      = $this->dashboardModel->getAsesorTotalAPL2Pending($asesorId);
+        $totalAPL2Validated    = $this->dashboardModel->getAsesorTotalAPL2Validated($asesorId);
+        $totalObservasi        = $this->dashboardModel->getAsesorTotalObservasi($asesorId);
+
+        $monthlyStats          = $this->dashboardModel->getAsesorMonthlyStats($asesorId);
+        $recentActivities      = $this->dashboardModel->getAsesorRecentActivities($asesorId);
+        $upcomingAssessments   = $this->dashboardModel->getAsesorUpcomingAssessments($asesorId);
+
+        $data = [
+            'totalAPL2Pending'        => $totalAPL2Pending ?? 0,
+            'totalAPL2Validated'      => $totalAPL2Validated ?? 0,
+            'totalObservasi'          => $totalObservasi ?? 0,
+            'totalPersetujuanAsesmen' => $totalPersetujuanAsesmen ?? 0,
+            'monthlyStats'            => $monthlyStats ?? [],
+            'recentActivities'        => $recentActivities ?? [],
+            'upcomingAssessments'     => $upcomingAssessments ?? [],
+        ];
+
+        return view('asesor/dashboard', $data);
     }
 }

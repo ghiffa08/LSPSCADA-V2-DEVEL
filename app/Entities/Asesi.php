@@ -9,8 +9,8 @@ class Asesi extends Entity
 {
     protected $dates = ['created_at', 'updated_at', 'tanggal_lahir'];
     protected $casts = [
-        'id_asesi' => 'string',
-        'user_id' => 'integer',
+        'id_asesi' => 'integer',
+        'id_user' => 'integer',
         'nik' => 'string',
     ];
 
@@ -22,7 +22,7 @@ class Asesi extends Entity
     public function getUser()
     {
         $userModel = model('UserModel');
-        $user = $userModel->find($this->attributes['user_id']);
+        $user = $userModel->find($this->attributes['id_user']);
 
         if ($user) {
             return new User($user);
@@ -40,8 +40,8 @@ class Asesi extends Entity
     {
         $pengajuanModel = model('PengajuanAsesmenModel');
         return $pengajuanModel->where('id_asesi', $this->attributes['id_asesi'])
-                             ->where('status', 'active')
-                             ->findAll();
+            ->where('status', 'active')
+            ->findAll();
     }
 
     /**
@@ -53,7 +53,7 @@ class Asesi extends Entity
     {
         $pengajuanModel = model('PengajuanAsesmenModel');
         return $pengajuanModel->where('id_asesi', $this->attributes['id_asesi'])
-                             ->findAll();
+            ->findAll();
     }
 
     /**
@@ -92,19 +92,21 @@ class Asesi extends Entity
         }
 
         // Get desa, kecamatan, kabupaten and provinsi names
-        if (!empty($this->attributes['kelurahan']) ||
+        if (
+            !empty($this->attributes['kelurahan']) ||
             !empty($this->attributes['kecamatan']) ||
             !empty($this->attributes['kabupaten']) ||
-            !empty($this->attributes['provinsi'])) {
+            !empty($this->attributes['provinsi'])
+        ) {
 
             $db = \Config\Database::connect();
 
             // Get village/kelurahan name
             if (!empty($this->attributes['kelurahan'])) {
                 $desa = $db->table('villages')
-                          ->where('id', $this->attributes['kelurahan'])
-                          ->get()
-                          ->getRowArray();
+                    ->where('id', $this->attributes['kelurahan'])
+                    ->get()
+                    ->getRowArray();
 
                 if ($desa) {
                     $parts[] = $desa['name'];
@@ -114,9 +116,9 @@ class Asesi extends Entity
             // Get subdistrict/kecamatan name
             if (!empty($this->attributes['kecamatan'])) {
                 $kecamatan = $db->table('districts')
-                              ->where('id', $this->attributes['kecamatan'])
-                              ->get()
-                              ->getRowArray();
+                    ->where('id', $this->attributes['kecamatan'])
+                    ->get()
+                    ->getRowArray();
 
                 if ($kecamatan) {
                     $parts[] = "Kecamatan " . $kecamatan['name'];
@@ -126,9 +128,9 @@ class Asesi extends Entity
             // Get city/kabupaten name
             if (!empty($this->attributes['kabupaten'])) {
                 $kabupaten = $db->table('regencies')
-                              ->where('id', $this->attributes['kabupaten'])
-                              ->get()
-                              ->getRowArray();
+                    ->where('id', $this->attributes['kabupaten'])
+                    ->get()
+                    ->getRowArray();
 
                 if ($kabupaten) {
                     $parts[] = $kabupaten['name'];
@@ -138,9 +140,9 @@ class Asesi extends Entity
             // Get province name
             if (!empty($this->attributes['provinsi'])) {
                 $provinsi = $db->table('provinces')
-                             ->where('id', $this->attributes['provinsi'])
-                             ->get()
-                             ->getRowArray();
+                    ->where('id', $this->attributes['provinsi'])
+                    ->get()
+                    ->getRowArray();
 
                 if ($provinsi) {
                     $parts[] = "Provinsi " . $provinsi['name'];
@@ -168,7 +170,7 @@ class Asesi extends Entity
         // First get all APL1 IDs for this asesi
         $pengajuanModel = model('PengajuanAsesmenModel');
         $pengajuanList = $pengajuanModel->where('id_asesi', $this->attributes['id_asesi'])
-                                      ->findAll();
+            ->findAll();
 
         $apl1Ids = array_column($pengajuanList, 'id_apl1');
 

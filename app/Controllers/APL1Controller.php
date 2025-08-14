@@ -24,12 +24,17 @@ class APL1Controller extends BaseController
 
     public function __construct()
     {
+        helper(['auth', 'application']); // Ensure application helper is loaded
+
         $this->cache = Services::cache();
         $this->pdfService = new PDFService();
         $this->qrCodeService = new QRCodeService();
         $this->formatterService = new FormatterService();
         $this->emailService = new EmailService();
         $this->validationService = new ValidationService();
+
+        // Initialize the dynamic dependent model if needed
+        $this->dynamicDependentModel = new \App\Models\DynamicDependent();
     }
 
     /**
@@ -381,27 +386,7 @@ class APL1Controller extends BaseController
         return $this->response->setJSON($result);
     }
 
-    /**
-     * Optimized version of renderSelectOptions function
-     * This function uses StringBuilder approach to improve performance with large datasets
-     */
-    function renderSelectOptions($data, $placeholder = null, $selectedValue = null)
-    {
-        $options = [];
-
-        if ($placeholder !== null) {
-            $options[] = "<option value=\"\">$placeholder</option>";
-        }
-
-        foreach ($data as $item) {
-            $id = isset($item['id']) ? $item['id'] : $item[0];
-            $name = isset($item['name']) ? $item['name'] : $item[1];
-            $selected = ($selectedValue == $id) ? ' selected' : '';
-            $options[] = "<option value=\"$id\"$selected>$name</option>";
-        }
-
-        return implode('', $options);
-    }
+    // Using the global renderSelectOptions helper function instead of a local duplicate
 
     /**
      * Get validated data by date (AJAX)

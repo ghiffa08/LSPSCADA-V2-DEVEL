@@ -27,8 +27,8 @@ class Database extends Config
     public array $default = [
         'DSN'          => '',
         'hostname'     => 'localhost',
-        'username'     => 'root',
-        'password'     => '',
+        'username'     => 'ghiffa',
+        'password'     => 'developer08',
         'database'     => 'lsp_scada_app_devel',
         'DBDriver'     => 'MySQLi',
         'DBPrefix'     => '',

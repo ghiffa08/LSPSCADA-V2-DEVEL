@@ -95,7 +95,7 @@
 
             try {
                 const response = await $.ajax({
-                    url: '<?= base_url('/asesor/observasi/getAsesiByAsesmen') ?>',
+                    url: '<?= base_url('/asesor/observasi/getAsesiByAsesmen') ?>', // PERBAIKAN: URL yang benar
                     type: 'GET',
                     data: {
                         id_asesmen: state.id_asesmen
@@ -162,7 +162,7 @@
                 $('#formObservasi').hide();
 
                 const response = await $.ajax({
-                    url: '<?= base_url('/asesor/observasi/loadObservasi') ?>',
+                    url: '<?= base_url('/asesor/observasi/loadObservasi') ?>', // PERBAIKAN: URL yang benar sesuai route
                     type: 'GET',
                     data: {
                         id_skema: state.id_skema,
@@ -172,10 +172,10 @@
                     dataType: 'json'
                 });
 
-                if (response.success) {
-                    console.log('API Response:', response); // Debug log
+                console.log('loadObservasi response:', response); // Debug log
 
-                    // Check if observasi data exists (could be object or array)
+                if (response.success) {
+                    // Check if observasi data exists
                     let hasObservasi = false;
                     let observasiCount = 0;
 
@@ -190,7 +190,7 @@
 
                             // Convert object to array format for rendering
                             response.observasi = convertObservasiObjectToArray(response.observasi);
-                            console.log('Converted observasi to array:', response.observasi); // Debug log
+                            console.log('Converted observasi to array:', response.observasi);
                         }
                     }
 
@@ -198,20 +198,17 @@
                         renderObservasiTable(response.observasi, response.existing_data);
                         state.totalKUK = response.totalKUK || response.observasi.length;
 
-                        // Try to extract id_observasi from existing_data or response
-                        if (response.existing_data && response.existing_data.id_observasi) {
-                            state.id_observasi = response.existing_data.id_observasi;
-                            console.log('Loaded existing id_observasi:', state.id_observasi);
-                        } else if (response.id_observasi) {
+                        // Store id_observasi if available
+                        if (response.id_observasi) {
                             state.id_observasi = response.id_observasi;
-                            console.log('Loaded id_observasi from response:', state.id_observasi);
+                            console.log('Loaded existing id_observasi:', state.id_observasi);
                         }
 
                         updateProgressBar();
                         $('#formObservasi').show();
-                        showSuccess('Data berhasil dimuat', `${observasiCount} unit kompetensi siap untuk observasi`);
+                        showSuccess('Data berhasil dimuat', `${observasiCount} kriteria unjuk kerja siap untuk observasi`);
                     } else {
-                        console.warn('No observasi data found or conversion failed'); // Debug log
+                        console.warn('No observasi data found');
                         showInfo('Belum Ada Data Observasi', 'Belum ada unit kompetensi yang tersedia untuk asesmen ini.');
                         $('#formObservasi').hide();
                     }
@@ -220,7 +217,20 @@
                 }
             } catch (error) {
                 console.error('Error loading observasi data:', error);
-                const errorMessage = error.responseJSON?.message || 'Terjadi kesalahan saat memuat data observasi';
+                
+                // Enhanced error handling
+                let errorMessage = 'Terjadi kesalahan saat memuat data observasi';
+                if (error.responseJSON && error.responseJSON.message) {
+                    errorMessage = error.responseJSON.message;
+                } else if (error.responseText) {
+                    try {
+                        const errorResponse = JSON.parse(error.responseText);
+                        errorMessage = errorResponse.message || errorMessage;
+                    } catch (e) {
+                        errorMessage = error.responseText;
+                    }
+                }
+                
                 showError('Error Database', errorMessage);
             } finally {
                 $('#loadingData').hide();
@@ -233,41 +243,44 @@
         function convertObservasiObjectToArray(observasiObject) {
             const observasiArray = [];
 
-            console.log('Converting observasi object:', observasiObject); // Debug log
+            console.log('Converting observasi object:', observasiObject);
 
-            Object.keys(observasiObject).forEach(unitKey => {
-                const unit = observasiObject[unitKey];
-                const unitInfo = unit.unit_info;
-
-                console.log('Processing unit:', unitKey, unitInfo); // Debug log
-
-                Object.keys(unit.elements || {}).forEach(elemenKey => {
-                    const element = unit.elements[elemenKey];
-                    const elemenInfo = element.element_info;
-
-                    console.log('Processing element:', elemenKey, elemenInfo); // Debug log
-
-                    (element.kuks || []).forEach(kuk => {
-                        console.log('Processing KUK:', kuk); // Debug log
-
-                        observasiArray.push({
-                            id_kelompok: unitInfo.id_kelompok || 1, // Default kelompok ID
-                            nama_kelompok: unitInfo.nama_kelompok || 'Kelompok Utama', // Default grouping
-                            id_unit: unitInfo.id_unit,
-                            kode_unit: unitInfo.kode_unit,
-                            nama_unit: unitInfo.nama_unit,
-                            id_elemen: elemenInfo.id_elemen,
-                            kode_elemen: elemenInfo.kode_elemen,
-                            nama_elemen: elemenInfo.nama_elemen,
-                            id_kuk: kuk.id_kuk,
-                            kode_kuk: kuk.kode_kuk,
-                            kriteria_unjuk_kerja: kuk.nama_kuk
-                        });
+            // PERBAIKAN: Handle new hierarchical structure
+            Object.keys(observasiObject).forEach(kelompokKey => {
+                const kelompok = observasiObject[kelompokKey];
+                
+                if (kelompok.units) {
+                    Object.keys(kelompok.units).forEach(unitKey => {
+                        const unit = kelompok.units[unitKey];
+                        
+                        if (unit.elements) {
+                            Object.keys(unit.elements).forEach(elemenKey => {
+                                const element = unit.elements[elemenKey];
+                                
+                                if (element.kuks && Array.isArray(element.kuks)) {
+                                    element.kuks.forEach(kuk => {
+                                        observasiArray.push({
+                                            id_kelompok: kelompok.id_kelompok,
+                                            nama_kelompok: kelompok.nama_kelompok,
+                                            id_unit: unit.id_unit,
+                                            kode_unit: unit.kode_unit,
+                                            nama_unit: unit.nama_unit,
+                                            id_elemen: element.id_elemen,
+                                            kode_elemen: element.kode_elemen,
+                                            nama_elemen: element.nama_elemen,
+                                            id_kuk: kuk.id_kuk,
+                                            kode_kuk: kuk.kode_kuk,
+                                            kriteria_unjuk_kerja: kuk.nama_kuk
+                                        });
+                                    });
+                                }
+                            });
+                        }
                     });
-                });
+                }
             });
 
-            console.log('Converted array length:', observasiArray.length); // Debug log
+            console.log('Converted array length:', observasiArray.length);
             return observasiArray;
         }
 
@@ -450,7 +463,7 @@
 
             try {
                 const response = await $.ajax({
-                    url: '<?= base_url('/asesor/observasi/save') ?>',
+                    url: '<?= base_url('/asesor/observasi/save') ?>', // PERBAIKAN: URL yang benar
                     type: 'POST',
                     data: JSON.stringify(batchData),
                     contentType: 'application/json',
@@ -484,7 +497,7 @@
 
             try {
                 const response = await $.ajax({
-                    url: '<?= base_url('/asesor/observasi/save') ?>',
+                    url: '<?= base_url('/asesor/observasi/save') ?>', // PERBAIKAN: URL yang benar
                     type: 'POST',
                     data: data,
                     dataType: 'json'
@@ -534,7 +547,7 @@
 
             try {
                 const response = await $.ajax({
-                    url: '<?= base_url('/asesor/observasi/save') ?>',
+                    url: '<?= base_url('/asesor/observasi/save') ?>', // PERBAIKAN: URL yang benar
                     type: 'POST',
                     data: data,
                     dataType: 'json'
@@ -593,7 +606,7 @@
                     });
 
                     const response = await $.ajax({
-                        url: '<?= base_url('/asesor/observasi/save') ?>',
+                        url: '<?= base_url('/asesor/observasi/save') ?>', // PERBAIKAN: URL yang benar
                         type: 'POST',
                         data: formData,
                         dataType: 'json'

@@ -14,11 +14,11 @@ class UserModel extends Model
     protected $protectFields    = true;
     protected $allowedFields    =  [
         'email',
+        'no_hp',
         'username',
         'nama_lengkap',
         'user_image',
         'tanda_tangan',
-        'no_telp',
         'password_hash',
         'reset_hash',
         'reset_at',

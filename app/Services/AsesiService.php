@@ -2,8 +2,8 @@
 
 namespace App\Services;
 
-use App\Entities\AsesiEntity;
 use App\DTOs\ApiResponseDTO;
+use App\Entities\AsesiEntity;
 use App\Repositories\AsesiRepository;
 use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\I18n\Time;
@@ -78,9 +78,13 @@ class AsesiService
     public function createAsesi(array $data): ApiResponseDTO
     {
         try {
+            // Log data for debugging
+            log_message('debug', 'Create asesi data received: ' . json_encode($data));
+
             // Validate required fields
             $validationErrors = $this->validateAsesiData($data);
             if (!empty($validationErrors)) {
+                log_message('error', 'Validation errors: ' . json_encode($validationErrors));
                 return ApiResponseDTO::validationError($validationErrors);
             }
 
@@ -107,8 +111,14 @@ class AsesiService
 
             $data['created_at'] = Time::now();
 
-            if (!$this->asesiRepository->create($data)) {
-                throw new \Exception('Gagal menyimpan data asesi');
+            try {
+                if (!$this->asesiRepository->create($data)) {
+                    log_message('error', 'Failed to save asesi data in repository');
+                    throw new \Exception('Gagal menyimpan data asesi ke database');
+                }
+            } catch (\Exception $dbEx) {
+                log_message('error', 'Database error when creating asesi: ' . $dbEx->getMessage());
+                throw $dbEx;
             }
 
             return ApiResponseDTO::success(
@@ -117,7 +127,7 @@ class AsesiService
             );
         } catch (\Exception $e) {
             log_message('error', 'Error creating asesi: ' . $e->getMessage());
-            return ApiResponseDTO::error('Terjadi kesalahan saat menyimpan data asesi');
+            return ApiResponseDTO::error('Terjadi kesalahan saat menyimpan data asesi: ' . $e->getMessage());
         }
     }
 
@@ -276,7 +286,7 @@ class AsesiService
         $errors = [];
 
         // Required fields validation
-        $requiredFields = ['nama', 'nik', 'email', 'no_hp', 'jenis_kelamin'];
+        $requiredFields = ['nik', 'email', 'jenis_kelamin'];
         foreach ($requiredFields as $field) {
             if (empty($data[$field])) {
                 $errors[$field] = ucfirst($field) . ' harus diisi';
@@ -293,8 +303,8 @@ class AsesiService
             $errors['email'] = 'Format email tidak valid';
         }
 
-        // Phone number validation
-        if (isset($data['no_hp']) && !preg_match('/^\d+$/', $data['no_hp'])) {
+        // Phone number validation - only if provided
+        if (!empty($data['no_hp']) && !preg_match('/^\d+$/', $data['no_hp'])) {
             $errors['no_hp'] = 'Nomor HP harus berupa angka';
         }
 

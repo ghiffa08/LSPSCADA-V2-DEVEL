@@ -15,9 +15,8 @@ class AsesiModel extends Model
     protected $protectFields    = true;
     protected $allowedFields    = [
         'id_asesi',
-        'user_id',
+        'id_user',
         'nik',
-        'nama',
         'tempat_lahir',
         'tanggal_lahir',
         'jenis_kelamin',
@@ -26,7 +25,6 @@ class AsesiModel extends Model
         'jurusan',
         'kebangsaan',
         'telpon_rumah',
-        'no_hp',
         'email',
         'pekerjaan',
         'nama_lembaga',
@@ -54,13 +52,12 @@ class AsesiModel extends Model
     // Validation
     protected $validationRules      = [
         'id_asesi' => 'required|max_length[36]',
-        'user_id' => 'required|integer',
-        'nik' => 'required|max_length[16]|is_unique[asesi.nik,id_asesi,{id_asesi}]',
-        'nama' => 'required|max_length[255]',
-        'tempat_lahir' => 'required|max_length[255]',
+        'id_user' => 'required|integer',
+        'nik' => 'required|max_length[20]|is_unique[asesi.nik,id_asesi,{id_asesi}]',
+        'tempat_lahir' => 'required|max_length[30]',
         'tanggal_lahir' => 'required|valid_date',
         'jenis_kelamin' => 'required|in_list[Laki-Laki,Perempuan]',
-        'pendidikan_terakhir' => 'required|in_list[SD,SMP,SMA/SMK,Diploma,Sarjana,Magister,Doktor]',
+        'pendidikan_terakhir' => 'required|in_list[SD,SMP,SMA/SMK,D3,S1,S2,S3]',
         'email' => 'required|valid_email|is_unique[asesi.email,id_asesi,{id_asesi}]',
     ];
 
@@ -88,7 +85,7 @@ class AsesiModel extends Model
      */
     public function getByUserId(int $userId)
     {
-        return $this->where('user_id', $userId)->first();
+        return $this->where('id_user', $userId)->first();
     }
 
     /**

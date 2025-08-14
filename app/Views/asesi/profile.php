@@ -5,19 +5,10 @@
 <?= $this->endSection() ?>
 
 <?= $this->section("content"); ?>
-<h2 class="section-title">Hi, <?= user()->fullname ?>!</h2>
+<h2 class="section-title">Hi, <?= $user->fullname ?? $user->nama_lengkap ?>!</h2>
 <p class="section-lead">
-    Change information about yourself on this page.
+    Kelola informasi profil Anda di halaman ini.F
 </p>
-
-<?= form_open_multipart('asesi/save') ?>
-<?= csrf_field() ?>
-
-<?php if (isset($asesi)) : ?>
-    <input type="hidden" name="id_asesi" value="<?= isset($asesi['id_asesi']) ? $asesi['id_asesi'] : $asesi->id_asesi ?>">
-<?php endif; ?>
-
-<input type="hidden" name="user_id" value="<?= user_id() ?>">
 
 <?php if (session()->has('error')) : ?>
     <div class="alert alert-danger"><?= session('error') ?></div>
@@ -25,6 +16,10 @@
 
 <?php if (session()->has('success')) : ?>
     <div class="alert alert-success"><?= session('success') ?></div>
+<?php endif; ?>
+
+<?php if (session()->has('pesan')) : ?>
+    <div class="alert alert-success"><?= session('pesan') ?></div>
 <?php endif; ?>
 
 <?php if (session()->has('errors')) : ?>
@@ -35,36 +30,106 @@
     </ul>
 <?php endif; ?>
 
-<div class="bg-primary text-white text-center py-3 rounded mb-3 shadow-sm">
-    <h4 class="mb-0">DATA DIRI PEMOHON</h4>
+<!-- Data User (Always shown) -->
+<div class="bg-info text-white text-center py-3 rounded mb-3 shadow-sm">
+    <h4 class="mb-0">INFORMASI AKUN</h4>
 </div>
 
 <div class="card">
     <div class="card-body">
-
-
-        <div class="form-group mb-3">
-            <label class="form-label">Nama Lengkap<span class="text-danger">*</span></label>
-            <input type="text" class="form-control" name="fullname" value="<?= user()->fullname ?>">
-            <input type="hidden" name="user_id" value="<?= user()->id ?>">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="form-group mb-3">
+                    <label class="form-label"><strong>Nama Lengkap</strong></label>
+                    <p class="form-control-plaintext"><?= $user->nama_lengkap ?></p>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group mb-3">
+                    <label class="form-label"><strong>Email</strong></label>
+                    <p class="form-control-plaintext"><?= $user->email ?></p>
+                </div>
+            </div>
         </div>
         <div class="row">
-            <div class="form-group mb-3 col-12 col-md-4">
+            <div class="col-md-6">
+                <div class="form-group mb-3">
+                    <label class="form-label"><strong>Username</strong></label>
+                    <p class="form-control-plaintext"><?= $user->username ?></p>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="form-group mb-3">
+                    <label class="form-label"><strong>Nomor Telepon</strong></label>
+                    <p class="form-control-plaintext"><?= $user->no_telp ?? '-' ?></p>
+                </div>
+            </div>
+        </div>
+
+        <?php if (!$hasAsesiData): ?>
+            <div class="text-center mt-4">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> <strong>Silakan lengkapi profil detail Anda di bawah ini untuk dapat mendaftar asesmen.</strong>
+                </div>
+            </div>
+        <?php else: ?>
+            <div class="mt-4">
+                <div class="alert alert-success">
+                    <h6><i class="fas fa-check-circle"></i> <strong>Profil Detail Telah Dilengkapi</strong></h6>
+                    <hr>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <small><strong>NIK:</strong> <?= $asesi->nik ?? '-' ?></small><br>
+                            <small><strong>Tempat, Tanggal Lahir:</strong> <?= ($asesi->tempat_lahir ?? '-') . ', ' . ($asesi->tanggal_lahir ?? '-') ?></small><br>
+                            <small><strong>Jenis Kelamin:</strong> <?= $asesi->jenis_kelamin ?? '-' ?></small>
+                        </div>
+                        <div class="col-md-6">
+                            <small><strong>Pendidikan:</strong> <?= $asesi->pendidikan_terakhir ?? '-' ?></small><br>
+                            <small><strong>Sekolah/PT:</strong> <?= $asesi->nama_sekolah ?? '-' ?></small><br>
+                            <small><strong>Perusahaan:</strong> <?= $asesi->nama_lembaga ?? '-' ?></small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
+    </div>
+</div>
+
+<!-- Detail Profile Form - Always Show -->
+<?= form_open_multipart('asesi/save') ?>
+<?= csrf_field() ?>
+
+<?php if ($hasAsesiData && isset($asesi)) : ?>
+    <input type="hidden" name="id_asesi" value="<?= $asesi->id_asesi ?>">
+<?php endif; ?>
+
+<input type="hidden" name="id_user" value="<?= $user->id ?>">
+
+<div class="bg-primary text-white text-center py-3 rounded mb-3 shadow-sm">
+    <h4 class="mb-0">DETAIL PROFIL ASESI</h4>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <div class="form-group mb-3">
+            <label class="form-label">Nama Lengkap<span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="fullname" value="<?= $user->fullname ?? $user->nama_lengkap ?>" readonly>
+            <small class="text-muted">Nama lengkap diambil dari data akun dan tidak dapat diubah di sini.</small>
+        </div>
+
+        <div class="row">
+            <div class="form-group mb-3 col-12 col-md-6">
                 <label class="form-label">Email<span class="text-danger">*</span></label>
-                <input type="text" class="form-control" value="<?= user()->email ?>" readonly> <input type="hidden" name="email" value="<?= user()->email ?>">
+                <input type="text" class="form-control" value="<?= $user->email ?>" readonly>
+                <input type="hidden" name="email" value="<?= $user->email ?>">
+                <small class="text-muted">Email diambil dari data akun dan tidak dapat diubah di sini.</small>
             </div>
-            <!-- 
-            <div class="form-group mb-3 col-12 col-md-4">
-                <label class="form-label">Nomor Handphone<span class="text-danger">*</span></label>
-                <input type="number" class="form-control" name="no_telp" value="<?= user()->no_telp ?>">
-            </div>
-            -->
-            <div class="form-group mb-3 col-12 col-md-4">
-                <label class="form-label">Nomor Telpon</label>
-                <input type="number" class="form-control <?php if (session('errors.telpon_rumah')) : ?>is-invalid<?php endif ?>"
+            <div class="form-group mb-3 col-12 col-md-6">
+                <label class="form-label">Nomor Telepon Rumah</label>
+                <input type="text" class="form-control <?php if (session('errors.telpon_rumah')) : ?>is-invalid<?php endif ?>"
                     name="telpon_rumah"
                     value="<?= setFormValue('telpon_rumah', $asesi ?? null) ?>"
-                    placeholder="Masukan Nomor Telpon Rumah">
+                    placeholder="Masukan Nomor Telepon Rumah">
                 <?php if (session('errors.telpon_rumah')) { ?>
                     <div class="invalid-feedback">
                         <?= session('errors.telpon_rumah') ?>
@@ -72,9 +137,10 @@
                 <?php } ?>
             </div>
         </div>
+
         <div class="form-group mb-3">
             <label class="form-label">Nomor KTP/NIK/Paspor<span class="text-danger">*</span></label>
-            <input type="number" class="form-control <?php if (session('errors.nik')) : ?>is-invalid<?php endif ?>"
+            <input type="text" class="form-control <?php if (session('errors.nik')) : ?>is-invalid<?php endif ?>"
                 name="nik"
                 value="<?= setFormValue('nik', $asesi ?? null) ?>"
                 placeholder="Masukan Nomor Induk Kependudukan">
@@ -84,6 +150,7 @@
                 </div>
             <?php } ?>
         </div>
+
         <div class="row">
             <div class="form-group mb-3 col-12 col-md-6">
                 <label class="form-label">Tempat Lahir<span class="text-danger">*</span></label>
@@ -109,8 +176,9 @@
                 <?php } ?>
             </div>
         </div>
-        <div class="form-group mb-3 mb-3">
-            <label class="form-label" class="form-label">Jenis Kelamin<span class="text-danger">*</span></label>
+
+        <div class="form-group mb-3">
+            <label class="form-label">Jenis Kelamin<span class="text-danger">*</span></label>
             <select class="form-control select2 <?php if (session('errors.jenis_kelamin')) : ?>is-invalid<?php endif ?>" name="jenis_kelamin">
                 <option value="">Pilih Jenis Kelamin</option>
                 <option value="Laki-Laki" <?= isSelected("Laki-Laki", "jenis_kelamin", $asesi ?? null) ?>>Laki-Laki</option>
@@ -122,6 +190,7 @@
                 </div>
             <?php } ?>
         </div>
+
         <div class="form-group mb-3">
             <label class="form-label">Kebangsaan<span class="text-danger">*</span></label>
             <input type="text" class="form-control <?php if (session('errors.kebangsaan')) : ?>is-invalid<?php endif ?>"
@@ -138,7 +207,7 @@
 </div>
 
 <div class="bg-primary text-white text-center py-3 rounded mb-3 shadow-sm">
-    <h4 class="mb-0">RIWAYAT PENDIDIKAN PEMOHON</h4>
+    <h4 class="mb-0">RIWAYAT PENDIDIKAN</h4>
 </div>
 
 <div class="card">
@@ -150,18 +219,18 @@
                 <option value="SD" <?= isSelected("SD", "pendidikan_terakhir", $asesi ?? null) ?>>SD</option>
                 <option value="SMP" <?= isSelected("SMP", "pendidikan_terakhir", $asesi ?? null) ?>>SMP</option>
                 <option value="SMA/SMK" <?= isSelected("SMA/SMK", "pendidikan_terakhir", $asesi ?? null) ?>>SMA/SMK</option>
-                <option value="Diploma" <?= isSelected("Diploma", "pendidikan_terakhir", $asesi ?? null) ?>>Diploma</option>
-                <option value="Sarjana" <?= isSelected("Sarjana", "pendidikan_terakhir", $asesi ?? null) ?>>Sarjana</option>
-                <option value="Magister" <?= isSelected("Magister", "pendidikan_terakhir", $asesi ?? null) ?>>Magister</option>
-                <option value="Doktor" <?= isSelected("Doktor", "pendidikan_terakhir", $asesi ?? null) ?>>Doktor</option>
+                <option value="D3" <?= isSelected("D3", "pendidikan_terakhir", $asesi ?? null) ?>>Diploma (D3)</option>
+                <option value="S1" <?= isSelected("S1", "pendidikan_terakhir", $asesi ?? null) ?>>Sarjana (S1)</option>
+                <option value="S2" <?= isSelected("S2", "pendidikan_terakhir", $asesi ?? null) ?>>Magister (S2)</option>
+                <option value="S3" <?= isSelected("S3", "pendidikan_terakhir", $asesi ?? null) ?>>Doktor (S3)</option>
             </select>
-
             <?php if (session('errors.pendidikan_terakhir')) { ?>
                 <div class="invalid-feedback">
                     <?= session('errors.pendidikan_terakhir') ?>
                 </div>
             <?php } ?>
         </div>
+
         <div class="form-group mb-3">
             <label class="form-label">Nama Sekolah / Perguruan Tinggi<span class="text-danger">*</span></label>
             <input type="text" class="form-control <?php if (session('errors.nama_sekolah')) : ?>is-invalid<?php endif ?>"
@@ -174,6 +243,7 @@
                 </div>
             <?php } ?>
         </div>
+
         <div class="form-group mb-3">
             <label class="form-label">Jurusan / Program Studi<span class="text-danger">*</span></label>
             <input type="text" class="form-control <?php if (session('errors.jurusan')) : ?>is-invalid<?php endif ?>"
@@ -190,7 +260,7 @@
 </div>
 
 <div class="bg-primary text-white text-center py-3 rounded mb-3 shadow-sm">
-    <h4 class="mb-0">ALAMAT DOMISILI PEMOHON</h4>
+    <h4 class="mb-0">ALAMAT DOMISILI</h4>
 </div>
 
 <div class="card">
@@ -214,20 +284,19 @@
                 <select class="form-control select2 <?= session('errors.kabupaten') ? 'is-invalid' : '' ?>"
                     name="kabupaten" id="id_kabupaten">
                     <option value="">-- Pilih Kabupaten/Kota --</option>
-                    <!-- Will be filled via Ajax -->
                 </select>
                 <?php if (session('errors.kabupaten')): ?>
                     <div class="invalid-feedback"><?= session('errors.kabupaten') ?></div>
                 <?php endif; ?>
             </div>
         </div>
+
         <div class="row">
             <div class="form-group mb-3 col-12 col-md-6">
                 <label class="form-label">Kecamatan<span class="text-danger">*</span></label>
                 <select class="form-control select2 <?= session('errors.kecamatan') ? 'is-invalid' : '' ?>"
                     name="kecamatan" id="id_kecamatan">
                     <option value="">-- Pilih Kecamatan --</option>
-                    <!-- Will be filled via Ajax -->
                 </select>
                 <?php if (session('errors.kecamatan')): ?>
                     <div class="invalid-feedback"><?= session('errors.kecamatan') ?></div>
@@ -238,20 +307,20 @@
                 <select class="form-control select2 <?= session('errors.kelurahan') ? 'is-invalid' : '' ?>"
                     name="kelurahan" id="id_desa">
                     <option value="">-- Pilih Kelurahan/Desa --</option>
-                    <!-- Will be filled via Ajax -->
                 </select>
                 <?php if (session('errors.kelurahan')): ?>
                     <div class="invalid-feedback"><?= session('errors.kelurahan') ?></div>
                 <?php endif; ?>
             </div>
         </div>
+
         <div class="row">
             <div class="form-group mb-3 col-12 col-md-4">
                 <label class="form-label">RT<span class="text-danger">*</span></label>
-                <input type="number" class="form-control <?php if (session('errors.rt')) : ?>is-invalid<?php endif ?>"
+                <input type="text" class="form-control <?php if (session('errors.rt')) : ?>is-invalid<?php endif ?>"
                     name="rt"
                     value="<?= setFormValue('rt', $asesi ?? null) ?>"
-                    placeholder="Masukan RT">
+                    placeholder="RT">
                 <?php if (session('errors.rt')) { ?>
                     <div class="invalid-feedback">
                         <?= session('errors.rt') ?>
@@ -260,10 +329,10 @@
             </div>
             <div class="form-group mb-3 col-12 col-md-4">
                 <label class="form-label">RW<span class="text-danger">*</span></label>
-                <input type="number" class="form-control <?php if (session('errors.rw')) : ?>is-invalid<?php endif ?>"
+                <input type="text" class="form-control <?php if (session('errors.rw')) : ?>is-invalid<?php endif ?>"
                     name="rw"
                     value="<?= setFormValue('rw', $asesi ?? null) ?>"
-                    placeholder="Masukan RW">
+                    placeholder="RW">
                 <?php if (session('errors.rw')) { ?>
                     <div class="invalid-feedback">
                         <?= session('errors.rw') ?>
@@ -271,11 +340,11 @@
                 <?php } ?>
             </div>
             <div class="form-group mb-3 col-12 col-md-4">
-                <label class="form-label">Kode Pos<span class="text-danger">*</span></label>
-                <input type="number" class="form-control <?php if (session('errors.kode_pos')) : ?>is-invalid<?php endif ?>"
+                <label class="form-label">Kode Pos</label>
+                <input type="text" class="form-control <?php if (session('errors.kode_pos')) : ?>is-invalid<?php endif ?>"
                     name="kode_pos"
                     value="<?= setFormValue('kode_pos', $asesi ?? null) ?>"
-                    placeholder="Masukan Kode Pos">
+                    placeholder="Kode Pos">
                 <?php if (session('errors.kode_pos')) { ?>
                     <div class="invalid-feedback">
                         <?= session('errors.kode_pos') ?>
@@ -283,11 +352,24 @@
                 <?php } ?>
             </div>
         </div>
+
+        <div class="form-group mb-3">
+            <label class="form-label">No. Handphone<span class="text-danger">*</span></label>
+            <input type="text" class="form-control <?php if (session('errors.no_hp')) : ?>is-invalid<?php endif ?>"
+                name="no_hp"
+                value="<?= $user->no_hp ?? '' ?>"
+                placeholder="Masukan Nomor Handphone">
+            <?php if (session('errors.no_hp')) { ?>
+                <div class="invalid-feedback">
+                    <?= session('errors.no_hp') ?>
+                </div>
+            <?php } ?>
+        </div>
     </div>
 </div>
 
 <div class="bg-primary text-white text-center py-3 rounded mb-3 shadow-sm">
-    <h4 class="mb-0">DATA PEKERJAAN</h4>
+    <h4 class="mb-0">INFORMASI PEKERJAAN</h4>
 </div>
 
 <div class="card">
@@ -302,7 +384,7 @@
                 <option value="Petani" <?= isSelected("Petani", "pekerjaan", $asesi ?? null) ?>>Petani</option>
                 <option value="Guru" <?= isSelected("Guru", "pekerjaan", $asesi ?? null) ?>>Guru</option>
                 <option value="Dokter" <?= isSelected("Dokter", "pekerjaan", $asesi ?? null) ?>>Dokter</option>
-                <option value="Lainya" <?= isSelected("Lainya", "pekerjaan", $asesi ?? null) ?>>Lainya</option>
+                <option value="Lainnya" <?= isSelected("Lainnya", "pekerjaan", $asesi ?? null) ?>>Lainnya</option>
             </select>
             <?php if (session('errors.pekerjaan')) { ?>
                 <div class="invalid-feedback">
@@ -310,228 +392,147 @@
                 </div>
             <?php } ?>
         </div>
+
         <div class="form-group mb-3">
-            <label class="form-label">Nama Instansi</label>
+            <label class="form-label">Nama Lembaga/Perusahaan</label>
             <input type="text" class="form-control <?php if (session('errors.nama_lembaga')) : ?>is-invalid<?php endif ?>"
                 name="nama_lembaga"
                 value="<?= setFormValue('nama_lembaga', $asesi ?? null) ?>"
-                placeholder="Organisasi / Tempat Kerja / Instansi Terkait / Freelance / - (bila tidak ada)">
+                placeholder="Masukan Nama Lembaga/Perusahaan">
             <?php if (session('errors.nama_lembaga')) { ?>
                 <div class="invalid-feedback">
                     <?= session('errors.nama_lembaga') ?>
                 </div>
             <?php } ?>
         </div>
+
         <div class="form-group mb-3">
             <label class="form-label">Jabatan</label>
             <input type="text" class="form-control <?php if (session('errors.jabatan')) : ?>is-invalid<?php endif ?>"
                 name="jabatan"
                 value="<?= setFormValue('jabatan', $asesi ?? null) ?>"
-                placeholder="Jabatan di Perusahaan">
+                placeholder="Masukan Jabatan">
             <?php if (session('errors.jabatan')) { ?>
                 <div class="invalid-feedback">
                     <?= session('errors.jabatan') ?>
                 </div>
             <?php } ?>
         </div>
+
         <div class="form-group mb-3">
-            <label class="form-label">Alamat Lembaga / Perusahaan</label>
+            <label class="form-label">Alamat Perusahaan</label>
             <textarea class="form-control <?php if (session('errors.alamat_perusahaan')) : ?>is-invalid<?php endif ?>"
                 name="alamat_perusahaan"
-                id="inputDescription"><?= setFormValue('alamat_perusahaan', $asesi ?? null) ?></textarea>
+                rows="3"
+                placeholder="Masukan Alamat Perusahaan"><?= setFormValue('alamat_perusahaan', $asesi ?? null) ?></textarea>
             <?php if (session('errors.alamat_perusahaan')) { ?>
                 <div class="invalid-feedback">
                     <?= session('errors.alamat_perusahaan') ?>
                 </div>
             <?php } ?>
         </div>
-        <div class="row">
-            <div class="form-group mb-3 col-12 col-md-6">
-                <label class="form-label">Email Perusahaan</label>
-                <input type="text" class="form-control <?php if (session('errors.email_perusahaan')) : ?>is-invalid<?php endif ?>"
-                    name="email_perusahaan"
-                    value="<?= setFormValue('email_perusahaan', $asesi ?? null) ?>"
-                    placeholder="Masukan Nomor Email Perusahaan">
-                <?php if (session('errors.email_perusahaan')) { ?>
-                    <div class="invalid-feedback">
-                        <?= session('errors.email_perusahaan') ?>
-                    </div>
-                <?php } ?>
-            </div>
-            <div class="form-group mb-3 col-12 col-md-6">
-                <label class="form-label">Nomor Telp Perusahaan</label>
-                <input type="text" class="form-control <?php if (session('errors.no_telp_perusahaan')) : ?>is-invalid<?php endif ?>"
-                    name="no_telp_perusahaan"
-                    value="<?= setFormValue('no_telp_perusahaan', $asesi ?? null) ?>"
-                    placeholder="Masukan Nomor Telpon Perusahaan">
-                <?php if (session('errors.no_telp_perusahaan')) { ?>
-                    <div class="invalid-feedback">
-                        <?= session('errors.no_telp_perusahaan') ?>
-                    </div>
-                <?php } ?>
-            </div>
-        </div>
     </div>
-</div>
-
-<div class="bg-primary text-white text-center py-3 rounded mb-3 shadow-sm">
-    <h4 class="mb-0">Tanda Tangan Asesi</h4>
 </div>
 
 <div class="card">
     <div class="card-body">
-        <div class="row">
-            <!-- Input Tanda Tangan -->
-            <div class="col-12 col-md-6">
-                <div class="form-group">
-                    <label for="">Tanda Tangan</label>
-                    <div class="mb-2 text-muted">Silakan tanda tangani pada area di bawah ini.</div>
-                    <div class="signature-container">
-                        <div class="signature-pad-wrapper">
-                            <canvas id="signature-pad"></canvas>
-                        </div>
-                        <input type="hidden" id="signature-data" name="tanda_tangan" value="<?= isset($asesi['tanda_tangan']) ? $asesi['tanda_tangan'] : '' ?>">
-                        <input type="file" id="signature-upload" accept="image/png, image/jpeg" style="display: none;">
-                        <div class="btn-group mt-2">
-                            <button type="button" id="clear-signature" class="btn btn-danger">Hapus</button>
-                            <button type="button" id="upload-signature" class="btn btn-info">Upload Tanda Tangan</button>
-                        </div>
-
-                        <div id="signature-status"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Preview Tanda Tangan -->
-            <div class="col-12 col-md-6">
-                <?php if (!empty(user()->tanda_tangan) || (isset($asesi['tanda_tangan']) && !empty($asesi['tanda_tangan']))) : ?>
-                    <div class="form-group">
-                        <label for="">Tanda Tangan Saat Ini</label>
-                        <div class="mb-2 text-muted">Tanda tangan yang tersimpan:</div>
-                        <div class="signature-preview">
-                            <?php if (isset($asesi['tanda_tangan']) && !empty($asesi['tanda_tangan'])) : ?>
-                                <img src="<?= get_signature_url($asesi['tanda_tangan']) ?>" alt="Tanda Tangan" class="img-fluid border rounded">
-                            <?php else : ?>
-                                <img src="<?= get_signature_url(user()->tanda_tangan) ?>" alt="Tanda Tangan" class="img-fluid border rounded">
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                <?php endif; ?>
-            </div>
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> Pastikan semua data dengan tanda <span class="text-danger">*</span> terisi dengan benar.
         </div>
-    </div>
-    <div class="card-footer text-right bg-whitesmoke">
-        <?= form_submit('submit', isset($asesi) ? 'Update' : 'Submit', ['class' => 'btn btn-primary']) ?>
+        <div class="d-flex justify-content-between">
+            <a href="<?= current_url() ?>" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Kembali ke Info Akun
+            </a>
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="fas fa-save"></i> <?= $hasAsesiData ? 'Update Profil' : 'Simpan Profil' ?>
+            </button>
+        </div>
     </div>
 </div>
 
 <?= form_close() ?>
 
-
 <?= $this->endSection() ?>
 
 <?= $this->section("js") ?>
 <?= $this->include('components/signature-pad/js-signature'); ?>
-<!-- ===== Script Dynamic Dependent ===== -->
-<!-- ===== Optimized Script Dynamic Dependent ===== -->
+
 <script>
     $(document).ready(function() {
-        // Cache for storing fetched data to avoid redundant requests
+        // Initialize select2 if available
+        if ($.fn.select2) {
+            $('.select2').select2({
+                width: '100%'
+            });
+        }
+
+        // Dependent dropdown logic for location selection
+        const elements = {
+            provinsi: '#id_provinsi',
+            kabupaten: '#id_kabupaten',
+            kecamatan: '#id_kecamatan',
+            desa: '#id_desa'
+        };
+
+        const endpoints = {
+            kabupaten: '<?= base_url('api/kabupaten') ?>',
+            kecamatan: '<?= base_url('api/kecamatan') ?>',
+            desa: '<?= base_url('api/desa') ?>'
+        };
+
+        // Cache for dropdown data
         const dataCache = {
             kabupaten: {},
             kecamatan: {},
             desa: {}
         };
 
+        // Existing values for edit mode
         const existingValues = {
-            kabupaten: <?= json_encode(getDropdownValue('kabupaten', $asesi)) ?>,
-            kecamatan: <?= json_encode(getDropdownValue('kecamatan', $asesi)) ?>,
-            kelurahan: <?= json_encode(getDropdownValue('kelurahan', $asesi)) ?>
+            provinsi: '<?= setFormValue('provinsi', $asesi ?? null) ?>',
+            kabupaten: '<?= setFormValue('kabupaten', $asesi ?? null) ?>',
+            kecamatan: '<?= setFormValue('kecamatan', $asesi ?? null) ?>',
+            kelurahan: '<?= setFormValue('kelurahan', $asesi ?? null) ?>'
         };
-
-        const endpoints = {
-            kabupaten: "<?= base_url('api/kabupaten') ?>",
-            kecamatan: "<?= base_url('api/kecamatan') ?>",
-            desa: "<?= base_url('api/desa') ?>"
-        };
-
-        const elements = {
-            provinsi: "#id_provinsi",
-            kabupaten: "#id_kabupaten",
-            kecamatan: "#id_kecamatan",
-            desa: "#id_desa"
-        };
-
-        const placeholders = {
-            kabupaten: '-- Pilih Kabupaten/Kota --',
-            kecamatan: '-- Pilih Kecamatan --',
-            desa: '-- Pilih Kelurahan/Desa --'
-        };
-
-        // Preload select2 for faster rendering if you're using it
-        $(elements.provinsi).select2({
-            placeholder: "-- Pilih Provinsi --",
-            allowClear: true
-        });
-        $(elements.kabupaten).select2({
-            placeholder: placeholders.kabupaten,
-            allowClear: true
-        });
-        $(elements.kecamatan).select2({
-            placeholder: placeholders.kecamatan,
-            allowClear: true
-        });
-        $(elements.desa).select2({
-            placeholder: placeholders.desa,
-            allowClear: true
-        });
 
         function resetOptions(targets) {
-            targets.forEach(t => {
-                const $el = $(elements[t]);
-                $el.html(`<option value="">${placeholders[t]}</option>`);
-                // Efficiently update select2 if used
-                if ($el.data('select2')) {
-                    $el.val('').trigger('change.select2');
-                } else {
-                    $el.val('');
-                }
+            targets.forEach(target => {
+                $(elements[target]).html('<option value="">-- Pilih ' +
+                    (target === 'kabupaten' ? 'Kabupaten/Kota' :
+                        target === 'kecamatan' ? 'Kecamatan' : 'Kelurahan/Desa') +
+                    ' --</option>').prop('disabled', true);
             });
         }
 
         function loadDropdown(type, parentId, target, nextTrigger = null) {
-            // Check cache first
-            const cacheKey = type + '_' + parentId;
+            const $targetEl = $(elements[target]);
+            const cacheKey = parentId;
+
             if (dataCache[type][cacheKey]) {
                 renderOptions(dataCache[type][cacheKey], target, nextTrigger);
                 return;
             }
 
-            // Show loading indicator
-            const $targetEl = $(elements[target]);
             $targetEl.prop('disabled', true);
 
-            // Prepare data object based on type
+            // Prepare POST data according to controller's expected parameters
             let postData = {};
-            switch (type) {
-                case 'kabupaten':
-                    postData = {
-                        id_provinsi: parentId,
-                        selected_value: existingValues.kabupaten
-                    };
-                    break;
-                case 'kecamatan':
-                    postData = {
-                        id_kabupaten: parentId,
-                        selected_value: existingValues.kecamatan
-                    };
-                    break;
-                case 'desa':
-                    postData = {
-                        id_kecamatan: parentId,
-                        selected_value: existingValues.kelurahan
-                    };
-                    break;
+
+            if (type === 'kabupaten') {
+                postData = {
+                    id_provinsi: parentId,
+                    selected_value: existingValues.kabupaten
+                };
+            } else if (type === 'kecamatan') {
+                postData = {
+                    id_kabupaten: parentId,
+                    selected_value: existingValues.kecamatan
+                };
+            } else if (type === 'desa') {
+                postData = {
+                    id_kecamatan: parentId,
+                    selected_value: existingValues.kelurahan
+                };
             }
 
             $.ajax({
@@ -540,13 +541,13 @@
                 data: postData,
                 dataType: "json",
                 success: function(response) {
-                    // Cache the response
                     dataCache[type][cacheKey] = response;
                     renderOptions(response, target, nextTrigger);
                 },
-                error: function() {
+                error: function(xhr, status, error) {
                     $targetEl.prop('disabled', false);
-                    console.error(`Failed to load ${type} data`);
+                    console.error(`Failed to load ${type} data:`, error);
+                    console.error('Response:', xhr.responseText);
                 }
             });
         }
@@ -556,7 +557,6 @@
             $targetEl.html(response.options);
             $targetEl.prop('disabled', false);
 
-            // Use more efficient trigger method for select2 if used
             if ($targetEl.data('select2')) {
                 $targetEl.trigger('change.select2');
             } else {
@@ -568,7 +568,7 @@
             }
         }
 
-        // Use delegated event handling for better performance
+        // Event handlers
         $(document).on('change', elements.provinsi, function() {
             const id = $(this).val();
             if (!id) return resetOptions(['kabupaten', 'kecamatan', 'desa']);
@@ -590,8 +590,7 @@
             loadDropdown('desa', id, 'desa');
         });
 
-        // Lazy initialization - only trigger the cascade when form is visible
-        // or use IntersectionObserver for modern browsers
+        // Initialize cascade if editing existing data
         if ($(elements.provinsi).is(':visible') && $(elements.provinsi).val()) {
             $(elements.provinsi).trigger('change');
         }

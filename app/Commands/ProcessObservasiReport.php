@@ -3,6 +3,7 @@
 namespace App\Commands;
 
 use CodeIgniter\CLI\BaseCommand;
+use CodeIgniter\CLI\CLI;
 
 class ProcessObservasiReport extends BaseCommand
 {

@@ -2,6 +2,8 @@
 
 namespace App\Events;
 
+use CodeIgniter\Events\Events;
+
 class ObservasiEvents
 {
     public static function onObservasiSaved($observasiData)

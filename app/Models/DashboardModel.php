@@ -8,9 +8,10 @@ class DashboardModel extends Model
 {
 
 
+    // Total asesi (jika ingin hitung semua pengajuan)
     public function total_asesi()
     {
-        return $this->db->table('apl1')->countAll();
+        return $this->db->table('pengajuan_asesmen')->countAll();
     }
     public function total_admin()
     {
@@ -37,10 +38,12 @@ class DashboardModel extends Model
             ->countAllResults();
     }
 
+    // Contoh: get pending APL2 (jika ada relasi ke pengajuan_asesmen)
     public function getAsesorTotalAPL2Pending($assessorId)
     {
         return $this->db->table('apl2')
-            ->where('validasi_apl2', 'pending')
+            ->join('pengajuan_asesmen', 'pengajuan_asesmen.id_pengajuan = apl2.id_pengajuan')
+            ->where('apl2.validasi_apl2', 'pending')
             ->countAllResults();
     }
 
@@ -59,22 +62,17 @@ class DashboardModel extends Model
             ->countAllResults();
     }
 
-    public function getAsesorTotalPersetujuanAsesmen($assessorId)
-    {
-        return $this->db->table('ak')
-            ->where('id_asesor', $assessorId)
-            ->countAllResults();
-    }
-
+    // Contoh: get recent activities (ubah join ke pengajuan_asesmen)
     public function getAsesorRecentActivities($assessorId, $limit = 5)
     {
         $activities = [];
 
         // Recent APL2 validations
         $apl2Activities = $this->db->table('apl2')
-            ->select('apl2.*, apl1.nama_siswa, skema.nama_skema, apl2.updated_at as activity_time')
-            ->join('apl1', 'apl1.id_apl1 = apl2.id_apl1')
-            ->join('skema', 'skema.id_skema = apl1.skema_id')
+            ->select('apl2.*, users.nama_lengkap as nama_asesi, skema.nama_skema, apl2.updated_at as activity_time')
+            ->join('pengajuan_asesmen', 'pengajuan_asesmen.id_pengajuan = apl2.id_pengajuan')
+            ->join('users', 'users.id = pengajuan_asesmen.id_asesi')
+            ->join('skema', 'skema.id_skema = pengajuan_asesmen.id_skema')
             ->where('apl2.validator', $assessorId)
             ->where('apl2.validasi_apl2 !=', 'pending')
             ->orderBy('apl2.updated_at', 'DESC')
@@ -86,7 +84,7 @@ class DashboardModel extends Model
             $activities[] = [
                 'type' => 'apl2_validation',
                 'title' => 'Validasi FR.APL.02',
-                'description' => "Validasi asesmen mandiri {$activity['nama_siswa']} - {$activity['nama_skema']}",
+                'description' => "Validasi asesmen mandiri {$activity['nama_asesi']} - {$activity['nama_skema']}",
                 'status' => $activity['validasi_apl2'],
                 'time' => $activity['activity_time'],
                 'icon' => 'fas fa-clipboard-check',
@@ -96,9 +94,10 @@ class DashboardModel extends Model
 
         // Recent observations
         $observasiActivities = $this->db->table('observasi')
-            ->select('observasi.*, apl1.nama_siswa, skema.nama_skema, observasi.created_at as activity_time')
-            ->join('apl1', 'apl1.id_apl1 = observasi.id_apl1')
-            ->join('skema', 'skema.id_skema = apl1.skema_id')
+            ->select('observasi.*, users.nama_lengkap as nama_asesi, skema.nama_skema, observasi.created_at as activity_time')
+            ->join('pengajuan_asesmen', 'pengajuan_asesmen.id_pengajuan = observasi.id_pengajuan')
+            ->join('users', 'users.id = pengajuan_asesmen.id_asesi')
+            ->join('skema', 'skema.id_skema = pengajuan_asesmen.id_skema')
             ->where('observasi.id_asesor', $assessorId)
             ->orderBy('observasi.created_at', 'DESC')
             ->limit($limit)
@@ -109,7 +108,7 @@ class DashboardModel extends Model
             $activities[] = [
                 'type' => 'observasi',
                 'title' => 'Ceklist Observasi',
-                'description' => "Observasi {$activity['nama_siswa']} - {$activity['nama_skema']}",
+                'description' => "Observasi {$activity['nama_asesi']} - {$activity['nama_skema']}",
                 'status' => 'completed',
                 'time' => $activity['activity_time'],
                 'icon' => 'fas fa-eye',
@@ -160,7 +159,7 @@ class DashboardModel extends Model
     {
         return $this->db->table('asesmen')
             ->select('asesmen.*, skema.nama_skema, asesmen.tanggal, asesmen.waktu')
-            ->join('skema', 'skema.id_skema = asesmen.skema_id')
+            ->join('skema', 'skema.id_skema = asesmen.id_skema')
             ->where('asesmen.tanggal >=', date('Y-m-d'))
             ->orderBy('asesmen.tanggal', 'ASC')
             ->orderBy('asesmen.waktu', 'ASC')
