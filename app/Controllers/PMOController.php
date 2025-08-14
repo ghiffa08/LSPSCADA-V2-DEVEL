@@ -33,17 +33,17 @@ class PMOController extends BaseController
      */
     public function pdf(): void
     {
-        try {
-            $data = [
-                'jenisSertifikasiFormatted' => $this->formatterService->formatJenisSertifikasi($dataAPL1['asesmen']['jenis_skema']),
-            ];
-            // Generate PDF with the prepared data
-            $this->generatePdf($data);
-        } catch (\Exception $e) {
-            log_message('error', 'Error generating PDF: ' . $e->getMessage());
-            // Redirect with error message or handle error appropriately
-            return;
-        }
+        // try {
+        $data = [
+            'jenisSertifikasiFormatted' => '',
+        ];
+        // Generate PDF with the prepared data
+        $this->generatePdf($data);
+        // } catch (\Exception $e) {
+        //     log_message('error', 'Error generating PDF: ' . $e->getMessage());
+        //     // Redirect with error message or handle error appropriately
+        //     return;
+        // }
     }
 
     /**

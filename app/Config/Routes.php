@@ -214,22 +214,14 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->post('save', 'Api\FeedbackAsesi::save');
         });
 
-        // Rekaman Asesmen
+        // PERBAIKAN: Rekaman Asesmen routes
         $routes->group('rekaman-asesmen', function ($routes) {
-            $routes->get('/', 'RekamanAsesmenController::create');
-            $routes->post('store', 'RekamanAsesmenController::store');
-            $routes->get('loadRekamanAsesmen', 'RekamanAsesmenController::loadRekamanAsesmen');
-            $routes->get('getSkemaDetails', 'RekamanAsesmenController::getSkemaDetails');
-            $routes->get('pdf/(:num)', 'RekamanAsesmenController::pdf/$1');
-            $routes->delete('(:num)', 'RekamanAsesmenController::delete/$1');
+            $routes->get('/', 'RekamanAsesmenController::index');
+            $routes->get('create', 'RekamanAsesmenController::create');
             $routes->get('getAsesiByAsesmen', 'RekamanAsesmenController::getAsesiByAsesmen');
-
-            // AJAX Auto-save endpoints
-            $routes->post('saveMethod', 'RekamanAsesmenController::saveMethod');
-            $routes->post('saveKeterangan', 'RekamanAsesmenController::saveKeterangan');
-            $routes->post('saveGeneral', 'RekamanAsesmenController::saveGeneral');
-            $routes->post('saveBulkMethods', 'RekamanAsesmenController::saveBulkMethods');
-            $routes->post('complete', 'RekamanAsesmenController::complete');
+            $routes->get('loadRekamanAsesmen', 'RekamanAsesmenController::loadRekamanAsesmen');
+            $routes->post('store', 'RekamanAsesmenController::store'); // PERBAIKAN: Tambahkan ini
+            $routes->get('pdf/(:num)', 'RekamanAsesmenController::pdf/$1');
         });
     });
 

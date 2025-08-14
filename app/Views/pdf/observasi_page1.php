@@ -85,7 +85,7 @@
         <tr>
             <td colspan="2">TUK</td>
             <td>:</td>
-            <td><?= esc($observasi['nama_tuk'] ?? '-') ?></td>
+            <td><?= esc($observasi['jenis_tuk'] ?? '-') ?> - <?= esc($observasi['nama_tuk'] ?? '-') ?></td>
         </tr>
         <tr>
             <td colspan="2">Nama Asesor</td>
@@ -100,9 +100,7 @@
         <tr>
             <td colspan="2">Tanggal</td>
             <td>:</td>
-            <td><?= isset($observasi['tanggal_observasi']) ?
-                    esc(format_tanggal_indonesia(date('Y-m-d', strtotime($observasi['tanggal_observasi'])))) :
-                    '-' ?>
+            <td><?= isset($observasi['tanggal_asesmen']) ? esc(date('d/m/Y', strtotime($observasi['tanggal_asesmen']))) : esc(date('d/m/Y', strtotime($observasi['tanggal_observasi']))) ?>
             </td>
         </tr>
     </table>

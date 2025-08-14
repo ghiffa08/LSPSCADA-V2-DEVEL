@@ -1,7 +1,7 @@
 <?= $this->extend("layouts/admin/layout-admin"); ?>
 <?= $this->section("content"); ?>
 
-<!-- Informasi Asesor & Skema -->
+<!-- Informasi Asesor & Skema - SAMA SEPERTI OBSERVASI -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="alert alert-info border-left-info">
@@ -42,7 +42,7 @@
     </div>
 </div>
 
-<!-- Error Message Display (Tambahkan jika belum ada) -->
+<!-- Error Message Display -->
 <?php if (isset($error_message)): ?>
     <div class="row mb-4">
         <div class="col-12">
@@ -76,13 +76,14 @@
                             <li>Pilih asesi yang akan direkam asesmen kompetensinya.</li>
                             <li>Tandai metode asesmen yang digunakan untuk setiap unit kompetensi.</li>
                             <li>Berikan rekomendasi hasil asesmen dan catatan.</li>
+                            <li>Pengisian akan disimpan secara otomatis saat Anda melakukan perubahan.</li>
                         </ul>
                     </div>
                 </div>
             </div>
 
             <div class="card-body">
-                <!-- Pilih Asesmen (SAMA SEPERTI OBSERVASI) -->
+                <!-- Pilih Asesmen - SAMA SEPERTI OBSERVASI -->
                 <div class="row mb-4">
                     <div class="col-md-6">
                         <div class="form-group">
@@ -116,7 +117,7 @@
                     </div>
                 </div>
 
-                <!-- Pilih Asesi (SAMA SEPERTI OBSERVASI) -->
+                <!-- Pilih Asesi - SAMA SEPERTI OBSERVASI -->
                 <div class="row mb-4">
                     <div class="col-md-6">
                         <div class="form-group">
@@ -134,7 +135,7 @@
                     </div>
                 </div>
 
-                <!-- Progress Bar (SAMA SEPERTI OBSERVASI) -->
+                <!-- Progress Bar - SAMA SEPERTI OBSERVASI -->
                 <div id="progress-container" class="card mb-4 border-left-primary">
                     <div class="card-body py-3">
                         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -209,12 +210,12 @@
                         </div>
                     </div>
 
-                    <!-- Rekaman Asesmen Container (HANYA UNTUK TABEL UNIT) -->
+                    <!-- Rekaman Asesmen Container -->
                     <div id="rekamanAsesmenContainer">
                         <!-- Dynamic content will be loaded here -->
                     </div>
 
-                    <!-- PERBAIKAN: Rekomendasi dan Catatan - TETAP DI TEMPLATE, JANGAN DI-GENERATE JS -->
+                    <!-- Rekomendasi dan Catatan -->
                     <div class="card mt-4">
                         <div class="card-header">
                             <h6 class="mb-0 font-weight-bold">
@@ -238,15 +239,15 @@
                                 <div class="col-md-6">
                                     <div class="form-group">
                                         <label class="font-weight-bold">Tindak Lanjut yang Dibutuhkan</label>
-                                        <textarea class="form-control" id="tindak_lanjut" name="tindak_lanjut" rows="2" 
-                                                  placeholder="Pekerjaan tambahan dan asesmen yang diperlukan untuk mencapai kompetensi"></textarea>
+                                        <textarea class="form-control" id="tindak_lanjut" name="tindak_lanjut" rows="2"
+                                            placeholder="Pekerjaan tambahan dan asesmen yang diperlukan untuk mencapai kompetensi"></textarea>
                                     </div>
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label class="font-weight-bold">Komentar/Observasi oleh Asesor</label>
-                                <textarea class="form-control" id="catatan" name="catatan" rows="3" 
-                                          placeholder="Komentar tambahan (opsional)"></textarea>
+                                <textarea class="form-control" id="catatan" name="catatan" rows="3"
+                                    placeholder="Komentar tambahan (opsional)"></textarea>
                             </div>
                         </div>
                     </div>

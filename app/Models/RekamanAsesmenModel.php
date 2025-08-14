@@ -69,21 +69,23 @@ class RekamanAsesmenModel extends Model
                 return null;
             }
 
-            // PERBAIKAN: Get pengajuan data menggunakan id_pengajuan
+            // PERBAIKAN: Get pengajuan data dengan relasi yang benar ke asesmen
             $pengajuan = $this->db->table('pengajuan_asesmen pa')
                 ->select('
                     pa.id_pengajuan,
                     pa.id_asesi,
-                    pa.id_skema,
+                    pa.id_asesmen,
                     a.nik,
                     u.nama_lengkap as nama_asesi,
+                    asm.id_skema,
                     s.nama_skema,
                     s.kode_skema
                 ')
                 ->join('asesi a', 'a.id_asesi = pa.id_asesi', 'left')
                 ->join('users u', 'u.id = a.id_user', 'left')
-                ->join('skema s', 's.id_skema = pa.id_skema', 'left')
-                ->where('pa.id_pengajuan', $rekaman['id_pengajuan']) // UBAH: dari id_apl1 ke id_pengajuan
+                ->join('asesmen asm', 'asm.id_asesmen = pa.id_asesmen', 'left') // JOIN ke asesmen untuk id_skema
+                ->join('skema s', 's.id_skema = asm.id_skema', 'left')
+                ->where('pa.id_pengajuan', $rekaman['id_pengajuan'])
                 ->get()
                 ->getRowArray();
 
@@ -146,11 +148,12 @@ class RekamanAsesmenModel extends Model
                     s.nama_skema,
                     s.kode_skema
                 ')
-                ->join('pengajuan_asesmen pa', 'pa.id_pengajuan = ra.id_pengajuan', 'left') // UBAH: relasi ke id_pengajuan
+                ->join('pengajuan_asesmen pa', 'pa.id_pengajuan = ra.id_pengajuan', 'left')
                 ->join('asesi a', 'a.id_asesi = pa.id_asesi', 'left')
                 ->join('users u', 'u.id = a.id_user', 'left')
-                ->join('skema s', 's.id_skema = pa.id_skema', 'left')
-                ->join('asesor_asesmen aa', 'aa.id_asesmen = pa.id_asesmen', 'left')
+                ->join('asesmen asm', 'asm.id_asesmen = pa.id_asesmen', 'left') // JOIN ke asesmen untuk akses id_skema
+                ->join('skema s', 's.id_skema = asm.id_skema', 'left')
+                ->join('asesor_asesmen aa', 'aa.id_asesmen = asm.id_asesmen', 'left')
                 ->where('aa.id_asesor', $id_asesor)
                 ->where('ra.deleted_at', null)
                 ->orderBy('ra.created_at', 'DESC')

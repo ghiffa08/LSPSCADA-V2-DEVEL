@@ -2,19 +2,27 @@
     $(document).ready(function() {
         'use strict';
 
-        // Configuration
+        // Initialize select2
+        $('.select2').select2({
+            placeholder: "Pilih...",
+            allowClear: true,
+            width: '100%'
+        });
+
+        // Configuration - PERBAIKAN: URL endpoints yang benar
         const config = {
             baseUrl: '<?= base_url() ?>',
             endpoints: {
                 getAsesi: 'asesor/rekaman-asesmen/getAsesiByAsesmen',
                 loadRekaman: 'asesor/rekaman-asesmen/loadRekamanAsesmen',
-                store: 'asesor/rekaman-asesmen/store'
+                store: 'asesor/rekaman-asesmen/store', // PERBAIKAN: Endpoint store
+                saveSettings: 'asesor/rekaman-asesmen/store',
+                saveMethod: 'asesor/rekaman-asesmen/store',
+                saveBatch: 'asesor/rekaman-asesmen/store',
+                saveRecommendation: 'asesor/rekaman-asesmen/store',
+                saveComplete: 'asesor/rekaman-asesmen/store'
             }
         };
-
-        // CSRF Token
-        let csrf_token = '<?= csrf_token() ?>';
-        let csrf_hash = '<?= csrf_hash() ?>';
 
         // State management
         const state = {
@@ -22,23 +30,49 @@
             selectedAsesi: null,
             selectedPengajuan: null,
             totalUnits: 0,
-            assessedUnits: 0
+            assessedUnits: 0,
+            id_rekaman: null,
+            isProcessing: false,
+            csrfHash: '<?= csrf_hash() ?>'
+        };
+
+        // PERBAIKAN: Define updateProgress as global function
+        window.updateProgress = function() {
+            updateUnitStatus();
+
+            const percentage = state.totalUnits > 0 ? (state.assessedUnits / state.totalUnits) * 100 : 0;
+
+            $('#progress-text').text(Math.round(percentage) + '%');
+            $('#progress-bar').css('width', percentage + '%');
+
+            if (state.assessedUnits === 0) {
+                $('#data-status').html('<i class="fas fa-hourglass-start text-warning"></i> Belum ada data');
+            } else if (state.assessedUnits === state.totalUnits) {
+                $('#data-status').html('<i class="fas fa-check-circle text-success"></i> Semua unit terisi');
+            } else {
+                $('#data-status').html(`<i class="fas fa-clock text-info"></i> ${state.assessedUnits}/${state.totalUnits} unit terisi`);
+            }
         };
 
         // Initialize
         function init() {
             bindEvents();
+            initializePageState();
         }
 
         // Bind event handlers
         function bindEvents() {
             // Asesmen selection
             $('#id_asesmen').on('change', function() {
-                const asesmenId = $(this).val();
-                state.selectedAsesmen = asesmenId;
+                const selectedOption = $(this).find('option:selected');
+                state.selectedAsesmen = $(this).val();
 
-                if (asesmenId) {
-                    loadAsesiOptions(asesmenId);
+                $('#form_id_skema').val(selectedOption.data('id-skema'));
+                $('#form_id_asesmen').val(state.selectedAsesmen);
+                $('#kode_skema').val(selectedOption.data('kode-skema') || '');
+
+                if (state.selectedAsesmen) {
+                    loadAsesiOptions(state.selectedAsesmen);
                 } else {
                     resetAsesiSelection();
                 }
@@ -53,7 +87,8 @@
                 const pengajuanId = selectedOption.data('id-pengajuan');
                 state.selectedPengajuan = pengajuanId;
 
-                console.log('Asesi changed - asesiId:', asesiId, 'pengajuanId:', pengajuanId);
+                $('#form_id_asesi').val(asesiId);
+                $('#form_id_pengajuan').val(pengajuanId);
 
                 if (asesiId && pengajuanId && state.selectedAsesmen) {
                     loadRekamanData();
@@ -63,75 +98,84 @@
                 }
             });
 
+            // Tanggal asesmen change - AUTO SAVE
+            $('#tanggal_asesmen').on('change', function() {
+                $('#form_tanggal_asesmen').val($(this).val());
+                saveSettings();
+            });
+
             // Form submission
             $('#formRekamanAsesmen').on('submit', function(e) {
                 e.preventDefault();
-                saveRekamanAsesmen();
+                saveCompleteRekaman();
             });
 
             // Bulk actions
             $('#checkAllMethods').on('click', function() {
-                $('input[type="checkbox"]').prop('checked', true).trigger('change');
-                updateProgress();
+                handleBulkCheck(true);
             });
 
             $('#uncheckAllMethods').on('click', function() {
-                $('input[type="checkbox"]').prop('checked', false).trigger('change');
-                updateProgress();
+                handleBulkCheck(false);
             });
+
+            // Event delegation untuk checkbox yang akan dibuat dinamis - AUTO SAVE
+            $(document).on('change', 'input[type="checkbox"][name^="kompetensi"]', function() {
+                const $checkbox = $(this);
+                const unitId = $checkbox.data('unit-id') || $checkbox.attr('name').match(/\[(\d+)\]/)[1];
+                const method = $checkbox.data('method') || $checkbox.attr('name').match(/\[([^\]]+)\]$/)[1];
+                const isChecked = $checkbox.is(':checked');
+
+                console.log(`Checkbox changed: Unit ${unitId}, Method ${method}, Checked ${isChecked}`); // Debug log
+
+                // Auto save single method
+                saveSingleMethod(unitId, method, isChecked);
+
+                window.updateProgress();
+            });
+
+            // Event delegation untuk textarea rekomendasi - AUTO SAVE dengan debounce
+            $(document).on('change', '#rekomendasi', function() {
+                saveRecommendation();
+            });
+
+            $(document).on('input', '#tindak_lanjut, #catatan', debounce(function() {
+                saveRecommendation();
+            }, 1000));
         }
 
-        // PERBAIKAN: Load asesi options
+        // Load asesi options
         function loadAsesiOptions(asesmenId) {
             $('#id_asesi').prop('disabled', true).html('<option value="">Loading...</option>');
             hideEmptyDataMessage();
 
             $.ajax({
-                url: `${config.baseUrl}/${config.endpoints.getAsesi}`,
+                url: `${config.baseUrl}/${config.endpoints.getAsesi}`, // PERBAIKAN: URL yang benar
                 type: 'GET',
                 data: {
                     id_asesmen: asesmenId
                 },
                 dataType: 'json',
                 success: function(response) {
-                    console.log('getAsesiByAsesmen:', response);
-
-                    // PERBAIKAN: Check response structure yang benar
-                    if (response.success && response.asesi && Array.isArray(response.asesi)) {
+                    if (response.success && response.asesi && response.asesi.length > 0) {
                         let options = '<option value="">-- Pilih Asesi --</option>';
-
-                        if (response.asesi.length > 0) {
-                            response.asesi.forEach(function(asesi) {
-                                // PERBAIKAN: Pastikan semua field tersedia
-                                const pengajuanId = asesi.id_pengajuan;
-                                const namaAsesi = asesi.nama_asesi || asesi.nama_lengkap;
-                                const username = asesi.username || asesi.nik;
-                                const displayText = `${namaAsesi} (${username})`;
-
-                                // VALIDASI: Pastikan pengajuanId ada
-                                if (pengajuanId) {
-                                    options += `<option value="${asesi.id_asesi}" data-id-pengajuan="${pengajuanId}">${displayText}</option>`;
-                                } else {
-                                    console.warn('Missing pengajuan ID for asesi:', asesi);
-                                }
-                            });
-
-                            $('#id_asesi').html(options).prop('disabled', false);
-                            hideEmptyDataMessage();
-                            showInitialInstructions();
-                        } else {
-                            $('#id_asesi').html('<option value="">-- Tidak ada asesi --</option>');
-                            showEmptyDataMessage();
-                        }
+                        response.asesi.forEach(function(asesi) {
+                            const displayName = asesi.nama_lengkap || asesi.nama_asesi || asesi.nama || 'Nama tidak tersedia';
+                            const nik = asesi.nik || 'NIK tidak tersedia';
+                            options += `<option value="${asesi.id_asesi}" data-id-pengajuan="${asesi.id_pengajuan}">${displayName} (${nik})</option>`;
+                        });
+                        $('#id_asesi').html(options).prop('disabled', false);
+                        hideEmptyDataMessage();
                     } else {
-                        console.error('Invalid response structure:', response);
-                        $('#id_asesi').html('<option value="">-- Error loading data --</option>');
-                        showError('Gagal memuat data asesi: ' + (response.message || 'Format response tidak valid'));
+                        $('#id_asesi').html('<option value="">-- Belum Ada Asesi Terdaftar --</option>').prop('disabled', true);
+                        showEmptyDataMessage();
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('Error loading asesi:', error);
-                    $('#id_asesi').html('<option value="">-- Error loading --</option>');
+                    console.error('XHR status:', xhr.status);
+                    console.error('Response text:', xhr.responseText);
+                    $('#id_asesi').html('<option value="">-- Error memuat data --</option>').prop('disabled', true);
                     showError('Gagal memuat data asesi: ' + error);
                 }
             });
@@ -147,29 +191,19 @@
                 return;
             }
 
-            console.log('Loading rekaman data with:', {
-                asesmen: state.selectedAsesmen,
-                asesi: state.selectedAsesi,
-                pengajuan: state.selectedPengajuan
-            });
-
-            // Set hidden form fields
-            $('#form_id_asesmen').val(state.selectedAsesmen);
-            $('#form_id_asesi').val(state.selectedAsesi);
-            $('#form_id_pengajuan').val(state.selectedPengajuan);
-            $('#form_tanggal_asesmen').val($('#tanggal_asesmen').val());
-
-            // Get skema data from asesmen selection
+            // PERBAIKAN: Get skema data dari asesmen selection
             const skemaData = $('#id_asesmen option:selected');
-            $('#form_id_skema').val(skemaData.data('id-skema'));
+            const id_skema = skemaData.data('id-skema');
 
+            // PERBAIKAN: URL yang benar dengan parameter yang diperlukan
             $.ajax({
                 url: `${config.baseUrl}/${config.endpoints.loadRekaman}`,
                 type: 'GET',
                 data: {
-                    id_skema: skemaData.data('id-skema'),
+                    id_skema: id_skema,
                     id_asesmen: state.selectedAsesmen,
-                    id_asesi: state.selectedAsesi
+                    id_asesi: state.selectedAsesi,
+                    id_pengajuan: state.selectedPengajuan
                 },
                 dataType: 'json',
                 success: function(response) {
@@ -178,7 +212,11 @@
                     if (response.success) {
                         renderRekamanForm(response);
                         showRekamanForm();
-                        updateProgress();
+
+                        // Initialize settings save after loading data
+                        saveSettings();
+
+                        window.updateProgress();
                     } else {
                         showError(response.message || 'Gagal memuat data rekaman');
                     }
@@ -186,17 +224,22 @@
                 error: function(xhr, status, error) {
                     hideLoading();
                     console.error('Error loading rekaman:', error);
+                    console.error('XHR status:', xhr.status);
+                    console.error('Response text:', xhr.responseText);
                     showError('Gagal memuat data rekaman: ' + error);
                 }
             });
         }
 
-        // Render rekaman form
+        // Render rekaman form - PERBAIKAN: Handle existing data dengan benar
         function renderRekamanForm(data) {
             const container = $('#rekamanAsesmenContainer');
             let html = '';
 
             state.totalUnits = data.totalUnits || 0;
+
+            console.log('Rendering form with data:', data); // Debug log
+            console.log('Existing data:', data.existing_data); // Debug log
 
             if (data.rekaman_asesmen && data.rekaman_asesmen.length > 0) {
                 html = '<div class="table-responsive">';
@@ -217,17 +260,25 @@
 
                 data.rekaman_asesmen.forEach(function(unit) {
                     const unitId = unit.id_unit;
+                    // PERBAIKAN: Handle existing data dengan key yang benar
                     const existingData = data.existing_data && data.existing_data[unitId] ? data.existing_data[unitId] : {};
+
+                    console.log(`Unit ${unitId} existing data:`, existingData); // Debug log
 
                     html += `<tr data-unit-id="${unitId}">`;
                     html += `<td><strong>${unit.kode_unit}</strong><br><small>${unit.nama_unit}</small></td>`;
 
-                    // Method checkboxes
+                    // Method checkboxes - PERBAIKAN: Periksa nilai dengan benar
                     const methods = ['observasi', 'portofolio', 'pihak_ketiga', 'lisan', 'tertulis', 'proyek', 'lainnya'];
                     methods.forEach(function(method) {
-                        const checked = existingData[method] ? 'checked' : '';
+                        // PERBAIKAN: Periksa nilai dengan tepat (1 = checked, 0 atau undefined = unchecked)
+                        const isChecked = existingData[method] === 1;
+                        const checked = isChecked ? 'checked' : '';
+
+                        console.log(`Unit ${unitId}, Method ${method}: value=${existingData[method]}, checked=${checked}`); // Debug log
+
                         html += `<td class="text-center">`;
-                        html += `<input type="checkbox" name="kompetensi[${unitId}][${method}]" value="1" ${checked} onchange="updateProgress()">`;
+                        html += `<input type="checkbox" name="kompetensi[${unitId}][${method}]" value="1" ${checked} data-unit-id="${unitId}" data-method="${method}">`;
                         html += `</td>`;
                     });
 
@@ -248,81 +299,245 @@
 
             container.html(html);
 
-            // PERBAIKAN: Populate rekomendasi section yang sudah ada di template HTML
-            // Jangan buat baru, tapi isi yang sudah ada
+            // PERBAIKAN: Populate rekomendasi section dengan data yang benar
             if (data.existing_recommendation) {
                 $('#rekomendasi').val(data.existing_recommendation.rekomendasi || '');
                 $('#tindak_lanjut').val(data.existing_recommendation.tindak_lanjut || '');
-                $('#catatan').val(data.existing_recommendation.catatan || '');
+                $('#catatan').val(data.existing_recommendation.komentar || '');
             }
 
             updateUnitStatus();
+        }
+
+        // AUTO SAVE: Save settings
+        async function saveSettings() {
+            if (!state.selectedPengajuan) {
+                return;
+            }
+
+            const data = {
+                save_type: 'settings',
+                id_pengajuan: state.selectedPengajuan,
+                tanggal_asesmen: $('#tanggal_asesmen').val(),
+                [state.csrfName]: state.csrfHash
+            };
+
+            try {
+                const response = await $.ajax({
+                    url: `${config.baseUrl}/${config.endpoints.store}`, // PERBAIKAN: URL yang benar
+                    type: 'POST',
+                    data: data,
+                    dataType: 'json'
+                });
+
+                if (response.success) {
+                    if (response.data && response.data.id_rekaman) {
+                        state.id_rekaman = response.data.id_rekaman;
+                    }
+                    if (response.csrf_hash) state.csrfHash = response.csrf_hash;
+                } else {
+                    console.error('Save settings failed:', response.message);
+                }
+            } catch (error) {
+                console.error('Error saving settings:', error);
+            }
+        }
+
+        // AUTO SAVE: Save single method - PERBAIKAN: URL dan data yang benar
+        async function saveSingleMethod(unitId, method, value) {
+            if (!state.selectedPengajuan) {
+                return;
+            }
+
+            console.log(`Saving single method: Unit ${unitId}, Method ${method}, Value ${value}`);
+
+            const data = {
+                save_type: 'method',
+                id_pengajuan: state.selectedPengajuan,
+                id_unit: unitId,
+                method: method,
+                value: value ? 1 : 0,
+                [state.csrfName]: state.csrfHash
+            };
+
+            try {
+                const response = await $.ajax({
+                    url: `${config.baseUrl}/${config.endpoints.store}`, // PERBAIKAN: URL yang benar
+                    type: 'POST',
+                    data: data,
+                    dataType: 'json'
+                });
+
+                console.log('Save single method response:', response);
+
+                if (response.success) {
+                    console.log(`Successfully saved: Unit ${unitId}, Method ${method}, Value ${data.value}`);
+                    if (response.csrf_hash) state.csrfHash = response.csrf_hash;
+                } else {
+                    console.error('Failed to save single method:', response.message);
+                }
+            } catch (error) {
+                console.error('Error saving method:', error);
+                console.error('XHR status:', error.status);
+                console.error('Response text:', error.responseText);
+            }
+        }
+
+        // AUTO SAVE: Save recommendation - PERBAIKAN: URL yang benar
+        async function saveRecommendation() {
+            if (!state.selectedPengajuan) {
+                return;
+            }
+
+            const data = {
+                save_type: 'recommendation',
+                id_pengajuan: state.selectedPengajuan,
+                rekomendasi: $('#rekomendasi').val(),
+                komentar: $('#catatan').val(),
+                tindak_lanjut: $('#tindak_lanjut').val(),
+                [state.csrfName]: state.csrfHash
+            };
+
+            try {
+                const response = await $.ajax({
+                    url: `${config.baseUrl}/${config.endpoints.store}`, // PERBAIKAN: URL yang benar
+                    type: 'POST',
+                    data: data,
+                    dataType: 'json'
+                });
+
+                if (response.csrf_hash) state.csrfHash = response.csrf_hash;
+            } catch (error) {
+                console.error('Error saving recommendation:', error);
+            }
+        }
+
+        // Bulk check handler - PERBAIKAN: URL yang benar
+        async function handleBulkCheck(checkState) {
+            const $btn = $(checkState ? '#checkAllMethods' : '#uncheckAllMethods');
+            const originalBtnText = $btn.html();
+
+            $btn.html('<i class="fas fa-spinner fa-spin"></i> Memproses...').attr('disabled', true);
+
+            // Ensure settings are saved first
+            if (!state.id_rekaman) {
+                await saveSettings();
+                if (!state.id_rekaman) {
+                    showError('Gagal menyimpan pengaturan rekaman');
+                    $btn.html(originalBtnText).attr('disabled', false);
+                    return;
+                }
+            }
+
+            const $checkboxes = $('input[type="checkbox"][name^="kompetensi"]');
+            $checkboxes.prop('checked', checkState);
+            window.updateProgress();
+
+            const batchData = {
+                save_type: 'batch',
+                id_pengajuan: state.selectedPengajuan,
+                items: {}
+            };
+
+            $checkboxes.each(function() {
+                const name = $(this).attr('name');
+                const unitMatch = name.match(/\[(\d+)\]/);
+                const methodMatch = name.match(/\[([^\]]+)\]$/);
+
+                if (unitMatch && methodMatch) {
+                    const unitId = unitMatch[1];
+                    const method = methodMatch[1];
+
+                    if (!batchData.items[unitId]) {
+                        batchData.items[unitId] = {};
+                    }
+
+                    if (checkState) {
+                        batchData.items[unitId][method] = 1;
+                    }
+                }
+            });
+
+            // Add CSRF token
+            batchData[state.csrfName] = state.csrfHash;
+
+            try {
+                const response = await $.ajax({
+                    url: `${config.baseUrl}/${config.endpoints.store}`, // PERBAIKAN: URL yang benar
+                    type: 'POST',
+                    data: JSON.stringify(batchData),
+                    contentType: 'application/json',
+                    dataType: 'json'
+                });
+
+                if (response.success) {
+                    showSuccess(response.message);
+                    if (response.csrf_hash) state.csrfHash = response.csrf_hash;
+                } else {
+                    showError(response.message || 'Gagal menyimpan data batch');
+                }
+            } catch (error) {
+                console.error('Batch save error:', error);
+                showError('Terjadi kesalahan saat menyimpan data batch');
+            } finally {
+                $btn.html(originalBtnText).attr('disabled', false);
+            }
         }
 
         // Save complete rekaman
-        function saveRekamanAsesmen() {
-            const idPengajuan = $('#form_id_pengajuan').val();
+        function saveCompleteRekaman() {
             const rekomendasi = $('#rekomendasi').val();
 
-            console.log('Form validation - id_pengajuan:', idPengajuan, 'rekomendasi:', rekomendasi);
-
-            if (!idPengajuan) {
-                showError('ID Pengajuan tidak valid. Silakan pilih ulang asesi.');
-                return;
-            }
-
             if (!rekomendasi) {
-                showError('Rekomendasi wajib diisi.');
+                showError('Rekomendasi wajib diisi sebelum menyelesaikan rekaman.');
                 return;
             }
 
-            const formData = new FormData($('#formRekamanAsesmen')[0]);
-            formData.set('id_pengajuan', idPengajuan);
+            Swal.fire({
+                title: 'Konfirmasi',
+                text: 'Apakah Anda yakin ingin menyelesaikan rekaman asesmen ini?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, Selesaikan',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Final save with completion status
+                    const data = {
+                        save_type: 'recommendation',
+                        id_pengajuan: state.selectedPengajuan,
+                        rekomendasi: $('#rekomendasi').val(),
+                        komentar: $('#catatan').val(),
+                        tindak_lanjut: $('#tindak_lanjut').val(),
+                        status: 'completed'
+                    };
 
-            // Debug: Log form data
-            console.log('Form submission data:');
-            for (let [key, value] of formData.entries()) {
-                console.log(key, ':', value);
-            }
-
-            $.ajax({
-                url: `${config.baseUrl}/${config.endpoints.store}`,
-                type: 'POST',
-                data: formData,
-                processData: false,
-                contentType: false,
-                dataType: 'json',
-                success: function(response) {
-                    if (response.status === 'success') {
-                        showSuccess(response.message || 'Rekaman asesmen berhasil disimpan');
-                        // Optionally reload data or redirect
-                    } else {
-                        showError(response.message || 'Gagal menyimpan rekaman');
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error saving rekaman:', error);
-                    showError('Terjadi kesalahan saat menyimpan: ' + error);
+                    $.ajax({
+                        url: `${config.baseUrl}/${config.endpoints.store}`,
+                        type: 'POST',
+                        data: data,
+                        dataType: 'json',
+                        success: function(response) {
+                            if (response.success) {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Berhasil!',
+                                    text: 'Rekaman asesmen telah diselesaikan',
+                                    confirmButtonText: 'OK'
+                                }).then(() => {
+                                    // Redirect or refresh
+                                    window.location.href = config.baseUrl + '/asesor/rekaman-asesmen';
+                                });
+                            } else {
+                                showError(response.message);
+                            }
+                        },
+                        error: function() {
+                            showError('Terjadi kesalahan saat menyelesaikan rekaman');
+                        }
+                    });
                 }
             });
-        }
-
-        // Update progress
-        function updateProgress() {
-            updateUnitStatus();
-
-            const percentage = state.totalUnits > 0 ? (state.assessedUnits / state.totalUnits) * 100 : 0;
-
-            $('#progress-text').text(Math.round(percentage) + '%');
-            $('#progress-bar').css('width', percentage + '%');
-
-            if (state.assessedUnits === 0) {
-                $('#data-status').html('<i class="fas fa-hourglass-start text-warning"></i> Belum ada data');
-            } else if (state.assessedUnits === state.totalUnits) {
-                $('#data-status').html('<i class="fas fa-check-circle text-success"></i> Semua unit terisi');
-            } else {
-                $('#data-status').html(`<i class="fas fa-clock text-info"></i> ${state.assessedUnits}/${state.totalUnits} unit terisi`);
-            }
         }
 
         // Update unit status
@@ -342,8 +557,9 @@
             $('#id_asesi').html('<option value="">-- Pilih Asesmen Terlebih Dahulu --</option>').prop('disabled', true);
             state.selectedAsesi = null;
             state.selectedPengajuan = null;
+            state.id_rekaman = null;
             hideRekamanForm();
-            hideEmptyDataMessage(); // TAMBAH: Hide empty message
+            hideEmptyDataMessage();
             showInitialInstructions();
         }
 
@@ -383,17 +599,30 @@
             $('#emptyDataMessage').hide();
         }
 
+        function initializePageState() {
+            $('#loadingState').hide();
+            $('#formRekamanAsesmen').hide();
+            $('#emptyDataMessage').hide();
+            $('#initialInstructions').show();
+
+            if (!$('#id_asesmen').val()) {
+                $('#id_asesi').html('<option value="">-- Pilih Asesmen Terlebih Dahulu --</option>').prop('disabled', true);
+            }
+        }
+
         function showSuccess(message) {
             if (typeof Swal !== 'undefined') {
                 Swal.fire({
                     icon: 'success',
                     title: 'Berhasil!',
                     text: message,
-                    timer: 3000,
-                    showConfirmButton: false
+                    timer: 2000,
+                    showConfirmButton: false,
+                    position: 'top-end',
+                    toast: true
                 });
             } else {
-                alert('Berhasil: ' + message);
+                console.log('Success: ' + message);
             }
         }
 
@@ -407,6 +636,19 @@
             } else {
                 alert('Error: ' + message);
             }
+        }
+
+        // Debounce function for auto-save
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
         }
 
         // Initialize the module

@@ -196,7 +196,9 @@ class CeklistObservasiController extends ResourceController
             }
 
             $data = $result['data'];
-            
+
+            // dd($data);
+
             // Validasi data yang diperlukan untuk PDF
             if (empty($data['observasi'])) {
                 throw new \Exception('Data observasi kosong');
@@ -226,14 +228,13 @@ class CeklistObservasiController extends ResourceController
 
             // Generate PDF dengan data yang sudah diperbaiki
             $this->generatePdf($data);
-
         } catch (\Exception $e) {
             log_message('error', 'CeklistObservasiController PDF Error: ' . $e->getMessage());
             log_message('error', 'Stack trace: ' . $e->getTraceAsString());
-            
+
             // PERBAIKAN: Set flash message dan redirect tanpa return
             session()->setFlashdata('error', 'Gagal generate PDF: ' . $e->getMessage());
-            
+
             // Redirect ke halaman sebelumnya
             header('Location: ' . previous_url());
             exit();

@@ -67,6 +67,7 @@
 </head>
 
 <body>
+    <!-- Signature Section - PERBAIKAN: Handle empty signatures -->
     <table cellpadding="4" border="1" cellspacing="0" width="100%" style="margin-top: 20px;">
         <tr>
             <td colspan="3"><strong>Asesi:</strong></td>
@@ -74,13 +75,20 @@
         <tr>
             <td style="width: 20%;">Nama</td>
             <td style="width: 5%;">:</td>
-            <td style="width: 75%;">Haikal Jibran A</td>
+            <td style="width: 75%;"><?= esc($observasi['nama_asesi'] ?? '-') ?></td>
         </tr>
         <tr>
-            <td style="width: 20%;">Tanda tangan dan Tanggal
-            </td>
+            <td style="width: 20%;">Tanda tangan dan Tanggal</td>
             <td style="width: 5%;">:</td>
-            <td style="width: 75%; height:80px;"></td>
+            <td style="width: 75%; height:80px;" class="center">
+                <?php if (!empty($qr_asesi)): ?>
+                <img src="<?= esc($qr_asesi) ?>" alt="QR Code Asesi" style="width: 150px;">
+                <?php else: ?>
+                <div style="height: 60px; padding: 20px; color: #666;">
+                    <em>Belum ada tanda tangan digital</em>
+                </div>
+                <?php endif; ?>
+            </td>
         </tr>
         <tr>
             <td colspan="3"><strong>Asesor:</strong></td>
@@ -88,18 +96,25 @@
         <tr>
             <td style="width: 20%;">Nama</td>
             <td style="width: 5%;">:</td>
-            <td style="width: 75%;">Sri Sayuningsih</td>
+            <td style="width: 75%;"><?= esc($observasi['nama_asesor'] ?? '-') ?></td>
         </tr>
         <tr>
             <td style="width: 20%;">No. Reg</td>
             <td style="width: 5%;">:</td>
-            <td style="width: 75%;">MET. 000. 002233 2021</td>
+            <td style="width: 75%;"><?= esc($rekaman['nomor_registrasi'] ?? '-') ?></td>
         </tr>
         <tr>
-            <td style="width: 20%;">Tanda tangan dan Tanggal
-            </td>
+            <td style="width: 20%;">Tanda tangan dan Tanggal</td>
             <td style="width: 5%;">:</td>
-            <td style="width: 75%; height:80px;"></td>
+            <td style="width: 75%; height:80px;" class="center">
+                <?php if (!empty($qr_asesor)): ?>
+                <img src="<?= esc($qr_asesor) ?>" alt="QR Code Asesor" style="width: 150px;">
+                <?php else: ?>
+                <div style="height: 60px; padding: 20px; color: #666;">
+                    <em>Belum ada tanda tangan digital</em>
+                </div>
+                <?php endif; ?>
+            </td>
         </tr>
     </table>
 
