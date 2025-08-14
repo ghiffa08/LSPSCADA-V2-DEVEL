@@ -223,6 +223,16 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->post('store', 'RekamanAsesmenController::store'); // PERBAIKAN: Tambahkan ini
             $routes->get('pdf/(:num)', 'RekamanAsesmenController::pdf/$1');
         });
+
+        // PMO routes
+        $routes->group('pmo', function ($routes) {
+            $routes->get('/', 'PMOController::index');
+            $routes->get('create', 'PMOController::index'); // Alias untuk create
+            $routes->get('getAsesiByAsesmen', 'PMOController::getAsesiByAsesmen'); // SAMA SEPERTI OBSERVASI
+            $routes->get('loadPMO', 'PMOController::loadPMO');
+            $routes->post('store', 'PMOController::store');
+            $routes->get('pdf/(:num)', 'PMOController::pdf/$1');
+        });
     });
 
     // Manajemen Data Master
@@ -310,6 +320,17 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->get('delete/(:num)', 'Api\SetTanggal::delete/$1');
             $routes->get('getById/(:num)', 'Api\SetTanggal::getById/$1');
             $routes->post('get-data-table', 'Api\SetTanggal::getDataTable');
+        });
+
+        // Pertanyaan PMO
+        $routes->group('pertanyaan-pmo', function ($routes) {
+            $routes->get('/', 'PMOPertanyaanController::index');
+            $routes->post('save', 'Api\PMOPertanyaan::save');
+            $routes->post('import', 'PMOPertanyaanController::import');
+            $routes->get('download-template', 'PMOPertanyaanController::downloadTemplate');
+            $routes->get('delete/(:num)', 'Api\PMOPertanyaan::delete/$1');
+            $routes->get('getById/(:num)', 'Api\PMOPertanyaan::getById/$1');
+            $routes->post('get-data-table', 'Api\PMOPertanyaan::getDataTable');
         });
     });
 
