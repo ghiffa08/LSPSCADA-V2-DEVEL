@@ -16,7 +16,7 @@ class AsesiController extends BaseController
     private AsesiService $asesiService;
     private ValidationService $validationService;
     private CustomResponseService $responseService;
-    private $dependent;
+    // private $dependent;
     private $usermodel;
     private int $userId;
 

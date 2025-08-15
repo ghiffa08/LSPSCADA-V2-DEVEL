@@ -3526,7 +3526,7 @@ CREATE TABLE `pengajuan_asesmen` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Dumping data untuk tabel `pengajuan_asesmen`
+-- Dumping data untuk tabel `pengajuaan_asesmen`
 --
 
 INSERT INTO `pengajuan_asesmen` (`id_pengajuan`, `id_asesi`, `id_asesor`, `id_asesmen`, `status_pengajuan`, `tanggal_pengajuan`, `status`) VALUES

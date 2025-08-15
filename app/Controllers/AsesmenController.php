@@ -20,7 +20,7 @@ class AsesmenController extends BaseController
         return view('admin/kelola_asesmen', $data);
     }
 
-    public function getJadwal()
+    public function getJadwalSertifikasi()
     {
         $id_skema = $this->request->getPost('id_skema');
         $tuk = $this->asesmenModel->getTuk($id_skema);
@@ -41,6 +41,31 @@ class AsesmenController extends BaseController
         $response = [
             'options_tanggal' => $options_tanggal,
             '' => $id_asesmen
+        ];
+
+        echo json_encode($response);
+    }
+
+    public function getJadwal()
+    {
+        $id_skema = $this->request->getPost('id_skema');
+
+        $jadwal = $this->asesmenModel->getJadwal($id_skema);
+
+        $options_tanggal = '';
+        $options_tuk = '';
+        $id_asesmen = '';
+
+        foreach ($jadwal as $key => $row) {
+            $options_tanggal .= '<option value="' . $row['id_tanggal'] . '">' . $row['tanggal'] . '</option>';
+            $options_tuk .= '<option value="' . $row['id_tuk'] . '">' . $row['nama_tuk'] . '</option>';
+            $id_asesmen = $row['id_asesmen'];
+        }
+
+        $response = [
+            'options_tanggal' => $options_tanggal,
+            'options_tuk' => $options_tuk,
+            'id_asesmen' => $id_asesmen
         ];
 
         echo json_encode($response);

@@ -23,9 +23,23 @@ $routes->set404Override();
 $routes->get('/', 'HomeController::index');
 $routes->get('skema-sertifikasi', 'HomeController::skema');
 
+// AJAX
+$routes->post('/get-jadwal', 'AsesmenController::getJadwal');
+$routes->post('/get-tuk', 'AsesmenController::getTuk');
+$routes->post('/getUnit', 'UnitController::getUnit');
+$routes->post('/getElemen', 'ElemenController::getElemen');
+$routes->post('/kabupaten', 'APL1Controller::kabupaten');
+$routes->post('/kecamatan', 'APL1Controller::kecamatan');
+$routes->post('/desa', 'APL1Controller::desa');
+$routes->post('/get-jadwal', 'AsesmenController::getJadwal');
+
 // Pendaftaran dan Pengajuan
-$routes->get('pendaftaran-uji-kompetensi', 'PengajuanAsesmenController::index');
-$routes->post('store-pengajuan', 'PengajuanAsesmenController::store');
+// $routes->get('pendaftaran-uji-kompetensi', 'PengajuanAsesmenController::index');
+// $routes->post('store-pengajuan', 'PengajuanAsesmenController::store');
+
+$routes->get('/pendaftaran-uji-kompetensi', 'LandingpageController::ujikom');
+
+$routes->post('/store-pengajuan', 'LandingpageController::store_pengajuan');
 
 // Asesmen Mandiri
 $routes->get('asesmen-mandiri/(:any)', 'HomeController::asesmen/$1');
@@ -345,6 +359,7 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->post('store-validasi', 'APL1Controller::store_validasi');
             $routes->post('store-email-validasi', 'APL1Controller::send_email_validasi');
             $routes->post('store-email-validasi-by-date', 'APL1Controller::send_email_validasi_by_date');
+            $routes->post('getDateValidated', 'APL1Controller::getDateValidated'); // Tambah route ini
             $routes->post('delete', 'APL1Controller::delete');
             $routes->get('pdf/(:any)', 'APL1Controller::pdf/$1');
         });
@@ -504,4 +519,40 @@ $routes->group('api', function ($routes) {
 
     // Add this new route for asesor skema
     $routes->get('get-skema-asesor', 'Api\AsesorSkema::getSkemaAsesor');
+});
+
+
+$routes->group('kelola_apl1', ['filter' => 'login'], function ($routes) {
+    $routes->get('/', 'APL1Controller::index');
+    $routes->post('store', 'APL1Controller::store');
+    $routes->get('validasi', 'APL1Controller::validasi');
+    $routes->get('send-email-validasi', 'APL1Controller::email_validasi');
+    $routes->post('store-validasi', 'APL1Controller::store_validasi');
+    $routes->post('store-email-validasi', 'APL1Controller::send_email_validasi');
+    $routes->post('store-email-validasi-by-date', 'APL1Controller::send_email_validasi_by_date');
+    $routes->post('getDateValidated', 'APL1Controller::getDateValidated'); // Tambah route ini
+    $routes->post('delete', 'APL1Controller::delete');
+    $routes->get('pdf-(:any)', 'APL1Controller::pdf/$1');
+});
+
+
+$routes->group('kelola_apl2', ['filter' => 'login'], function ($routes) {
+    $routes->get('/', 'APL2Controller::index');
+    $routes->post('store', 'APL2Controller::store');
+    $routes->get('validasi', 'APL2Controller::validasi');
+    $routes->post('validasi-store', 'APL2Controller::store_validasi');
+    $routes->get('send-email-validasi', 'APL2Controller::email_validasi');
+    $routes->post('store-email-validasi', 'APL2Controller::send_email_validasi');
+    $routes->post('store-email-validasi-by-date', 'APL2Controller::send_email_validasi_by_date');
+    $routes->post('delete', 'APL2Controller::delete');
+    $routes->get('pdf-(:any)', 'APL2Controller::pdf/$1');
+});
+
+$routes->group('persetujuan-asesmen', ['filter' => 'login'], function ($routes) {
+    $routes->get('/', 'AKController::index');
+    $routes->post('store', 'AKController::store');
+    $routes->get('pdf-(:any)', 'AKController::pdf/$1');
+    $routes->post('import', 'AKController::import');
+    $routes->post('update', 'AKController::update');
+    $routes->post('delete', 'AKController::delete');
 });

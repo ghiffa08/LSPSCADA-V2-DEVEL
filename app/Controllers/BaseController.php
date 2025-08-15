@@ -45,6 +45,10 @@ use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
 use Myth\Auth\Models\UserModel as MythUserModel;
 
+
+
+
+
 /**
  * Class BaseController
  *
@@ -99,6 +103,8 @@ abstract class BaseController extends Controller
     protected $KomponenfeedbackModel;
 
     protected  $importService;
+
+    protected $dependent;
 
     /**
      * Helpers to be loaded automatically

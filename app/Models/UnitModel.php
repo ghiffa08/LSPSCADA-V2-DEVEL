@@ -98,6 +98,15 @@ class UnitModel extends Model
         return $data;
     }
 
+    public function getUnit($id_skema)
+    {
+        return $this->db->table('unit')
+            ->where('id_skema', $id_skema)
+            ->where('status', 'Y')
+            ->get()
+            ->getResultArray();
+    }
+
     /**
      * Validate that the scheme exists and is active
      */

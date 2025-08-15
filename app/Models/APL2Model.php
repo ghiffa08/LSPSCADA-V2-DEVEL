@@ -66,7 +66,7 @@ class APL2Model extends Model
             ->join('asesmen', 'asesmen.id_asesmen = apl1.id_asesmen', 'left')
             ->join('users as asesor_users', 'asesor_users.id = apl2.validator', 'left')
             ->join('skema', 'skema.id_skema = asesmen.id_skema', 'left')
-            ->select('apl1.id_apl1, apl2.id_apl2, apl2.validasi_apl2, apl1.nama_siswa, apl1.email, apl2.email_validasi as email_validasi_apl2, apl2.updated_at as tanggal_validasi, skema.nama_skema, skema.id_skema, asesor_users.fullname as validator_apl2')
+            ->select('apl1.id_apl1, apl2.id_apl2, apl2.validasi_apl2, apl1.nama_siswa, apl1.email, apl2.email_validasi as email_validasi_apl2, apl2.updated_at as tanggal_validasi, skema.nama_skema, skema.id_skema, asesor_users.nama_lengkap as validator_apl2')
             ->get()
             ->getResultArray();
     }
@@ -82,7 +82,7 @@ class APL2Model extends Model
             ->join('asesmen', 'asesmen.id_asesmen = apl1.id_asesmen', 'left')
             ->join('users as asesor_users', 'asesor_users.id = apl2.validator', 'left')
             ->join('skema', 'skema.id_skema = asesmen.id_skema', 'left')
-            ->select('apl1.id_apl1, apl2.id_apl2, apl2.validasi_apl2, apl1.nama_siswa, apl1.email, apl2.email_validasi as email_validasi_apl2, apl2.updated_at as tanggal_validasi, skema.nama_skema, skema.id_skema, asesor_users.fullname as validator_apl2')
+            ->select('apl1.id_apl1, apl2.id_apl2, apl2.validasi_apl2, apl1.nama_siswa, apl1.email, apl2.email_validasi as email_validasi_apl2, apl2.updated_at as tanggal_validasi, skema.nama_skema, skema.id_skema, asesor_users.nama_lengkap as validator_apl2')
             ->get()
             ->getResultArray();
     }
@@ -114,7 +114,7 @@ class APL2Model extends Model
             ->join('users as admin_users', 'admin_users.id=apl1.validasi_admin', 'left')
             ->join('users as asesor_users', 'asesor_users.id = apl2.validator', 'left')
             ->join('skema', 'skema.id_skema=asesmen.id_skema', 'left')
-            ->select('apl1.*,apl1.id_apl1, wilayah_provinsi.nama as nama_provinsi, wilayah_kabupaten.nama as nama_kabupaten, wilayah_kecamatan.nama as nama_kecamatan, wilayah_desa.nama as nama_kelurahan, skema.nama_skema, skema.id_skema as skema_id, skema.jenis_skema, asesmen.tujuan,admin_users.fullname as validator_apl1, admin_users.tanda_tangan as ttd_validator_apl1, asesor_users.fullname as validator_apl2, asesor_users.tanda_tangan as ttd_validator_apl2, apl2.validasi_apl2')
+            ->select('apl1.*,apl1.id_apl1, wilayah_provinsi.nama as nama_provinsi, wilayah_kabupaten.nama as nama_kabupaten, wilayah_kecamatan.nama as nama_kecamatan, wilayah_desa.nama as nama_kelurahan, skema.nama_skema, skema.id_skema as skema_id, skema.jenis_skema, asesmen.tujuan,admin_users.nama_lengkap as validator_apl1, admin_users.tanda_tangan as ttd_validator_apl1, asesor_users.nama_lengkap as validator_apl2, asesor_users.tanda_tangan as ttd_validator_apl2, apl2.validasi_apl2')
             ->Get()->getRowArray();
     }
 
@@ -129,7 +129,7 @@ class APL2Model extends Model
             ->join('users as asesor_users', 'asesor_users.id = apl2.validator', 'left')
             ->join('skema', 'skema.id_skema=asesmen.id_skema', 'left')
             ->join('set_tanggal', 'set_tanggal.id_tanggal=asesmen.id_tanggal', 'left')
-            ->select('apl1.id_apl1,skema.nama_skema, skema.jenis_skema, tuk.nama_tuk, tuk.jenis_tuk, apl1.nama_siswa, apl1.tanda_tangan_asesi, apl1.created_at,apl2.updated_at, set_tanggal.tanggal, apl2.id_apl2, asesor_users.fullname as validator,asesor_users.tanda_tangan as ttd_validator')
+            ->select('apl1.id_apl1,skema.nama_skema, skema.jenis_skema, tuk.nama_tuk, tuk.jenis_tuk, apl1.nama_siswa, apl1.tanda_tangan_asesi, apl1.created_at,apl2.updated_at, set_tanggal.tanggal, apl2.id_apl2, asesor_users.nama_lengkap as validator,asesor_users.tanda_tangan as ttd_validator')
             ->get()
             ->getRowArray();
     }
@@ -145,7 +145,7 @@ class APL2Model extends Model
             ->join('users as asesor_users', 'asesor_users.id = apl2.validator', 'left')
             ->join('skema', 'skema.id_skema=asesmen.id_skema', 'left')
             ->join('set_tanggal', 'set_tanggal.id_tanggal=asesmen.id_tanggal', 'left')
-            ->select('apl1.id_apl1,skema.nama_skema, skema.jenis_skema, tuk.nama_tuk, tuk.jenis_tuk, apl1.nama_siswa, apl1.tanda_tangan_asesi, apl1.created_at,apl2.updated_at, set_tanggal.tanggal, apl2.id_apl2, asesor_users.fullname as validator,asesor_users.tanda_tangan as ttd_validator')
+            ->select('apl1.id_apl1,skema.nama_skema, skema.jenis_skema, tuk.nama_tuk, tuk.jenis_tuk, apl1.nama_siswa, apl1.tanda_tangan_asesi, apl1.created_at,apl2.updated_at, set_tanggal.tanggal, apl2.id_apl2, asesor_users.nama_lengkap as validator,asesor_users.tanda_tangan as ttd_validator')
             ->get()
             ->getResultArray();
     }
@@ -195,7 +195,7 @@ class APL2Model extends Model
             ->join('users as asesor_users', 'asesor_users.id = apl2.validator', 'left')
             ->join('skema', 'skema.id_skema=asesmen.id_skema', 'left')
             ->join('set_tanggal', 'set_tanggal.id_tanggal=asesmen.id_tanggal', 'left')
-            ->select('apl1.id_apl1,skema.nama_skema, skema.jenis_skema, tuk.nama_tuk, tuk.jenis_tuk, apl1.nama_siswa, apl1.tanda_tangan_asesi, apl1.created_at, set_tanggal.tanggal, admin_users.fullname as valdator_apl1, apl2.id_apl2, asesor_users.fullname as validator_apl2')
+            ->select('apl1.id_apl1,skema.nama_skema, skema.jenis_skema, tuk.nama_tuk, tuk.jenis_tuk, apl1.nama_siswa, apl1.tanda_tangan_asesi, apl1.created_at, set_tanggal.tanggal, admin_users.nama_lengkap as valdator_apl1, apl2.id_apl2, asesor_users.nama_lengkap as validator_apl2')
             ->get()
             ->getRowArray();
     }
@@ -207,7 +207,7 @@ class APL2Model extends Model
         return $this->db->table('apl2')
             ->where('tanda_tangan', $ttd)
             ->join('users', 'users.id=apl2.validator', 'left')
-            ->select('users.tanda_tangan as tanda_tangan_validator, users.fullname, apl2.created_at')
+            ->select('users.tanda_tangan as tanda_tangan_validator, users.nama_lengkap, apl2.created_at')
             ->Get()->getRowArray();
     }
 }

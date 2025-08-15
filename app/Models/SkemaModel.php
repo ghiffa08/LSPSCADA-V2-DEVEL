@@ -114,6 +114,11 @@ class SkemaModel extends Model
         return $data;
     }
 
+    public function AllSkema()
+    {
+        return $this->db->table('skema')->where('status', 'Y')->Get()->getResultArray();
+    }
+
     /**
      * Get active schemes (status = 'Y')
      */
