@@ -72,8 +72,8 @@
     <table border="1" cellpadding="6" cellspacing="0" width="100%">
         <tr>
             <td width="30%">Nama</td>
-            <td width="35%">Asesi: <strong><?= esc($observasi['nama_asesi'] ?? '-') ?></strong></td>
-            <td width="35%">Asesor: <strong><?= esc($observasi['nama_asesor'] ?? '-') ?></strong></td>
+            <td width="35%">Asesi: <strong><?= esc($pmo['nama_asesi'] ?? '-') ?></strong></td>
+            <td width="35%">Asesor: <strong><?= esc($pmo['nama_asesor'] ?? '-') ?></strong></td>
         </tr>
         <tr>
             <td>Tanda Tangan dan Tanggal</td>

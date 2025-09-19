@@ -2,1003 +2,325 @@
 
 namespace App\Controllers\Api;
 
-use Config\Services;
-use CodeIgniter\HTTP\ResponseInterface;
-use App\Controllers\DataTableController;
-use App\Models\UserManagementModel;
+use CodeIgniter\API\ResponseTrait;
+use App\Controllers\BaseController;
+use Myth\Auth\Models\UserModel;
+use App\Models\AsesorModel;
+use App\Models\GroupsModel;
 
-class UserManagement extends DataTableController
+class UserManagement extends BaseController
 {
+    use ResponseTrait;
+
+    protected $model;
+    protected $db;
+
     public function __construct()
     {
-        parent::__construct();
-
-        $this->model = new UserManagementModel();
-
-        // Define custom column mapping for ordering
-        $this->columnMap = [
-            0 => null, // No ordering for index column
-            1 => 'users.username',
-            2 => 'users.nama_lengkap',
-            3 => 'users.email',
-            4 => 'roles', // GROUP_CONCAT field
-            5 => 'users.active',
-            6 => 'users.created_at',
-            7 => null // No ordering for action column
-        ];
-    }
-    /**
-     * Get users by role
-     */
-    public function getUsersByRole($role = null): ResponseInterface
-    {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
-        }
-
-        try {
-            $users = $this->model->getUsersByRole($role);
-
-            return $this->response->setJSON([
-                'status' => true,
-                'data' => $users
-            ]);
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error fetching users: ' . $e->getMessage()
-            ]);
-        }
+        $this->model = new UserModel(); // Model dari Myth:Auth
+        $this->db = \Config\Database::connect();
     }
 
     /**
-     * Get user statistics
+     * Menyediakan data untuk DataTable (diperbaiki dengan metode 2-query).
      */
-    public function getUserStatistics(): ResponseInterface
+    public function getDataTable(): \CodeIgniter\HTTP\ResponseInterface
     {
         if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
+            return $this->failNotFound();
         }
 
-        try {
-            $stats = $this->model->getUserStatistics();
+        $request = service('request');
 
-            return $this->response->setJSON([
-                'status' => true,
-                'data' => $stats
-            ]);
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error fetching statistics: ' . $e->getMessage()
-            ]);
-        }
-    }
+        // Mengambil parameter DataTables
+        $draw = intval($request->getPost('draw'));
+        $start = intval($request->getPost('start'));
+        $length = intval($request->getPost('length'));
+        $searchValue = $this->db->escapeLikeString(trim($request->getPost('search')['value'] ?? ''));
+        $roleFilter = trim($request->getPost('role_filter') ?? '');
 
-    /**
-     * Get user statistics including deleted users
-     */
-    public function getUserStatisticsWithDeleted(): ResponseInterface
-    {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
-        }
+        // Query 1: Mengambil data PENGGUNA utama
+        $userQuery = $this->model
+            ->select('id, username, nama_lengkap, email, active, created_at')
+            ->where('deleted_at', null);
 
-        try {
-            $stats = $this->model->getUserStatisticsWithDeleted();
+        // Menghitung total record
+        $totalRecords = $userQuery->countAllResults(false);
 
-            return $this->response->setJSON([
-                'status' => true,
-                'data' => $stats
-            ]);
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error fetching statistics: ' . $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Get user details by ID
-     */
-    public function getUserById($id = null): ResponseInterface
-    {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
-        }
-
-        // Get ID from URL parameter or query parameter
-        if (!$id) {
-            $id = $this->request->getGet('id');
-        }
-
-        if (!$id) {
-            return $this->response->setStatusCode(400)->setJSON([
-                'status' => false,
-                'message' => 'User ID is required'
-            ]);
-        }
-
-        try {
-            $user = $this->model->getUserById($id);
-            if (!$user) {
-                return $this->response->setStatusCode(404)->setJSON([
-                    'status' => false,
-                    'message' => 'User not found'
-                ]);
-            }
-            return $this->response->setJSON([
-                'status' => true,
-                'data' => $user
-            ]);
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error fetching user: ' . $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Get user by ID (POST method alias)
-     */
-    public function getUserByIdPost(): ResponseInterface
-    {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
-        }
-
-        $id = $this->request->getPost('id');
-
-        if (!$id) {
-            return $this->response->setStatusCode(400)->setJSON([
-                'status' => false,
-                'message' => 'User ID is required'
-            ]);
-        }
-
-        try {
-            $user = $this->model->getUserById($id);
-
-            if (!$user) {
-                return $this->response->setStatusCode(404)->setJSON([
-                    'status' => false,
-                    'message' => 'User not found'
-                ]);
-            }
-
-            return $this->response->setJSON([
-                'status' => true,
-                'data' => $user
-            ]);
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error fetching user: ' . $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Update user status (activate/deactivate)
-     */
-    public function updateUserStatus(): ResponseInterface
-    {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
-        }
-
-        $id = $this->request->getPost('id');
-        $status = $this->request->getPost('status');
-
-        if (!$id || !isset($status)) {
-            return $this->response->setStatusCode(400)->setJSON([
-                'status' => false,
-                'message' => 'User ID and status are required'
-            ]);
-        }
-
-        try {
-            $updated = $this->model->update($id, [
-                'active' => (int)$status,
-                'updated_at' => date('Y-m-d H:i:s')
-            ]);
-
-            if ($updated) {
-                return $this->response->setJSON([
-                    'status' => true,
-                    'message' => 'User status updated successfully'
-                ]);
-            } else {
-                return $this->response->setStatusCode(400)->setJSON([
-                    'status' => false,
-                    'message' => 'Failed to update user status'
-                ]);
-            }
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error updating user status: ' . $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Update user profile
-     */
-    public function updateUserProfile(): ResponseInterface
-    {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
-        }
-
-        $data = $this->request->getPost();
-        $id = $data['id'] ?? null;
-
-        if (!$id) {
-            return $this->response->setStatusCode(400)->setJSON([
-                'status' => false,
-                'message' => 'User ID is required'
-            ]);
-        }
-
-        try {
-            // Prepare data for update
-            $updateData = [
-                'nama_lengkap' => $data['nama_lengkap'] ?? null,
-                'email' => $data['email'] ?? null,
-                'updated_at' => date('Y-m-d H:i:s')
-            ];
-
-            // Remove empty values
-            $updateData = array_filter($updateData, function ($value) {
-                return $value !== null && $value !== '';
+        // Menerapkan filter role jika ada
+        if (!empty($roleFilter)) {
+            $userQuery->whereIn('id', function ($subQuery) use ($roleFilter) {
+                $subQuery->select('user_id')->from('auth_groups_users gu')
+                    ->join('auth_groups g', 'g.id = gu.group_id')
+                    ->where('g.name', $roleFilter);
             });
+        }
 
-            $updated = $this->model->update($id, $updateData);
+        // Menerapkan filter pencarian
+        if (!empty($searchValue)) {
+            $userQuery->groupStart()
+                ->like('username', $searchValue)
+                ->orLike('nama_lengkap', $searchValue)
+                ->orLike('email', $searchValue)
+                ->groupEnd();
+        }
 
-            if ($updated) {
-                return $this->response->setJSON([
-                    'status' => true,
-                    'message' => 'User profile updated successfully'
-                ]);
-            } else {
-                return $this->response->setStatusCode(400)->setJSON([
-                    'status' => false,
-                    'message' => 'Failed to update user profile'
-                ]);
+        $filteredRecords = $userQuery->countAllResults(false);
+
+        // Mengambil data pengguna untuk halaman saat ini
+        $users = $userQuery->orderBy('created_at', 'DESC')
+            ->limit($length, $start)
+            ->get()
+            ->getResultObject();
+
+        $userIds = array_column($users, 'id');
+        $userRoles = [];
+
+        // Query 2: Mengambil ROLE untuk pengguna yang ditampilkan saja
+        if (!empty($userIds)) {
+            $groupModel = new GroupsModel();
+            $rolesData = $groupModel
+                ->select('auth_groups_users.user_id, auth_groups.name')
+                ->join('auth_groups_users', 'auth_groups_users.group_id = auth_groups.id', 'inner')
+                ->whereIn('auth_groups_users.user_id', $userIds)
+                ->findAll();
+
+            // Petakan role ke setiap user ID
+            foreach ($rolesData as $role) {
+                if (!isset($userRoles[$role['user_id']])) {
+                    $userRoles[$role['user_id']] = [];
+                }
+                $userRoles[$role['user_id']][] = $role['name'];
             }
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error updating user profile: ' . $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Update user profile (alias method)
-     */
-    public function updateProfile(): ResponseInterface
-    {
-        return $this->updateUserProfile();
-    }
-
-    /**
-     * Update user status (alias method)
-     */
-    public function updateStatus(): ResponseInterface
-    {
-        return $this->updateUserStatus();
-    }
-
-    /**
-     * Override getDataTable to handle role filter
-     */
-    public function getDataTable(): ResponseInterface
-    {
-        // Verify AJAX request
-        if (!$this->request->isAJAX()) {
-            return $this->failUnauthorized('Akses ditolak');
         }
 
-        // Get standard DataTable parameters
-        $draw = $this->request->getVar('draw');
-        $limit = (int)$this->request->getVar('length');
-        $start = (int)$this->request->getVar('start');
-        $search = $this->request->getVar('search')['value'] ?? '';
-
-        // Get role filter parameter
-        $roleFilter = $this->request->getVar('role_filter');
-
-        // Extract ordering information
-        $order = $this->request->getVar('order')[0] ?? null;
-        $orderColumn = null;
-        $orderDir = 'asc';
-
-        if ($order) {
-            $columnIndex = $order['column'];
-            $orderDir = $order['dir'];
-            $orderColumn = $this->columnMap[$columnIndex] ?? null;
+        // Menggabungkan data pengguna dengan data role
+        $data = [];
+        foreach ($users as $user) {
+            $user->roles = isset($userRoles[$user->id]) ? implode(', ', $userRoles[$user->id]) : null;
+            $data[] = (array)$user;
         }
 
-        // Get filtered data using model's method
-        $result = $this->model->getDataTableWithRoleFilter($limit, $start, $search, $orderColumn, $orderDir, $roleFilter);
-
-        // Format and return response
-        return $this->response->setJSON([
-            'draw' => intval($draw),
-            'recordsTotal' => $result['total'],
-            'recordsFiltered' => $result['filtered'],
-            'data' => $result['data']
+        return $this->respond([
+            'draw' => $draw,
+            'recordsTotal' => $totalRecords,
+            'recordsFiltered' => $filteredRecords,
+            'data' => $data
         ]);
     }
+
     /**
-     * Soft delete user
+     * Mengambil statistik jumlah pengguna berdasarkan nama role.
      */
-    public function softDeleteUser(): ResponseInterface
+    public function getStatistics(): \CodeIgniter\HTTP\ResponseInterface
     {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
+        $db = \Config\Database::connect();
+
+        // Query untuk menghitung jumlah user per role dalam satu kali jalan
+        $roleCountsQuery = $db->table('auth_groups_users gu')
+            ->join('auth_groups g', 'g.id = gu.group_id', 'left')
+            ->select('g.name, COUNT(gu.user_id) as total')
+            ->groupBy('g.name')
+            ->get();
+
+        $roleCounts = [];
+        foreach ($roleCountsQuery->getResultArray() as $row) {
+            // Menggunakan strtolower untuk kunci yang konsisten
+            $roleCounts[strtolower($row['name'])] = (int) $row['total'];
         }
 
-        $id = $this->request->getPost('id');
+        // Siapkan data statistik dengan nilai default 0
+        $stats = [
+            'admin'   => $roleCounts['admin'] ?? 0,
+            'asesor'  => $roleCounts['asesor'] ?? 0,
+            'asesi'   => $roleCounts['asesi'] ?? 0,
+            'total'   => $this->model->where('deleted_at', null)->countAllResults(),
+            'deleted' => $this->model->onlyDeleted()->countAllResults()
+        ];
 
-        if (!$id) {
-            return $this->response->setStatusCode(400)->setJSON([
-                'status' => false,
-                'message' => 'User ID is required'
-            ]);
-        }
-
-        try {
-            // Don't allow deleting own account
-            if ($id == user()->id) {
-                return $this->response->setJSON([
-                    'status' => false,
-                    'message' => 'Tidak dapat menghapus akun sendiri'
-                ]);
-            }
-
-            $deleted = $this->model->softDeleteUser($id);
-
-            if ($deleted) {
-                return $this->response->setJSON([
-                    'status' => true,
-                    'message' => 'User berhasil diarsipkan'
-                ]);
-            } else {
-                return $this->response->setStatusCode(400)->setJSON([
-                    'status' => false,
-                    'message' => 'Failed to delete user'
-                ]);
-            }
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error deleting user: ' . $e->getMessage()
-            ]);
-        }
+        return $this->respond(['status' => true, 'data' => $stats]);
     }
 
     /**
-     * Restore soft deleted user
+     * Mengambil detail user berdasarkan ID.
      */
-    public function restoreUser(): ResponseInterface
+    public function getById($id = null): \CodeIgniter\HTTP\ResponseInterface
     {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
+        $user = $this->model->find($id);
+        if (!$user) {
+            return $this->failNotFound('User tidak ditemukan.');
         }
 
-        $id = $this->request->getPost('id');
+        // --- PERBAIKAN DI SINI ---
+        // Menggunakan GroupModel untuk mendapatkan role/grup pengguna
+        $groupModel = model(\Myth\Auth\Models\GroupModel::class);
+        $groups = $groupModel->getGroupsForUser((int)$id);
 
-        if (!$id) {
-            return $this->response->setStatusCode(400)->setJSON([
-                'status' => false,
-                'message' => 'User ID is required'
-            ]);
+        // Ubah array of objects menjadi array of strings (nama grup)
+        $userGroups = array_column($groups, 'name');
+
+        $data = $user->toArray();
+        $data['groups'] = $userGroups; // Tambahkan nama grup ke data respons
+
+        // Cek apakah 'Asesor' ada di dalam array grup yang sudah kita dapatkan
+        if (in_array('Asesor', $userGroups)) {
+            $asesorModel = new AsesorModel();
+            $data['asesor_data'] = $asesorModel->where('id_user', $id)->first();
         }
 
-        try {
-            $restored = $this->model->restoreUser($id);
-
-            if ($restored) {
-                return $this->response->setJSON([
-                    'status' => true,
-                    'message' => 'User restored successfully'
-                ]);
-            } else {
-                return $this->response->setStatusCode(400)->setJSON([
-                    'status' => false,
-                    'message' => 'Failed to restore user'
-                ]);
-            }
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error restoring user: ' . $e->getMessage()
-            ]);
-        }
+        return $this->respond(['status' => true, 'data' => $data]);
     }
 
-    /**
-     * Create admin user
+/**
+     * Membuat user baru (Admin atau Asesor).
+     * Diperbaiki untuk memastikan semua field wajib terisi.
      */
-    public function createAdminUser(): ResponseInterface
+    public function create(): \CodeIgniter\HTTP\ResponseInterface
     {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
-        }
-
-        $data = $this->request->getPost();
-
-        // Validate required fields
-        $required = ['username', 'email', 'nama_lengkap', 'password'];
-        foreach ($required as $field) {
-            if (empty($data[$field])) {
-                return $this->response->setStatusCode(400)->setJSON([
-                    'status' => false,
-                    'message' => "Field $field is required"
-                ]);
-            }
-        }
-
-        try {
-            $result = $this->model->createAdminUser($data);
-
-            if ($result['success']) {
-                return $this->response->setJSON([
-                    'status' => true,
-                    'message' => $result['message'],
-                    'user_id' => $result['user_id']
-                ]);
-            } else {
-                return $this->response->setStatusCode(400)->setJSON([
-                    'status' => false,
-                    'message' => $result['message'],
-                    'errors' => $result['errors']
-                ]);
-            }
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error creating admin user: ' . $e->getMessage()
-            ]);
-        }
-    }
-    /**
-     * Create asesor user
-     */
-    public function createAsesorUser(): ResponseInterface
-    {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
-        }
-
-        $data = $this->request->getPost();
-
-        // Debug log
-        log_message('debug', 'Create Asesor User - Raw POST data: ' . json_encode($data));
-
-        // Validate required fields (changed from skema_ids to skema_id)
-        $required = ['username', 'email', 'nama_lengkap', 'password', 'skema_id'];
-        foreach ($required as $field) {
-            if (empty($data[$field])) {
-                log_message('error', "Create Asesor User - Missing required field: {$field}");
-                return $this->response->setStatusCode(400)->setJSON([
-                    'status' => false,
-                    'message' => "Field $field is required"
-                ]);
-            }
-        }
-
-        // Validate skema_id is a valid integer
-        if (!filter_var($data['skema_id'], FILTER_VALIDATE_INT)) {
-            log_message('error', "Create Asesor User - Invalid skema_id: " . $data['skema_id']);
-            return $this->response->setStatusCode(400)->setJSON([
-                'status' => false,
-                'message' => "Invalid skema ID"
-            ]);
-        }
-
-        log_message('debug', 'Create Asesor User - Processed skema_id: ' . $data['skema_id']);
-
-        try {
-            $result = $this->model->createAsesorUser($data);
-
-            if ($result['success']) {
-                return $this->response->setJSON([
-                    'status' => true,
-                    'message' => $result['message'],
-                    'user_id' => $result['user_id']
-                ]);
-            } else {
-                return $this->response->setStatusCode(400)->setJSON([
-                    'status' => false,
-                    'message' => $result['message'],
-                    'errors' => $result['errors']
-                ]);
-            }
-        } catch (\Exception $e) {
-            log_message('error', 'Create Asesor User - Exception: ' . $e->getMessage());
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error creating asesor user: ' . $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Get available roles
-     */
-    public function getAvailableRoles(): ResponseInterface
-    {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
-        }
-
-        try {
-            $roles = $this->model->getAvailableRoles();
-
-            return $this->response->setJSON([
-                'status' => true,
-                'data' => $roles
-            ]);
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error fetching roles: ' . $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Change user role
-     */
-    public function changeUserRole(): ResponseInterface
-    {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
-        }
-
-        $userId = $this->request->getPost('user_id');
-        $newRole = $this->request->getPost('new_role');
-
-        if (!$userId || !$newRole) {
-            return $this->response->setStatusCode(400)->setJSON([
-                'status' => false,
-                'message' => 'User ID and new role are required'
-            ]);
-        }
-
-        try {
-            $changed = $this->model->changeUserRole($userId, $newRole);
-
-            if ($changed) {
-                return $this->response->setJSON([
-                    'status' => true,
-                    'message' => 'User role changed successfully'
-                ]);
-            } else {
-                return $this->response->setStatusCode(400)->setJSON([
-                    'status' => false,
-                    'message' => 'Failed to change user role'
-                ]);
-            }
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error changing user role: ' . $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Validation helper for user data
-     */
-    protected function validateUserData(array $data, ?int $userId = null): array
-    {
+        $users = new UserModel();
+        
+        // Aturan validasi
         $rules = [
-            'username' => [
-                'label' => 'Username',
-                'rules' => $userId
-                    ? "required|alpha_numeric_space|min_length[3]|max_length[30]|is_unique[users.username,id,{$userId}]"
-                    : 'required|alpha_numeric_space|min_length[3]|max_length[30]|is_unique[users.username]',
-                'errors' => [
-                    'required' => '{field} harus diisi.',
-                    'alpha_numeric_space' => '{field} hanya boleh berisi huruf, angka, dan spasi.',
-                    'min_length' => '{field} minimal {param} karakter.',
-                    'max_length' => '{field} maksimal {param} karakter.',
-                    'is_unique' => '{field} sudah digunakan.'
-                ]
-            ],
-            'email' => [
-                'label' => 'Email',
-                'rules' => $userId
-                    ? "required|valid_email|is_unique[users.email,id,{$userId}]"
-                    : 'required|valid_email|is_unique[users.email]',
-                'errors' => [
-                    'required' => '{field} harus diisi.',
-                    'valid_email' => '{field} harus berformat valid.',
-                    'is_unique' => '{field} sudah digunakan.'
-                ]
-            ],
-            'nama_lengkap' => [
-                'label' => 'Nama Lengkap',
-                'rules' => 'required|min_length[3]|max_length[100]',
-                'errors' => [
-                    'required' => '{field} harus diisi.',
-                    'min_length' => '{field} minimal {param} karakter.',
-                    'max_length' => '{field} maksimal {param} karakter.'
-                ]
-            ]
+            'username'     => 'required|alpha_numeric_space|min_length[3]|is_unique[users.username]',
+            'email'        => 'required|valid_email|is_unique[users.email]',
+            'password'     => 'required|min_length[8]',
+            'nama_lengkap' => 'required|min_length[3]'
         ];
 
-        if (isset($data['password']) && !empty($data['password'])) {
-            $rules['password'] = [
-                'label' => 'Password',
-                'rules' => 'required|min_length[8]|strong_password',
-                'errors' => [
-                    'required' => '{field} harus diisi.',
-                    'min_length' => '{field} minimal {param} karakter.',
-                    'strong_password' => '{field} harus mengandung huruf besar, huruf kecil, angka, dan karakter khusus.'
-                ]
-            ];
-
-            $rules['pass_confirm'] = [
-                'label' => 'Konfirmasi Password',
-                'rules' => 'required|matches[password]',
-                'errors' => [
-                    'required' => '{field} harus diisi.',
-                    'matches' => '{field} harus sama dengan password.'
-                ]
-            ];
+        // Validasi tambahan khusus untuk Asesor
+        if ($this->request->getPost('role') === 'Asesor') {
+            $rules['skema_id'] = 'required|integer';
         }
 
-        return $rules;
-    }
-
-    /**
-     * Log user activity
-     */
-    protected function logUserActivity(string $action, int $userId, array $details = []): void
-    {
-        $currentUser = service('AuthenticationService')->getCurrentUser();
-        $adminId = $currentUser ? $currentUser->id : 'system';
-
-        $logData = [
-            'action' => $action,
-            'target_user_id' => $userId,
-            'admin_id' => $adminId,
-            'details' => json_encode($details),
-            'timestamp' => date('Y-m-d H:i:s')
-        ];
-
-        log_message('info', "User Management: {$action} - User ID: {$userId} by Admin ID: {$adminId}");
-    }
-
-    /**
-     * Enhanced error response
-     */
-    protected function errorResponse(string $message, array $errors = [], int $statusCode = 400): ResponseInterface
-    {
-        return $this->response->setStatusCode($statusCode)->setJSON([
-            'status' => 'error',
-            'message' => $message,
-            'errors' => $errors,
-            'timestamp' => date('c')
-        ]);
-    }
-
-    /**
-     * Enhanced success response
-     */
-    protected function successResponse(string $message, array $data = []): ResponseInterface
-    {
-        return $this->response->setJSON([
-            'status' => 'success',
-            'message' => $message,
-            'data' => $data,
-            'timestamp' => date('c')
-        ]);
-    }
-
-    /**
-     * Update user with role management
-     */    public function updateUser(): ResponseInterface
-    {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
+        if (!$this->validate($rules)) {
+            return $this->fail($this->validator->listErrors());
         }
 
-        $data = $this->request->getPost();
-        $id = $data['id'] ?? null;
-        $role = $data['role'] ?? null;
+        // --- PERBAIKAN UTAMA DI SINI ---
+        // Buat user entity dan isi datanya secara manual untuk memastikan
+        $user = new \Myth\Auth\Entities\User();
+        $user->username = $this->request->getPost('username');
+        $user->email = $this->request->getPost('email');
+        $user->password = $this->request->getPost('password');
+        $user->nama_lengkap = $this->request->getPost('nama_lengkap');
+        $user->activate();
+        
+     var_dump($user);
+        die();
+        
+        $role = $this->request->getPost('role');
+
+        if ($users->withGroup($role)->save($user)) {
+            $userId = $users->getInsertID();
+
+            // Jika role adalah Asesor, simpan juga datanya ke tabel asesor
+            if ($role === 'Asesor') {
+                $asesorModel = new AsesorModel();
+                $asesorModel->save([
+                    'id_user' => $userId,
+                    'nomor_registrasi' => $this->request->getPost('nomor_registrasi'),
+                    'id_skema' => $this->request->getPost('skema_id')
+                ]);
+            }
+            return $this->respondCreated(['status' => true, 'message' => "User {$role} berhasil dibuat."]);
+        }
+        
+        return $this->fail($users->errors());
+    }
+
+    /**
+     * Mengupdate data user, termasuk role dan skema asesor.
+     */
+    public function update(): \CodeIgniter\HTTP\ResponseInterface
+    {
+        // Ambil ID dari data POST, bukan dari parameter URL
+        $id = $this->request->getPost('id');
 
         if (!$id) {
-            return $this->response->setStatusCode(400)->setJSON([
-                'status' => false,
-                'message' => 'User ID is required'
-            ]);
+            return $this->fail('ID User diperlukan untuk proses update.', 400);
         }
 
-        try {
-            // Prepare user data for update
-            $updateData = [
-                'nama_lengkap' => $data['nama_lengkap'] ?? null,
-                'email' => $data['email'] ?? null,
-                'updated_at' => date('Y-m-d H:i:s')
-            ];
+        $users = new UserModel();
+        if (!$users->find($id)) {
+            return $this->failNotFound('User tidak ditemukan.');
+        }
 
-            // Remove empty values
-            $updateData = array_filter($updateData, function ($value) {
-                return $value !== null && $value !== '';
-            });
+        $postData = $this->request->getPost();
 
-            // Update user profile
-            $userUpdated = $this->model->update($id, $updateData);            // Handle role update if provided
-            $roleUpdated = true;
-            $roleMessage = '';
+        // Aturan validasi yang sudah diperbaiki
+        // is_unique[users.email,id,{$id}] akan mengabaikan record dengan ID ini
+        $rules = [
+            'nama_lengkap' => 'required|min_length[3]',
+            'email'        => "required|valid_email|is_unique[users.email,id,{$id}]",
+            'role'         => 'required|in_list[Admin,Asesor,Asesi]'
+        ];
 
-            if ($role && $userUpdated) {
-                try {
-                    // Normalize role name (capitalize first letter)
-                    $normalizedRole = ucfirst(strtolower($role));
+        if (!$this->validate($rules)) {
+            return $this->fail($this->validator->listErrors());
+        }
 
-                    // Load auth models
-                    $authGroupsModel = model('GroupModel');
-                    $db = \Config\Database::connect();
+        // 1. Update data dasar di tabel 'users'
+        $userData = [
+            'nama_lengkap' => $postData['nama_lengkap'],
+            'email'        => $postData['email']
+        ];
+        $users->update($id, $userData);
 
-                    // Remove user from all existing groups
-                    $db->table('auth_groups_users')->where('user_id', $id)->delete();                    // Add user to new role group
-                    $groupData = $authGroupsModel->where('name', $normalizedRole)->first();
-                    if (!$groupData) {
-                        // Try original case
-                        $groupData = $authGroupsModel->where('name', $role)->first();
-                    }
-                    if (!$groupData) {
-                        // Try lowercase
-                        $groupData = $authGroupsModel->where('LOWER(name)', strtolower($role))->first();
-                    }
+        // 2. Update group/role
+        $groups = model(\Myth\Auth\Models\GroupModel::class);
+        $groups->removeUserFromAllGroups((int)$id);
+        $group = $groups->where('name', $postData['role'])->first();
+        if ($group) {
+            $groups->addUserToGroup((int)$id, $group->id);
+        }
 
-                    if ($groupData) {
-                        $db->table('auth_groups_users')->insert([
-                            'group_id' => $groupData->id,
-                            'user_id' => $id
-                        ]);
-                        $roleMessage = ' dengan role ' . $normalizedRole;
-                    } else {
-                        $roleUpdated = false;
-                        $roleMessage = ' (Role tidak valid atau tidak ditemukan)';
-                    }
-                } catch (\Exception $roleError) {
-                    $roleUpdated = false;
-                    $roleMessage = ' (Gagal mengubah role)';
+        // 3. Update skema jika rolenya adalah Asesor
+        if ($postData['role'] === 'Asesor') {
+            $asesorModel = new AsesorModel();
+            $asesorData = $asesorModel->where('id_user', $id)->first();
+            $skemaId = $postData['skema_id'] ?? null;
+
+            if ($skemaId) {
+                if ($asesorData) {
+                    $asesorModel->update($asesorData['id_asesor'], ['id_skema' => $skemaId]);
+                } else {
+                    $asesorModel->save(['id_user' => $id, 'id_skema' => $skemaId]);
                 }
             }
-
-            if ($userUpdated && $roleUpdated) {
-                return $this->response->setJSON([
-                    'status' => true,
-                    'message' => 'User berhasil diperbarui' . $roleMessage
-                ]);
-            } else {
-                return $this->response->setStatusCode(400)->setJSON([
-                    'status' => false,
-                    'message' => 'Gagal memperbarui user' . $roleMessage
-                ]);
-            }
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error updating user: ' . $e->getMessage()
-            ]);
-        }
-    }
-    /**
-     * Get asesor details by user ID
-     */
-    public function getAsesorByUserId(): ResponseInterface
-    {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
         }
 
-        $userId = $this->request->getGet('user_id');
-
-        if (!$userId) {
-            return $this->response->setStatusCode(400)->setJSON([
-                'status' => false,
-                'message' => 'User ID is required'
-            ]);
-        }
-
-        try {
-            $asesorModel = new \App\Models\AsesorModel();
-            $asesor = $asesorModel->getByUserIdWithUser($userId);
-
-            if ($asesor) {
-                return $this->response->setJSON([
-                    'status' => true,
-                    'data' => $asesor
-                ]);
-            } else {
-                return $this->response->setStatusCode(404)->setJSON([
-                    'status' => false,
-                    'message' => 'Asesor not found'
-                ]);
-            }
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error fetching asesor: ' . $e->getMessage()
-            ]);
-        }
+        return $this->respondUpdated(['status' => true, 'message' => 'User berhasil diupdate.']);
     }
 
     /**
-     * Get all asesor with user data
+     * Menghapus user (Soft Delete).
      */
-    public function getAllAsesor(): ResponseInterface
+    public function delete($id = null): \CodeIgniter\HTTP\ResponseInterface
     {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
+        if ($id == user()->id) {
+            return $this->fail('Tidak dapat mengarsipkan akun sendiri.', 403);
         }
-
-        try {
-            $asesorModel = new \App\Models\AsesorModel();
-            $activeOnly = $this->request->getGet('active_only') === 'true';
-            $asesorList = $asesorModel->getAllWithUser($activeOnly);
-
-            return $this->response->setJSON([
-                'status' => true,
-                'data' => $asesorList
-            ]);
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error fetching asesor list: ' . $e->getMessage()
-            ]);
+        if ($this->model->delete($id)) { // Ini sudah soft delete karena $useSoftDeletes = true di model
+            return $this->respondDeleted(['status' => true, 'message' => 'User berhasil diarsipkan.']);
         }
+        return $this->fail('Gagal mengarsipkan user.');
     }
 
     /**
-     * Update asesor data
+     * Mengubah status aktif/nonaktif user.
      */
-    public function updateAsesor(): ResponseInterface
+    public function toggleStatus($id = null): \CodeIgniter\HTTP\ResponseInterface
     {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
+        if ($id == user()->id) {
+            return $this->fail('Tidak dapat menonaktifkan akun sendiri.', 403);
         }
+        $user = $this->model->find($id);
+        if (!$user) return $this->failNotFound('User tidak ditemukan.');
 
-        $data = $this->request->getPost();
-        $asesorId = $data['id_asesor'] ?? null;
+        $user->active = !$user->active;
+        $this->model->save($user);
 
-        if (!$asesorId) {
-            return $this->response->setStatusCode(400)->setJSON([
-                'status' => false,
-                'message' => 'Asesor ID is required'
-            ]);
-        }
-
-        try {
-            $asesorModel = new \App\Models\AsesorModel();
-
-            $updateData = [
-                'nomor_registrasi' => $data['nomor_registrasi'] ?? null
-            ];
-
-            // Remove empty values
-            $updateData = array_filter($updateData, function ($value) {
-                return $value !== null && $value !== '';
-            });
-
-            $hasUpdates = !empty($updateData);
-            $skemaUpdated = false;
-
-            // Update asesor basic data if we have any
-            if ($hasUpdates) {
-                $updated = $asesorModel->update($asesorId, $updateData);
-                if (!$updated) {
-                    return $this->response->setStatusCode(400)->setJSON([
-                        'status' => false,
-                        'message' => 'Failed to update asesor data',
-                        'errors' => $asesorModel->errors()
-                    ]);
-                }
-            }
-
-            // Handle skema assignment (single skema)
-            if (isset($data['skema_id'])) {
-                $skemaId = $data['skema_id'];
-
-                // Validate skema_id
-                if (!empty($skemaId) && !filter_var($skemaId, FILTER_VALIDATE_INT)) {
-                    return $this->response->setStatusCode(400)->setJSON([
-                        'status' => false,
-                        'message' => 'Invalid skema ID'
-                    ]);
-                }
-
-                $skemaUpdated = $asesorModel->updateAsesorSkema($asesorId, $skemaId);
-                if (!$skemaUpdated) {
-                    return $this->response->setStatusCode(400)->setJSON([
-                        'status' => false,
-                        'message' => 'Failed to update asesor skema assignment'
-                    ]);
-                }
-            }
-
-            if (!$hasUpdates && !$skemaUpdated) {
-                return $this->response->setStatusCode(400)->setJSON([
-                    'status' => false,
-                    'message' => 'No data to update'
-                ]);
-            }
-
-            return $this->response->setJSON([
-                'status' => true,
-                'message' => 'Asesor data updated successfully'
-            ]);
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error updating asesor: ' . $e->getMessage()
-            ]);
-        }
-    }
-    /**
-     * Get asesor statistics
-     */
-    public function getAsesorStatistics(): ResponseInterface
-    {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
-        }
-
-        try {
-            $asesorModel = new \App\Models\AsesorModel();
-            $statistics = [
-                'total_asesor' => count($asesorModel->getAllWithUser()),
-                'active_asesor' => count($asesorModel->getAllWithUser(true)),
-                'by_bidang_kompetensi' => $asesorModel->getCountByBidangKompetensi()
-            ];
-
-            return $this->response->setJSON([
-                'status' => true,
-                'data' => $statistics
-            ]);
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error fetching asesor statistics: ' . $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Get active skemas for asesor form
-     */
-    public function getActiveSkemas(): ResponseInterface
-    {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
-        }
-
-        try {
-            $skemaModel = new \App\Models\SkemaModel();
-            $skemas = $skemaModel->getActiveSchemes();
-
-            return $this->response->setJSON([
-                'status' => true,
-                'data' => $skemas
-            ]);
-        } catch (\Exception $e) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => false,
-                'message' => 'Error fetching skemas: ' . $e->getMessage()
-            ]);
-        }
+        $statusText = $user->active ? 'diaktifkan' : 'dinonaktifkan';
+        return $this->respond(['status' => true, 'message' => "User berhasil {$statusText}."]);
     }
 }

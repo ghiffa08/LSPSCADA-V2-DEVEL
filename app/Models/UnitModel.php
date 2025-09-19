@@ -108,6 +108,23 @@ class UnitModel extends Model
     }
 
     /**
+     * Get unit by asesmen ID
+     *
+     * @param int $id_asesmen
+     * @return array
+     */
+    public function getUnitByIdAsesmen(int $id_asesmen)
+    {
+        return $this->db->table('unit u')
+            ->join('asesmen a', 'a.id_skema = u.id_skema', 'inner')
+            ->where('a.id_asesmen', $id_asesmen)
+            ->where('u.status', 'Y')
+            ->select('u.*')
+            ->get()
+            ->getResultArray();
+    }
+
+    /**
      * Validate that the scheme exists and is active
      */
     protected function validateScheme(array $data): array

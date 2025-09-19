@@ -1,63 +1,76 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 
 <head>
     <meta charset="UTF-8">
-    <title>Validasi Data Pendaftaran Uji Kompetensi Keahlian</title>
+    <title>Validasi Pengajuan Asesmen Diterima</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             line-height: 1.6;
-            color: #000000;
+            color: #333;
             margin: 0;
             padding: 0;
-            background-color: #f9f9f9;
+            background-color: #f4f4f4;
         }
 
         .container {
             max-width: 600px;
-            margin: 0 auto;
+            margin: 20px auto;
             padding: 20px;
-            background-color: #fff;
+            background-color: #ffffff;
             border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .header {
-            margin-bottom: 30px;
+            text-align: center;
+            border-bottom: 1px solid #eeeeee;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
         }
 
-        .content {
-            margin-bottom: 30px;
+        .header h2 {
+            color: #0056b3;
+        }
+
+        .content table {
+            width: 100%;
+            margin: 20px 0;
+            border-collapse: collapse;
+        }
+
+        .content th,
+        .content td {
+            padding: 8px;
+            text-align: left;
+        }
+
+        .content th {
+            width: 150px;
+            color: #555;
+        }
+
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 12px 25px;
+            background-color: #28a745;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
         }
 
         .footer {
             text-align: center;
-            font-size: 14px;
-            color: #666;
-        }
-
-        /* Tombol Responsif */
-        .button {
-            display: inline-block;
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: #000000;
-            text-decoration: none;
-            border-radius: 5px;
-            transition: background-color 0.3s ease;
-        }
-
-        .button:hover {
-            background-color: #0056b3;
-        }
-
-        /* Responsif */
-        @media screen and (max-width: 600px) {
-            .container {
-                max-width: 100%;
-                border-radius: 0;
-            }
+            font-size: 12px;
+            color: #888;
+            margin-top: 30px;
         }
     </style>
 </head>
@@ -65,46 +78,46 @@
 <body>
     <div class="container">
         <div class="header">
-            <h2>Informasi Pendaftaran Sertifikasi Uji Kompetensi</h2>
+            <h2>Pengajuan Asesmen Diterima</h2>
         </div>
         <div class="content">
-            <p>Hai <?= $name ?>,</p>
+            <p>Halo <strong><?= esc($nama_asesi) ?></strong>,</p>
+            <p>Kabar baik! Pengajuan asesmen Anda untuk skema sertifikasi telah kami periksa dan dinyatakan <strong>DITERIMA</strong>.</p>
 
-            <p>Kabar baik! Data pendaftaran Sertifikasi kamu dengan ID Pendaftaran <?= $id ?> sudah terverifikasi!</p>
-
-            <p>Berikut detail data pendaftarannya:</p>
             <table>
                 <tr>
-                    <td>Nama Lengkap</td>
-                    <td>:</td>
-                    <td><?= $name ?></td>
+                    <th>Nama Asesi</th>
+                    <td>: <?= esc($nama_asesi) ?></td>
                 </tr>
                 <tr>
-                    <td>ID Pendaftaran</td>
-                    <td>:</td>
-                    <td><?= $id ?></td>
+                    <th>Skema Sertifikasi</th>
+                    <td>: <?= esc($skema) ?></td>
                 </tr>
                 <tr>
-                    <td>Skema Sertifikasi</td>
-                    <td>:</td>
-                    <td><?= $skema ?></td>
+                    <th>Status Validasi</th>
+                    <td>: <strong style="color: #28a745;"><?= esc(ucfirst($status_validasi)) ?></strong></td>
+                </tr>
+                <tr>
+                    <th>Divalidasi Oleh</th>
+                    <td>: Admin (<?= esc($validator) ?>)</td>
+                </tr>
+                <tr>
+                    <th>Tanggal Validasi</th>
+                    <td>: <?= esc($tanggal_validasi) ?></td>
                 </tr>
             </table>
 
-            <p>Selanjutnya, kamu tinggal menyelesaikan Asesmen Mandiri untuk melanjutkan proses sertifikasi.</p>
+            <p>Langkah selanjutnya adalah mengisi formulir Asesmen Mandiri (FR-APL-02). Silakan klik tombol di bawah ini untuk melanjutkan.</p>
 
-            <a href="<?= site_url('/asesmen-mandiri/' . $id) ?>" class="button">Mulai Asesmen Mandiri</a>
+            <div class="button-container">
+                <a href="<?= esc($next_step_url, 'attr') ?>" class="button">Mulai Asesmen Mandiri</a>
+            </div>
 
-            <p>Punya pertanyaan? Jangan ragu untuk menghubungi kami!</p>
-
-            <p>Salam,</p>
-
-            <p>Tim LSP - P1 SMK Negeri 2 Kuningan</p>
+            <p>Jika Anda memiliki pertanyaan, jangan ragu untuk menghubungi kami.</p>
+            <p>Terima kasih,<br>Tim LSP - P1 SMK Negeri 2 Kuningan</p>
         </div>
-
         <div class="footer">
-            <p>Email ini dikirimkan secara otomatis. Jangan membalas email ini.</p>
-            <p>&copy; <?= date('Y') ?> Sertifikasi LSP - P1 SMKN 2 Kuningan. Hak cipta dilindungi undang-undang.</p>
+            <p>&copy; <?= date('Y') ?> LSP - P1 SMKN 2 Kuningan. Email ini dikirim secara otomatis.</p>
         </div>
     </div>
 </body>

@@ -33,8 +33,7 @@ class KUKController extends BaseController
                 'id_unit' => $row[1] ?? null,
                 'id_elemen' => $row[2] ?? null,
                 'kode_kuk' => $row[3] ?? null,
-                'nama_kuk' => $row[4] ?? null,
-                'pertanyaan' => $row[5] ?? null,
+                'pertanyaan' => $row[4] ?? null,
             ];
         };
 
@@ -71,7 +70,6 @@ class KUKController extends BaseController
             'ID Unit',
             'ID Elemen',
             'Kode KUK',
-            'Nama KUK',
             'Pertanyaan'
         ];
 

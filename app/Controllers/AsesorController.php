@@ -220,15 +220,16 @@ class AsesorController extends BaseController
         }
 
         // Ambil statistik dari model (menggunakan nama method yang benar)
-        $totalAPL2Pending      = $this->dashboardModel->getAsesorTotalAPL2Pending($asesorId);
-        $totalAPL2Validated    = $this->dashboardModel->getAsesorTotalAPL2Validated($asesorId);
-        $totalObservasi        = $this->dashboardModel->getAsesorTotalObservasi($asesorId);
+        // $totalAPL2Pending      = $this->dashboardModel->getAsesorTotalAPL2Pending($asesorId);
+        // $totalAPL2Validated    = $this->dashboardModel->getAsesorTotalAPL2Validated($asesorId);
+        // $totalObservasi        = $this->dashboardModel->getAsesorTotalObservasi($asesorId);
 
-        $monthlyStats          = $this->dashboardModel->getAsesorMonthlyStats($asesorId);
-        $recentActivities      = $this->dashboardModel->getAsesorRecentActivities($asesorId);
-        $upcomingAssessments   = $this->dashboardModel->getAsesorUpcomingAssessments($asesorId);
+        // $monthlyStats          = $this->dashboardModel->getAsesorMonthlyStats($asesorId);
+        // $recentActivities      = $this->dashboardModel->getAsesorRecentActivities($asesorId);
+        // $upcomingAssessments   = $this->dashboardModel->getAsesorUpcomingAssessments($asesorId);
 
         $data = [
+            'siteTitle'              => "Dashboard Asesor",
             'totalAPL2Pending'        => $totalAPL2Pending ?? 0,
             'totalAPL2Validated'      => $totalAPL2Validated ?? 0,
             'totalObservasi'          => $totalObservasi ?? 0,

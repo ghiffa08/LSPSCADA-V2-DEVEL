@@ -94,6 +94,17 @@ class ElemenModel extends Model
         // For example, format dates, calculate values, etc.
         return $data;
     }
+    
+     /**
+     * Mendapatkan semua elemen dengan nama unit
+     * @return array
+     */
+    public function AllElemen(): array
+    {
+        return $this->select('elemen.*, unit.nama_unit')
+            ->join('unit', 'unit.id_unit = elemen.id_unit', 'left')
+            ->findAll();
+    }
 
     /**
      * Mendapatkan semua elemen dengan nama unit

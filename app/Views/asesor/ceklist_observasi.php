@@ -110,20 +110,56 @@
                     </div>
                 </div>
 
-                <!-- Pilih Asesi -->
+                <!-- Pilih APL1 (Changed from Asesi) -->
                 <div class="row mb-4">
                     <div class="col-md-6">
                         <div class="form-group">
-                            <label class="font-weight-bold"><i class="fas fa-user text-primary mr-1"></i>Nama Asesi</label>
-                            <select name="id_asesi" id="id_asesi" class="form-control select2" required disabled>
+                            <label class="font-weight-bold"><i class="fas fa-user text-primary mr-1"></i>Nama Siswa (APL1)</label>
+                            <select name="id_apl1" id="id_apl1" class="form-control select2" required disabled>
                                 <option value="">-- Pilih Asesmen Terlebih Dahulu --</option>
                             </select>
+                            <small class="form-text text-muted">Pilih siswa yang telah mengisi dan memvalidasi formulir APL1</small>
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="form-group">
                             <label class="font-weight-bold"><i class="fas fa-hashtag text-primary mr-1"></i>Kode Skema</label>
                             <input type="text" class="form-control bg-light" id="kode_skema" value="" readonly>
+                            <small class="form-text text-muted">Kode skema akan otomatis terisi setelah memilih asesmen</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- APL1 Information Display -->
+                <div id="apl1-info" class="row mb-4" style="display: none;">
+                    <div class="col-12">
+                        <div class="alert alert-light border-left-primary">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <h6 class="font-weight-bold mb-1">
+                                        <i class="fas fa-id-card mr-1"></i>NIK
+                                    </h6>
+                                    <p class="mb-0" id="apl1-nik">-</p>
+                                </div>
+                                <div class="col-md-3">
+                                    <h6 class="font-weight-bold mb-1">
+                                        <i class="fas fa-envelope mr-1"></i>Email
+                                    </h6>
+                                    <p class="mb-0" id="apl1-email">-</p>
+                                </div>
+                                <div class="col-md-3">
+                                    <h6 class="font-weight-bold mb-1">
+                                        <i class="fas fa-phone mr-1"></i>No. HP
+                                    </h6>
+                                    <p class="mb-0" id="apl1-phone">-</p>
+                                </div>
+                                <div class="col-md-3">
+                                    <h6 class="font-weight-bold mb-1">
+                                        <i class="fas fa-check-circle mr-1"></i>Status Validasi
+                                    </h6>
+                                    <span class="badge badge-success" id="apl1-status">Tervalidasi</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -144,7 +180,9 @@
                             <div id="progress-bar" class="progress-bar progress-bar-striped" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
                         </div>
                     </div>
-                </div> <!-- Instruction/Loading Indicator -->
+                </div>
+
+                <!-- Loading Indicator -->
                 <div id="loadingData" class="text-center py-5" style="display: none;">
                     <div class="spinner-border text-primary" role="status">
                         <span class="sr-only">Loading...</span>
@@ -159,7 +197,7 @@
                     <p class="mb-2">Untuk memulai observasi, silakan ikuti langkah berikut:</p>
                     <ol class="list-unstyled mb-0">
                         <li class="mb-2"><strong>1.</strong> Pilih <strong>Asesmen</strong> dari dropdown di atas</li>
-                        <li class="mb-2"><strong>2.</strong> Pilih <strong>Asesi</strong> yang akan diobservasi</li>
+                        <li class="mb-2"><strong>2.</strong> Pilih <strong>Siswa (APL1)</strong> yang akan diobservasi</li>
                         <li class="mb-0"><strong>3.</strong> Form observasi akan muncul secara otomatis</li>
                     </ol>
                 </div>
@@ -167,16 +205,18 @@
                 <!-- Empty Data Message -->
                 <div id="emptyDataMessage" class="alert alert-warning text-center py-4" style="display: none;">
                     <i class="fas fa-exclamation-triangle fa-2x text-warning mb-3"></i>
-                    <h5 class="alert-heading">Belum Ada Data Asesi</h5>
-                    <p class="mb-2">Belum ada asesi yang terdaftar untuk asesmen yang dipilih.</p>
-                    <p class="mb-0">Pastikan asesi sudah mengajukan permohonan dan statusnya telah disetujui.</p>
-                </div><!-- Form Observasi -->
+                    <h5 class="alert-heading">Belum Ada Data APL1</h5>
+                    <p class="mb-2">Belum ada siswa (APL1) yang terdaftar untuk asesmen yang dipilih.</p>
+                    <p class="mb-0">Pastikan siswa sudah mengisi formulir APL1 dan statusnya telah divalidasi.</p>
+                </div>
+
+                <!-- Form Observasi -->
                 <form action="<?= base_url('/asesor/observasi/save') ?>" method="POST" id="formObservasi" style="display: none;">
                     <?= csrf_field() ?>
                     <input type="hidden" name="id_asesmen" id="form_id_asesmen" value="">
                     <input type="hidden" name="id_skema" id="form_id_skema" value="">
                     <input type="hidden" name="tanggal_observasi" id="form_tanggal_observasi" value="<?= date('Y-m-d') ?>">
-                    <input type="hidden" name="id_asesi" id="form_id_asesi" value="">
+                    <input type="hidden" name="id_apl1" id="form_id_apl1" value="">
                     <input type="hidden" name="id_asesor" id="form_id_asesor" value="<?= $asesor['id_asesor'] ?>">
 
                     <!-- Toolbar Buttons -->
@@ -208,7 +248,7 @@
 
             <div class="card-footer bg-white">
                 <div class="text-muted text-center">
-                    <i class="fas fa-shield-alt mr-1"></i> Hasil observasi ini akan menentukan keputusan kompetensi asesi.
+                    <i class="fas fa-shield-alt mr-1"></i> Hasil observasi ini akan menentukan keputusan kompetensi siswa.
                 </div>
             </div>
         </div>

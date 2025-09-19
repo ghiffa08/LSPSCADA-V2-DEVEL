@@ -181,4 +181,26 @@ class APL1Model extends Model
             ->get()
             ->getResultArray();
     }
+    
+public function getAsesiDetailForEmail($id)
+    {
+        // Kueri ini disesuaikan dengan struktur join dan penamaan kolom
+        // yang sudah digunakan pada method lain di model ini.
+        return $this->db->table('apl1')
+            ->where('apl1.id_apl1', $id)
+            ->join('asesmen', 'asesmen.id_asesmen = apl1.id_asesmen', 'left')
+            ->join('skema', 'skema.id_skema = asesmen.id_skema', 'left')
+            ->join('users as admin_users', 'admin_users.id = apl1.validasi_admin', 'left')
+            ->select('
+                apl1.id_apl1, 
+                apl1.validasi_apl1, 
+                apl1.nama_siswa, 
+                apl1.email, 
+                apl1.updated_at as tanggal_validasi, 
+                skema.nama_skema, 
+                admin_users.nama_lengkap as validator_apl1
+            ')
+            ->get()
+            ->getRowArray(); // Menggunakan getRowArray() untuk satu baris data, konsisten dengan getAPL1()
+    }
 }

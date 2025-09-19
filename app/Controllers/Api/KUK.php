@@ -2,144 +2,117 @@
 
 namespace App\Controllers\Api;
 
-use Config\Database;
-use Config\Services;
-use App\Models\KUKModel;
+use CodeIgniter\API\ResponseTrait;
 use CodeIgniter\HTTP\ResponseInterface;
 use App\Controllers\DataTableController;
-use Exception;
 
 class KUK extends DataTableController
 {
+    use ResponseTrait;
 
     public function __construct()
     {
         parent::__construct();
         $this->model = $this->kukModel;
 
-        // Optional: Define custom column mapping for ordering
+        // Map untuk sorting, sesuai dengan JOIN di Model
         $this->columnMap = [
-            0 => null, // No ordering for index column
-            1 => 'kuk.id_kuk',
-            2 => 'kuk.kode_kuk',
-            3 => 'kuk.nama_kuk',
-            4 => 'kuk.pertanyaan',
-            5 => null // No ordering for action column
+            0 => null, // No
+            1 => 'skema.nama_skema',
+            2 => 'unit.nama_unit',
+            3 => 'elemen.nama_elemen',
+            4 => 'kuk.kode_kuk',
+            5 => 'kuk.pertanyaan',
+            6 => null  // Aksi
         ];
+    }
+    
+        /**
+     * Get KUK by Elemen ID for dependent dropdown
+     * Returns HTML options
+     */
+    public function getKuk(): ResponseInterface
+    {
+        if ($this->request->isAJAX()) {
+            $id_elemen = $this->request->getPost('id_elemen');
+            if (!$id_elemen) {
+                return $this->response->setStatusCode(400)->setBody('ID Elemen is required.');
+            }
+
+            // Cast the ID to an integer to match the model's type hint
+            $kukData = $this->kukModel->getByElemen((int)$id_elemen);
+
+            $options = '<option value="">-- Pilih KUK --</option>';
+            foreach ($kukData as $kuk) {
+                $options .= '<option value="' . $kuk['id_kuk'] . '">' . esc($kuk['kode_kuk'] . ' - ' . $kuk['pertanyaan']) . '</option>';
+            }
+
+            return $this->response->setBody($options);
+        }
+
+        // Return 404 if not AJAX
+        return $this->response->setStatusCode(404);
     }
 
     /**
-     * Save or update elemen data
+     * Save or update KUK data using Model's validation.
      */
     public function save(): ResponseInterface
     {
-        // If not AJAX request, throw 404
         if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
+            return $this->failNotFound();
         }
 
-        $modelName = KUKModel::class;
         $data = $this->request->getPost();
 
-        // Set proper field names (based on model allowedFields)
-        $formattedData = [
-            'id_kuk' => $data['id_kuk'] ?? null,
-            'id_skema' => $data['id_skema'],
-            'id_unit' => $data['id_unit'],
-            'id_elemen' => $data['id_elemen'],
-            'kode_kuk' => $data['kode_kuk'],
-            'nama_kuk' => $data['nama_kuk'],
-            'pertanyaan' => $data['pertanyaan'] ?? null
-        ];
+        // Unset primary key if empty (for INSERT)
+        if (empty($data['id_kuk'])) {
+            unset($data['id_kuk']);
+        }
 
-        // Process before save callback (if needed)
-        $beforeSave = function ($data) {
-            // You can modify data here if needed
-            return $data;
-        };
+        if ($this->model->save($data) === false) {
+            return $this->failValidationErrors($this->model->errors());
+        }
 
-        // Process after save callback (if needed)
-        $afterSave = function ($data, $id) {
-            // You can perform additional actions here
-            // For example: log activity, update related records, etc.
-        };
-
-        // Save the data
-        $result = $this->dataService->save(
-            $modelName,
-            $formattedData,
-            'id_kuk',
-            $beforeSave,
-            $afterSave
-        );
-
-        // Return response with appropriate status code
-        return $this->dataService->response($result, $result['code']);
+        $message = isset($data['id_kuk']) ? 'KUK berhasil diperbarui.' : 'KUK berhasil ditambahkan.';
+        return $this->respondCreated(['status' => true, 'message' => $message]);
     }
 
     /**
-     * Delete elemen
-     */
-    public function delete($id = null): ResponseInterface
-    {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
-        }
-
-        $KukModel = $this->kukModel;
-
-        // Start transaction
-        $db = Database::connect();
-        $db->transStart();
-
-        try {
-            $deleted = $KukModel->delete($id);
-
-            $db->transComplete();
-
-            if ($deleted) {
-                return $this->dataService->response([
-                    'status' => true,
-                    'message' => 'Elemen deleted successfully'
-                ]);
-            } else {
-                return $this->dataService->response([
-                    'status' => false,
-                    'message' => 'Failed to delete Elemen'
-                ], 400);
-            }
-        } catch (Exception $e) {
-            $db->transRollback();
-
-            return $this->dataService->response([
-                'status' => false,
-                'message' => 'An error occurred: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Get elemen by ID (for edit modal)
+     * Get KUK by ID for edit modal.
      */
     public function getById($id = null): ResponseInterface
     {
         if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
+            return $this->failNotFound();
+        }
+        
+        $data = $this->model->find($id);
+        if (!$data) {
+            return $this->failNotFound('Data KUK tidak ditemukan.');
         }
 
-        $KukModel = new $this->kukModel;
-        $elemen = $KukModel->find($id);
+        return $this->respond(['status' => true, 'data' => $data]);
+    }
+    
+   
 
-        if (!$elemen) {
-            return $this->dataService->response([
-                'status' => false,
-                'message' => 'Elemen not found'
-            ], 404);
+    /**
+     * Delete a KUK.
+     */
+    public function delete($id = null): ResponseInterface
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->failNotFound();
         }
 
-        return $this->dataService->response([
-            'status' => true,
-            'data' => $elemen
-        ]);
+        try {
+            if ($this->model->delete($id)) {
+                return $this->respondDeleted(['status' => true, 'message' => 'KUK berhasil dihapus.']);
+            }
+            return $this->fail($this->model->errors() ? implode(', ', $this->model->errors()) : 'Gagal menghapus KUK.');
+        } catch (\Exception $e) {
+            return $this->failServerError('Gagal menghapus KUK.');
+        }
     }
 }

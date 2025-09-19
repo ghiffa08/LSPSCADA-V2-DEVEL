@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rekaman Asesmen - <?= esc($observasi['nama_skema'] ?? '-') ?></title>
+    <title>Rekaman Asesmen - <?= esc($rekaman['nama_skema'] ?? '-') ?></title>
     <style>
         /* TCPDF compatible styles - SAMA SEPERTI OBSERVASI */
         body {
@@ -74,38 +74,38 @@
             <td rowspan="2" width="25%">Skema Sertifikasi<br>(KKNI/Okupasi/Klaster)</td>
             <td width="10%">Judul</td>
             <td width="5%">:</td>
-            <td width="60%"><?= esc($observasi['nama_skema'] ?? '-') ?></td>
+            <td width="60%"><?= esc($rekaman['nama_skema'] ?? '-') ?></td>
         </tr>
         <tr>
             <td>Nomor</td>
             <td>:</td>
-            <td><?= esc($observasi['kode_skema'] ?? '-') ?></td>
+            <td><?= esc($rekaman['kode_skema'] ?? '-') ?></td>
         </tr>
         <tr>
             <td colspan="2">TUK</td>
             <td>:</td>
-            <td><?= esc($observasi['jenis_tuk'] ?? '-') ?> - <?= esc($observasi['nama_tuk'] ?? '-') ?></td>
+            <td><?= esc($rekaman['jenis_tuk'] ?? '-') ?> - <?= esc($rekaman['nama_tuk'] ?? '-') ?></td>
         </tr>
         <tr>
             <td colspan="2">Nama Asesor</td>
             <td>:</td>
-            <td><?= esc($observasi['nama_asesor'] ?? '-') ?></td>
+            <td><?= esc($rekaman['nama_asesor'] ?? '-') ?></td>
         </tr>
         <tr>
             <td colspan="2">Nama Asesi</td>
             <td>:</td>
-            <td><?= esc($observasi['nama_asesi'] ?? '-') ?></td>
+            <td><?= esc($rekaman['nama_asesi'] ?? '-') ?></td>
         </tr>
         <tr>
             <td rowspan="2" width="25%">Tanggal Asesmen</td>
             <td width="10%">Mulai</td>
             <td width="5%">:</td>
-            <td width="60%"><?= isset($observasi['tanggal_asesmen']) ? esc(date('d/m/Y', strtotime($observasi['tanggal_asesmen']))) : esc(date('d/m/Y')) ?></td>
+            <td width="60%"><?= isset($rekaman['tanggal_asesmen']) ? esc(date('d/m/Y', strtotime($rekaman['tanggal_asesmen']))) : esc(date('d/m/Y')) ?></td>
         </tr>
         <tr>
             <td>Selesai</td>
             <td>:</td>
-            <td><?= isset($observasi['tanggal_asesmen']) ? esc(date('d/m/Y', strtotime($observasi['tanggal_asesmen']))) : esc(date('d/m/Y')) ?></td>
+            <td><?= isset($rekaman['tanggal_asesmen']) ? esc(date('d/m/Y', strtotime($rekaman['tanggal_asesmen']))) : esc(date('d/m/Y')) ?></td>
         </tr>
     </table>
 

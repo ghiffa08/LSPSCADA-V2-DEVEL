@@ -74,6 +74,9 @@
                                                 $no++;
                                                 $nextStep = $step + 1;
                                                 $prevStep = $step - 1;
+                                                
+                                                   // BUG FIX: Standardize on 'id_kuk' as the unique ID for inputs.
+        $kuk_id = $subelemen['id_kuk'];
 
                             ?>
 

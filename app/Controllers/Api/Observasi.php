@@ -9,10 +9,11 @@ use App\Controllers\Api\DataTableController;
 use App\Services\ObservasiService;
 
 /**
- * Observasi API Controller - OPTIMIZED
+ * Observasi API Controller - OPTIMIZED for APL1
  * 
  * Enhanced controller dengan service layer pattern,
  * caching, validation, dan error handling yang lebih baik
+ * Updated for simplified APL1 table structure
  */
 class Observasi extends DataTableController
 {
@@ -41,19 +42,20 @@ class Observasi extends DataTableController
 
         $this->id_asesor = $asesor['id_asesor'];
 
-        // Updated column mapping for new schema
+        // Updated column mapping for APL1 schema
         $this->columnMap = [
             0 => null, // No ordering for index column
-            1 => 'asesi_user.nama_lengkap',
+            1 => 'apl1.nama_siswa', // Changed from asesi_user.nama_lengkap
             2 => 'asesor_user.nama_lengkap',
             3 => 'skema.nama_skema',
             4 => 'observasi.tanggal_observasi',
-            5 => null // No ordering for action column
+            5 => 'tuk.nama_tuk',
+            6 => null // No ordering for action column
         ];
     }
 
     /**
-     * Get skema details and available asesi - OPTIMIZED
+     * Get skema details and available asesi - OPTIMIZED for APL1
      */
     public function getSkemaDetails()
     {
@@ -77,13 +79,13 @@ class Observasi extends DataTableController
                 return $this->fail('Skema tidak ditemukan', 404);
             }
 
-            // Get asesi list menggunakan service dengan caching
-            $asesi = $this->observasiService->getAsesiBySkema($id_skema);
+            // Get validated APL1 list untuk skema ini
+            $apl1List = $this->observasiService->getValidatedApl1BySkema($id_skema);
 
             return $this->respond([
                 'success' => true,
                 'skema' => $skema,
-                'asesi' => $asesi,
+                'apl1_list' => $apl1List, // Changed from 'asesi'
                 'cache_info' => [
                     'cached' => true,
                     'timestamp' => date('Y-m-d H:i:s')
@@ -96,7 +98,7 @@ class Observasi extends DataTableController
     }
 
     /**
-     * Load observation data via AJAX - NO CACHE
+     * Load observation data via AJAX - Updated for APL1
      * Always return fresh data from database
      */
     public function loadObservasi()
@@ -116,7 +118,7 @@ class Observasi extends DataTableController
         $this->response->setHeader('Expires', '0');
 
         $id_skema = $this->request->getGet('id_skema');
-        $id_asesi = $this->request->getGet('id_asesi');
+        $id_apl1 = $this->request->getGet('id_apl1'); // Changed from id_asesi
         $id_asesmen = $this->request->getGet('id_asesmen');
 
         // Enhanced validation
@@ -124,29 +126,29 @@ class Observasi extends DataTableController
             return $this->fail('ID Skema diperlukan dan harus berupa angka', 400);
         }
 
-        if (!$id_asesi || empty(trim($id_asesi))) {
-            return $this->fail('ID Asesi diperlukan', 400);
+        if (!$id_apl1 || empty(trim($id_apl1))) {
+            return $this->fail('ID APL1 diperlukan', 400);
         }
 
         try {
-            // PERBAIKAN: Check if observasi already exists
+            // Check if observasi already exists for this APL1
             $existingObservasi = $this->db->table('observasi o')
-                ->select('o.id_observasi, o.tanggal_observasi, o.status')
-                ->join('pengajuan_asesmen pa', 'pa.id_pengajuan = o.id_pengajuan', 'inner')
-                ->join('asesmen asm', 'asm.id_asesmen = pa.id_asesmen', 'inner') // JOIN untuk akses ke id_skema
-                ->where('o.id_asesi', $id_asesi)
+                ->select('o.id_observasi, o.tanggal_observasi')
+                ->join('apl1', 'apl1.id_apl1 = o.id_apl1', 'inner')
+                ->join('asesmen asm', 'asm.id_asesmen = apl1.id_asesmen', 'inner')
+                ->where('o.id_apl1', $id_apl1)
                 ->where('o.id_asesor', $this->id_asesor)
-                ->where('asm.id_skema', $id_skema) // Filter berdasarkan skema dari asesmen
+                ->where('asm.id_skema', $id_skema)
                 ->orderBy('o.created_at', 'DESC')
                 ->get()
                 ->getRowArray();
 
             $id_observasi = $existingObservasi['id_observasi'] ?? null;
 
-            // PERBAIKAN: Get KUK structure dengan service yang sudah diperbaiki
+            // Get KUK structure dengan service yang sudah diperbaiki untuk APL1
             $result = $this->observasiService->getKukStructureForSchema(
-                $id_skema, 
-                $id_asesi, 
+                $id_skema,
+                $id_apl1, // Changed from id_asesi
                 $id_observasi
             );
 
@@ -166,6 +168,12 @@ class Observasi extends DataTableController
                 'existing_data' => $result['existing_data'],
                 'totalKUK' => $result['totalKUK'],
                 'id_observasi' => $id_observasi,
+                'debug' => [
+                    'id_apl1' => $id_apl1,
+                    'id_skema' => $id_skema,
+                    'id_asesmen' => $id_asesmen,
+                    'existing_observasi' => $id_observasi ? 'found' : 'not_found'
+                ],
                 'performance' => [
                     'duration_seconds' => round($duration, 3),
                     'memory_usage_mb' => round(memory_get_usage(true) / 1024 / 1024, 2)
@@ -174,13 +182,13 @@ class Observasi extends DataTableController
         } catch (\Exception $e) {
             log_message('error', 'Error loading observasi: ' . $e->getMessage());
             log_message('error', 'Stack trace: ' . $e->getTraceAsString());
-            
+
             return $this->fail('Gagal memuat data observasi: ' . $e->getMessage(), 500);
         }
     }
 
     /**
-     * Universal handler for all observation saves - ENHANCED
+     * Universal handler for all observation saves - ENHANCED for APL1
      * Enhanced dengan service layer, validation, dan error handling
      */
     public function save()
@@ -223,37 +231,30 @@ class Observasi extends DataTableController
     }
 
     /**
-     * Save observasi settings (master data only)
+     * Save observasi settings (master data only) - Updated for APL1
      */
     private function saveSettings($postData, $jsonData): ResponseInterface
     {
         $data = array_merge($postData, $jsonData ?? []);
         $data['id_asesor'] = $this->id_asesor;
 
-        // Auto-get pengajuan if not provided but asesi is available
-        if (empty($data['id_pengajuan']) && !empty($data['id_asesi'])) {
-            $pengajuan = $this->db->table('pengajuan_asesmen')
-                ->where('id_asesi', $data['id_asesi'])
-                ->orderBy('tanggal_pengajuan', 'DESC')
-                ->get()
-                ->getRow();
-
-            if ($pengajuan) {
-                $data['id_pengajuan'] = $pengajuan->id_pengajuan;
-            }
-        }
-
-        // Validate required fields
-        $required = ['id_asesi', 'tanggal_observasi'];
+        // Validate required fields for APL1
+        $required = ['id_apl1', 'tanggal_observasi']; // Changed from id_asesi
         foreach ($required as $field) {
             if (empty($data[$field])) {
                 return $this->fail("Field {$field} diperlukan");
             }
         }
 
-        // Validate id_pengajuan separately with better error message
-        if (empty($data['id_pengajuan'])) {
-            return $this->fail("ID Pengajuan diperlukan. Pastikan asesi memiliki pengajuan asesmen yang valid.");
+        // Validate APL1 exists and is validated
+        $apl1 = $this->db->table('apl1')
+            ->where('id_apl1', $data['id_apl1'])
+            ->where('validasi_apl1', 'validated')
+            ->get()
+            ->getRowArray();
+
+        if (!$apl1) {
+            return $this->fail("APL1 tidak ditemukan atau belum tervalidasi");
         }
 
         // Log input data for debugging
@@ -377,37 +378,30 @@ class Observasi extends DataTableController
     }
 
     /**
-     * Save full observasi dengan details
+     * Save full observasi dengan details - Updated for APL1
      */
     private function saveFullObservasi($postData, $jsonData): ResponseInterface
     {
         $data = array_merge($postData, $jsonData ?? []);
         $data['id_asesor'] = $this->id_asesor;
 
-        // Auto-get pengajuan if not provided but asesi is available
-        if (empty($data['id_pengajuan']) && !empty($data['id_asesi'])) {
-            $pengajuan = $this->db->table('pengajuan_asesmen')
-                ->where('id_asesi', $data['id_asesi'])
-                ->orderBy('tanggal_pengajuan', 'DESC')
-                ->get()
-                ->getRow();
-
-            if ($pengajuan) {
-                $data['id_pengajuan'] = $pengajuan->id_pengajuan;
-            }
-        }
-
-        // Validate required fields
-        $required = ['id_asesi', 'tanggal_observasi'];
+        // Validate required fields for APL1
+        $required = ['id_apl1', 'tanggal_observasi']; // Changed from id_asesi
         foreach ($required as $field) {
             if (empty($data[$field])) {
                 return $this->fail("Field {$field} diperlukan");
             }
         }
 
-        // Validate id_pengajuan separately with better error message
-        if (empty($data['id_pengajuan'])) {
-            return $this->fail("ID Pengajuan diperlukan. Pastikan asesi memiliki pengajuan asesmen yang valid.");
+        // Validate APL1 exists and is validated
+        $apl1 = $this->db->table('apl1')
+            ->where('id_apl1', $data['id_apl1'])
+            ->where('validasi_apl1', 'validated')
+            ->get()
+            ->getRowArray();
+
+        if (!$apl1) {
+            return $this->fail("APL1 tidak ditemukan atau belum tervalidasi");
         }
 
         // Prepare details if available
@@ -538,5 +532,137 @@ class Observasi extends DataTableController
             log_message('error', 'Error getting progress report: ' . $e->getMessage());
             return $this->fail('Gagal mengambil laporan progress: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Get APL1 details by ID - New method for APL1
+     */
+    public function getApl1Details()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setJSON([
+                'status' => 401,
+                'error' => 'Unauthorized: Direct access not allowed'
+            ])->setStatusCode(401);
+        }
+
+        $id_apl1 = $this->request->getGet('id_apl1');
+
+        if (!$id_apl1 || empty(trim($id_apl1))) {
+            return $this->fail('ID APL1 diperlukan', 400);
+        }
+
+        try {
+            $apl1Data = $this->observasiModel->getApl1Data($id_apl1);
+
+            if (!$apl1Data) {
+                return $this->fail('Data APL1 tidak ditemukan', 404);
+            }
+
+            if ($apl1Data['validasi_apl1'] !== 'validated') {
+                return $this->fail('APL1 belum tervalidasi', 400);
+            }
+
+            return $this->respond([
+                'success' => true,
+                'data' => $apl1Data
+            ]);
+        } catch (\Exception $e) {
+            log_message('error', 'Error getting APL1 details: ' . $e->getMessage());
+            return $this->fail('Gagal memuat detail APL1: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Check existing observation for APL1 - New method
+     */
+    public function checkExistingObservation()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setJSON([
+                'status' => 401,
+                'error' => 'Unauthorized: Direct access not allowed'
+            ])->setStatusCode(401);
+        }
+
+        $id_apl1 = $this->request->getGet('id_apl1');
+
+        if (!$id_apl1 || empty(trim($id_apl1))) {
+            return $this->fail('ID APL1 diperlukan', 400);
+        }
+
+        try {
+            $existingObservation = $this->observasiModel->checkExistingObservation(
+                $id_apl1,
+                $this->id_asesor
+            );
+
+            return $this->respond([
+                'success' => true,
+                'existing' => $existingObservation !== null,
+                'data' => $existingObservation
+            ]);
+        } catch (\Exception $e) {
+            log_message('error', 'Error checking existing observation: ' . $e->getMessage());
+            return $this->fail('Gagal mengecek observasi yang ada: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Debug method to check available methods
+     */
+    public function debugMethods()
+    {
+        $methods = get_class_methods($this);
+        return $this->respond([
+            'controller' => get_class($this),
+            'methods' => $methods,
+            'request_uri' => $this->request->getUri()->getPath()
+        ]);
+    }
+
+    /**
+     * Get validated APL1 list for specific schema - New method
+     */
+    public function getValidatedApl1List()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setJSON([
+                'status' => 401,
+                'error' => 'Unauthorized: Direct access not allowed'
+            ])->setStatusCode(401);
+        }
+
+        $id_skema = $this->request->getGet('id_skema');
+
+        if (!$id_skema || !filter_var($id_skema, FILTER_VALIDATE_INT)) {
+            return $this->fail('ID Skema diperlukan dan harus berupa angka', 400);
+        }
+
+        try {
+            $apl1List = $this->observasiModel->getValidatedApl1BySkema($id_skema);
+
+            return $this->respond([
+                'success' => true,
+                'data' => $apl1List,
+                'count' => count($apl1List),
+                'debug' => [
+                    'method' => __METHOD__,
+                    'id_skema' => $id_skema,
+                    'controller' => get_class($this)
+                ]
+            ]);
+        } catch (\Exception $e) {
+            log_message('error', 'Error getting validated APL1 list: ' . $e->getMessage());
+            return $this->fail('Gagal memuat daftar APL1: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get validated APL1 by skema - Alias method for backward compatibility
+     */
+    public function getValidatedApl1BySkema()
+    {
+        return $this->getValidatedApl1List();
     }
 }

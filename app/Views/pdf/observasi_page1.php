@@ -65,11 +65,9 @@
 </head>
 
 <body>
-    <!-- Document Header -->
     <div class="header">FR.IA.01. CEKLIS OBSERVASI AKTIVITAS DI TEMPAT KERJA ATAU TEMPAT KERJA SIMULASI
     </div>
 
-    <!-- Info Table -->
     <table cellpadding="4">
         <tr>
             <td rowspan="2" width="25%">Skema Sertifikasi<br>(KKNI/Okupasi/Klaster)</td>
@@ -107,7 +105,6 @@
 
     <div style="clear:both; height:10px;"></div>
 
-    <!-- Assessment Guide -->
     <div style="border: 1px solid #000; margin-top: 10px;">
         <strong>PANDUAN BAGI ASESOR:</strong>
         <ul>
@@ -118,10 +115,8 @@
         </ul>
     </div>
 
-    <!-- Competency Units -->
     <?php foreach (groupByKelompok($detailObservasi) as $kelompok): ?>
         <div style="clear:both; height:10px;"></div>
-        <!-- Kelompok Table -->
         <table cellpadding="4" border="1" cellspacing="0" width="100%">
             <tr class="grey-bg bold center">
                 <td width="20%" rowspan="<?= count($kelompok['units']) + 1 ?>">
@@ -142,14 +137,10 @@
             <?php endforeach; ?>
         </table>
 
-
-
-        <!-- Unit Details -->
         <?php foreach ($kelompok['units'] as $unit): ?>
             <div style="clear:both; height:10px;"></div>
 
             <table cellpadding="4" border="1" cellspacing="0" width="100%" style="margin-top: 20px;">
-                <!-- Unit Header -->
                 <tr class="grey-bg">
                     <td colspan="7"><strong>Unit Kompetensi</strong></td>
                 </tr>
@@ -162,7 +153,6 @@
                     <td colspan="6"><?= esc($unit['judul_unit']) ?></td>
                 </tr>
 
-                <!-- Table Header -->
                 <tr class="grey-bg center">
                     <th rowspan="2" width="5%">No.</th>
                     <th rowspan="2" width="20%">Elemen</th>
@@ -176,21 +166,37 @@
                     <th width="8%">Tidak</th>
                 </tr>
 
-                <!-- KUK Rows -->
                 <?php
-                $no = 1;
+                $elemenNo = 0;
+                $kukNo = 1;
                 $currentElemen = null;
+
                 foreach ($unit['kuk'] as $kuk):
                     $id = $kuk['id_kuk'];
                     $kompeten = $existing_data[$id]['kompeten'] ?? '';
                     $keterangan = $existing_data[$id]['keterangan'] ?? '';
-                    $elemenText = ($currentElemen !== $kuk['id_elemen']) ? esc($kuk['nama_elemen']) : '';
-                    $currentElemen = $kuk['id_elemen'];
+
+                    $displayElemenNo = '';
+                    $elemenText = '';
+
+                    // Cek jika ini adalah elemen baru
+                    if ($currentElemen !== $kuk['id_elemen']) {
+                        $elemenNo++;
+                        $kukNo = 1;
+                        $currentElemen = $kuk['id_elemen'];
+
+                        $displayElemenNo = $elemenNo . '.';
+                        $elemenText = esc($kuk['nama_elemen']);
+                    }
+
+                    // Format KUK dengan penomoran baru
+                    $kukText = $elemenNo . '.' . $kukNo . ' ' . esc($kuk['kriteria_unjuk_kerja']);
+                    $kukNo++;
                 ?>
                     <tr>
-                        <td class="center"><?= $no++ ?></td>
+                        <td class="center"><?= $displayElemenNo ?></td>
                         <td><?= $elemenText ?></td>
-                        <td><?= esc($kuk['kriteria_unjuk_kerja']) ?></td>
+                        <td><?= $kukText ?></td>
                         <td class="center">SOP</td>
                         <td class="center"><span style="font-family: dejavusans;"><?= $kompeten === 'Y' ? '☑' : '☐' ?></span></td>
                         <td class="center"><span style="font-family: dejavusans;"><?= $kompeten === 'N' ? '☑' : '☐' ?></span></td>
@@ -204,7 +210,6 @@
     <?php endforeach; ?>
     <div style="clear:both; height:10px;"></div>
 
-    <!-- Signature Section -->
     <table border="1" cellpadding="6" cellspacing="0" width="100%">
         <tr>
             <td width="30%">Nama</td>

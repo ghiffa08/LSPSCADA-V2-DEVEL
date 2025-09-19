@@ -2,153 +2,113 @@
 
 namespace App\Controllers\Api;
 
-use Exception;
-use Config\Services;
-use App\Models\UnitModel;
+use CodeIgniter\API\ResponseTrait;
 use CodeIgniter\HTTP\ResponseInterface;
 use App\Controllers\DataTableController;
 
 class Unit extends DataTableController
 {
+    use ResponseTrait;
 
     /**
-     * Constructor
+     * Constructor.
      */
     public function __construct()
     {
         parent::__construct();
-
         $this->model = $this->unitModel;
 
-        // Optional: Define custom column mapping for complex ordering
+        // Pemetaan kolom ini tetap diperlukan oleh DataTableController Anda
+        // untuk menangani sorting/pengurutan data dari sisi klien.
         $this->columnMap = [
-            0 => null, // No ordering for index column
-            1 => 'skema.id_skema',
-            1 => 'unit.id_unit',
-            1 => 'unit.kode_unit',
-            2 => 'unit.nama_unit',
-            2 => 'unit.keterangan',
-            3 => 'unit.status',
-            4 => null // No ordering for action column
+            0 => null, // No
+            1 => 'skema.nama_skema',
+            2 => 'unit.kode_unit',
+            3 => 'unit.nama_unit',
+            4 => 'unit.status',
+            5 => null  // Aksi
         ];
     }
 
     /**
-     * Save or update unit data
+     * Save or update unit data.
+     * This method now leverages the validation and save logic from the Model.
      */
+
     public function save(): ResponseInterface
     {
-        // If not AJAX request, throw 404
         if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
+            return $this->failNotFound();
         }
 
-        $modelName = UnitModel::class;
         $data = $this->request->getPost();
 
-        // Set proper field names (based on model allowedFields)
-        $formattedData = [
-            'id_unit' => $data['id_unit'] ?? null,
-            'id_skema' => $data['id_skema'],
-            'kode_unit' => $data['kode'],
-            'nama_unit' => $data['nama'],
-            'keterangan' => $data['keterangan'],
-            'status' => $data['status']
-        ];
+        // =================================================================
+        // PERBAIKAN DI SINI:
+        // Jika id_unit kosong (saat tambah data baru), hapus dari array
+        // agar database bisa menjalankan auto-increment.
+        // =================================================================
+        if (empty($data['id_unit'])) {
+            unset($data['id_unit']);
+        }
 
-        // Process before save callback (if needed)
-        $beforeSave = function ($data) {
-            // You can modify data here if needed
-            return $data;
-        };
+        // Gunakan metode save() bawaan Model.
+        if ($this->model->save($data) === false) {
+            // Jika validasi gagal, kirim error langsung dari Model.
+            return $this->failValidationErrors($this->model->errors());
+        }
 
-        // Process after save callback (if needed)
-        $afterSave = function ($data, $id) {
-            // You can perform additional actions here
-            // For example: log activity, update related records, etc.
-        };
+        // Tentukan pesan sukses berdasarkan operasi (insert/update)
+        $message = isset($data['id_unit']) && !empty($data['id_unit'])
+            ? 'Unit Kompetensi berhasil diperbarui.'
+            : 'Unit Kompetensi berhasil ditambahkan.';
 
-        // Save the data
-        $result = $this->dataService->save(
-            $modelName,
-            $formattedData,
-            'id_unit',
-            $beforeSave,
-            $afterSave
-        );
-
-        // Return response with appropriate status code
-        return $this->dataService->response($result, $result['code']);
+        return $this->respondCreated(['status' => true, 'message' => $message]);
     }
 
     /**
-     * Get unit by ID (for edit modal)
+     * Get unit by ID for edit modal.
+     * This method remains lean as its job is simple.
      */
     public function getById($id = null): ResponseInterface
     {
         if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
+            return $this->failNotFound();
         }
 
-        $unitModel = new $this->unitModel;
-        $unit = $unitModel->find($id);
-
-        if (!$unit) {
-            return $this->dataService->response([
-                'status' => false,
-                'message' => 'Unit not found'
-            ], 404);
+        $data = $this->model->find($id);
+        if (!$data) {
+            return $this->failNotFound('Data unit tidak ditemukan.');
         }
 
-        return $this->dataService->response([
-            'status' => true,
-            'data' => $unit
-        ]);
+        return $this->respond(['status' => true, 'data' => $data]);
     }
 
     /**
-     * Delete unit
+     * Delete a unit using the custom method from the Model.
      */
     public function delete($id = null): ResponseInterface
     {
         if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
+            return $this->failNotFound();
         }
-
-        $unitModel = $this->unitModel;
-
-        // Start transaction
-        $db = \Config\Database::connect();
-        $db->transStart();
 
         try {
-            $deleted = $unitModel->delete($id);
-
-            $db->transComplete();
-
-            if ($deleted) {
-                return $this->dataService->response([
-                    'status' => true,
-                    'message' => 'Unit deleted successfully'
-                ]);
-            } else {
-                return $this->dataService->response([
-                    'status' => false,
-                    'message' => 'Failed to delete unit'
-                ], 400);
+            // Memanggil metode deleteUnit() khusus dari Model untuk keamanan transaksi
+            // dan menghapus data terkait (elemen).
+            if ($this->model->deleteUnit((int)$id)) {
+                return $this->respondDeleted(['status' => true, 'message' => 'Unit berhasil dihapus.']);
             }
-        } catch (\Exception $e) {
-            $db->transRollback();
+            
+            // Pesan ini mungkin muncul jika data tidak ditemukan sebelum dihapus.
+            return $this->fail('Gagal menghapus unit. Data mungkin tidak ditemukan.', 400);
 
-            return $this->dataService->response([
-                'status' => false,
-                'message' => 'An error occurred: ' . $e->getMessage()
-            ], 500);
+        } catch (\Exception $e) {
+            return $this->failServerError('Gagal menghapus unit. Mungkin data ini terhubung dengan data lain.');
         }
     }
-
-
-    /**
+    
+       /**
      * Get unit data for AJAX request (returns HTML options)
      */
     public function getUnit()
@@ -176,36 +136,37 @@ class Unit extends DataTableController
             return '<option value="">-- Error loading data --</option>';
         }
     }
-
+    
     /**
-     * Get unit data for AJAX request (returns JSON)
+     * Get unit data for the dependent dropdown, returns JSON.
      */
-    public function getUnitJSON()
+    public function getUnitJSON(): ResponseInterface
     {
+        $id_skema = $this->request->getPost('id_skema');
+
+        if (empty($id_skema)) {
+            // Mengirim error jika id_skema tidak ada
+            return $this->fail('ID Skema diperlukan.', 400);
+        }
+
         try {
-            $id_skema = $this->request->getPost('id_skema');
-            if (empty($id_skema)) {
-                return $this->response->setJSON([
-                    'status' => 'error',
-                    'message' => 'ID skema tidak valid',
-                    'data' => []
-                ]);
-            }
+            // Gunakan UnitModel yang sudah ada di controller
+            $units = $this->unitModel
+                ->where('id_skema', $id_skema)
+                ->where('status', 'Y') // Hanya ambil unit yang aktif
+                ->orderBy('kode_unit', 'asc')
+                ->findAll();
 
-            $units = $this->unitModel->getUnitsByScheme($id_skema);
-
-            return $this->response->setJSON([
-                'status' => 'success',
-                'data' => $units
+            // Mengirim respons JSON yang sukses
+            return $this->respond([
+                'status'  => 'success',
+                'data'    => $units
             ]);
+
         } catch (\Exception $e) {
-            log_message('error', 'Error getting unit options: ' . $e->getMessage());
-
-            return $this->response->setJSON([
-                'status' => 'error',
-                'message' => 'Terjadi kesalahan saat mengambil data unit',
-                'data' => []
-            ]);
+            // Menangani jika ada error database
+            log_message('error', '[getUnitJSON] ' . $e->getMessage());
+            return $this->failServerError('Terjadi kesalahan saat mengambil data unit.');
         }
     }
 }

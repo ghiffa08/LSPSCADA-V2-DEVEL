@@ -27,9 +27,9 @@ class Database extends Config
     public array $default = [
         'DSN'          => '',
         'hostname'     => 'localhost',
-        'username'     => 'ghiffa',
-        'password'     => 'developer08',
-        'database'     => 'lsp_scada_app_devel',
+        'username'     => 'lspk5958_lspk5958',
+        'password'     => 'kng@874824',
+        'database'     => 'lspk5958_lsp_scada_app',
         'DBDriver'     => 'MySQLi',
         'DBPrefix'     => '',
         'pConnect'     => true, // Persistent connections

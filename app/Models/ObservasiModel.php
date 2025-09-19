@@ -17,8 +17,7 @@ class ObservasiModel extends Model
     protected $protectFields    = true;
     protected $allowedFields    = [
         'id_asesor',
-        'id_asesi',
-        'id_pengajuan', // Foreign key to pengajuan_asesmen table
+        'id_apl1',  // Changed from id_asesi to id_apl1
         'tanggal_observasi'
     ];
 
@@ -53,36 +52,41 @@ class ObservasiModel extends Model
     protected $afterDelete    = [];
 
     // Fields that should be searched when using DataTable
-    protected $dataTableSearchFields = ['observasi.id_asesor'];
+    protected $dataTableSearchFields = ['observasi.id_asesor', 'apl1.nama_siswa', 'apl1.nik'];
+
     /**
-     * Apply joins for DataTable query
+     * Apply joins for DataTable query - Updated for APL1
      *
      * @param object $builder Query builder instance
      * @return object
-     */    protected function applyDataTableJoins($builder)
+     */
+    protected function applyDataTableJoins($builder)
     {
-        return $builder->join('asesi', 'asesi.id_asesi = observasi.id_asesi', 'inner')
-            ->join('users as asesi_user', 'asesi_user.id = asesi.id_user')
-            ->join('pengajuan_asesmen', 'pengajuan_asesmen.id_pengajuan = observasi.id_pengajuan', 'inner')
+        return $builder->join('apl1', 'apl1.id_apl1 = observasi.id_apl1', 'inner')
+            ->join('asesmen', 'asesmen.id_asesmen = apl1.id_asesmen', 'inner')
             ->join('asesor', 'asesor.id_asesor = observasi.id_asesor', 'inner')
             ->join('users as asesor_user', 'asesor_user.id = asesor.id_user', 'inner')
-            ->join('skema', 'skema.id_skema = pengajuan_asesmen.id_skema');
+            ->join('skema', 'skema.id_skema = asesmen.id_skema', 'inner')
+               ->join('tuk', 'tuk.id_tuk = asesmen.id_tuk', 'inner');;
     }
 
     /**
-     * Apply custom select fields for DataTable query
+     * Apply custom select fields for DataTable query - Updated for APL1
      *
      * @param object $builder Query builder instance
      * @return object
-     */    protected function applyDataTableSelects($builder)
+     */
+    protected function applyDataTableSelects($builder)
     {
         return $builder->select(
             'observasi.*, 
             asesor_user.nama_lengkap AS nama_asesor, 
-            asesi_user.nama_lengkap AS nama_asesi, 
+            apl1.nama_siswa AS nama_asesi,
+            apl1.nik,
+            apl1.email,
             skema.nama_skema,
-            pengajuan_asesmen.status_pengajuan,
-            pengajuan_asesmen.status'
+            tuk.nama_tuk,
+            apl1.validasi_apl1 as status_pengajuan'
         );
     }
 
@@ -100,19 +104,19 @@ class ObservasiModel extends Model
     }
 
     /**
-     * Get asesi data for the given assessment ID
-     */    public function getAsesiBySkema($id_skema)
+     * Get asesi data for the given assessment ID - Updated for APL1
+     */
+    public function getAsesiBySkema($id_skema)
     {
-        $builder = $this->db->table('pengajuan_asesmen');
+        $builder = $this->db->table('apl1');
         $builder->select('
-            asesi.id_asesi, 
-            users.nama_lengkap as nama_lengkap,
-            pengajuan_asesmen.status_pengajuan
+            apl1.id_apl1, 
+            apl1.nama_siswa as nama_lengkap,
+            apl1.validasi_apl1 as status_pengajuan
         ');
-        $builder->join('asesi', 'asesi.id_asesi = pengajuan_asesmen.id_asesi', 'inner');
-        $builder->join('users', 'users.id = asesi.id_user', 'inner');
-        $builder->where('pengajuan_asesmen.id_skema', $id_skema);
-        $builder->where('pengajuan_asesmen.status_pengajuan', 'diterima'); // Only accepted applications
+        $builder->join('asesmen', 'asesmen.id_asesmen = apl1.id_asesmen', 'inner');
+        $builder->where('asesmen.id_skema', $id_skema);
+        $builder->where('apl1.validasi_apl1', 'validated'); // Only validated applications
 
         return $builder->get()->getResultArray();
     }
@@ -150,7 +154,7 @@ class ObservasiModel extends Model
             e.nama_elemen,
             k.id_kuk,
             k.kode_kuk,
-            k.nama_kuk AS kriteria_unjuk_kerja,
+          k.pertanyaan AS kriteria_unjuk_kerja,
             CONCAT(u.kode_unit, '.', e.kode_elemen, '.', k.kode_kuk) as hierarchy_path
         FROM skema s
         INNER JOIN unit u ON u.id_skema = s.id_skema AND u.status = 'Y'
@@ -172,7 +176,6 @@ class ObservasiModel extends Model
 
         return $structuredData;
     }
-
 
     /**
      * Transform flat query result into hierarchical structure
@@ -267,19 +270,19 @@ class ObservasiModel extends Model
         return $structure;
     }
 
-
     /**
-     * Get observation schema structure by observation ID
+     * Get observation schema structure by observation ID - Updated for APL1
      *
      * @param int $id_observasi Observation ID
      * @return array
-     */    public function getStrukturById(int $id_observasi): array
+     */
+    public function getStrukturById(int $id_observasi): array
     {
-        // PERBAIKAN: Get the schema ID from the observation dengan relasi yang benar
+        // Get the schema ID from the observation with correct relations
         $observasiBuilder = $this->db->table('observasi o');
-        $observasiBuilder->select('asm.id_skema'); // PERBAIKAN: Ambil id_skema dari asesmen
-        $observasiBuilder->join('pengajuan_asesmen pa', 'pa.id_pengajuan = o.id_pengajuan', 'inner');
-        $observasiBuilder->join('asesmen asm', 'asm.id_asesmen = pa.id_asesmen', 'inner'); // PERBAIKAN: JOIN ke asesmen
+        $observasiBuilder->select('asesmen.id_skema');
+        $observasiBuilder->join('apl1', 'apl1.id_apl1 = o.id_apl1', 'inner');
+        $observasiBuilder->join('asesmen', 'asesmen.id_asesmen = apl1.id_asesmen', 'inner');
         $observasiBuilder->where('o.id_observasi', $id_observasi);
 
         $observasiResult = $observasiBuilder->get()->getRowArray();
@@ -294,45 +297,42 @@ class ObservasiModel extends Model
         return $this->getStrukturObservasiSkema($id_skema);
     }
 
-
     /**
-     * Get observation metadata including assessee signature only
+     * Get observation metadata including assessee data - Updated for APL1
      *
-     * @param string $id_asesi Assessee ID
+     * @param string $id_apl1 APL1 ID
      * @param int $id_skema Schema ID
      * @return array|null
      */
-    public function getObservasiData(string $id_asesi, int $id_skema): ?array
+    public function getObservasiData(string $id_apl1, int $id_skema): ?array
     {
         $builder = $this->db->table('observasi');
         $builder->select([
             'observasi.*',
-            'asesi.nik',
-            'asesi_user.nama_lengkap as nama_asesi',
-            'asesi_user.email as email_asesi',
+            'apl1.nik',
+            'apl1.nama_siswa as nama_asesi',
+            'apl1.email as email_asesi',
             'asesor_user.nama_lengkap as nama_asesor',
             'asesor_user.email as email_asesor',
             'skema.nama_skema',
             'skema.kode_skema'
         ]);
-        // Join tables dengan relasi yang benar
-        $builder->join('asesi', 'asesi.id_asesi = observasi.id_asesi', 'inner');
-        $builder->join('users as asesi_user', 'asesi_user.id = asesi.id_user');
-        $builder->join('pengajuan_asesmen pa', 'pa.id_pengajuan = observasi.id_pengajuan', 'inner');
-        $builder->join('asesmen asm', 'asm.id_asesmen = pa.id_asesmen', 'inner'); // PERBAIKAN: JOIN ke asesmen
+        // Join tables with correct relations for APL1
+        $builder->join('apl1', 'apl1.id_apl1 = observasi.id_apl1', 'inner');
+        $builder->join('asesmen', 'asesmen.id_asesmen = apl1.id_asesmen', 'inner');
         $builder->join('asesor', 'asesor.id_asesor = observasi.id_asesor', 'inner');
         $builder->join('users as asesor_user', 'asesor_user.id = asesor.id_user', 'inner');
-        $builder->join('skema', 'skema.id_skema = asm.id_skema'); // PERBAIKAN: JOIN dari asesmen ke skema
+        $builder->join('skema', 'skema.id_skema = asesmen.id_skema', 'inner');
 
         // Apply filters
-        $builder->where('observasi.id_asesi', $id_asesi);
-        $builder->where('asm.id_skema', $id_skema); // PERBAIKAN: Filter skema dari asesmen
+        $builder->where('observasi.id_apl1', $id_apl1);
+        $builder->where('asesmen.id_skema', $id_skema);
 
         return $builder->get()->getRowArray();
     }
 
     /**
-     * Get observation metadata including assessee signature by observation ID
+     * Get observation metadata by observation ID - Updated for APL1
      *
      * @param int $id_observasi Observation ID
      * @return array|null
@@ -342,22 +342,20 @@ class ObservasiModel extends Model
         $builder = $this->db->table('observasi');
         $builder->select([
             'observasi.*',
-            'asesi.nik',
-            'asesi_user.nama_lengkap as nama_asesi',
-            'asesi_user.email as email_asesi',
+            'apl1.nik',
+            'apl1.nama_siswa as nama_asesi',
+            'apl1.email as email_asesi',
             'asesor_user.nama_lengkap as nama_asesor',
             'asesor_user.email as email_asesor',
             'skema.nama_skema',
             'skema.kode_skema'
         ]);
-        // Join tables dengan relasi yang benar
-        $builder->join('asesi', 'asesi.id_asesi = observasi.id_asesi', 'inner');
-        $builder->join('users as asesi_user', 'asesi_user.id = asesi.id_user');
-        $builder->join('pengajuan_asesmen pa', 'pa.id_pengajuan = observasi.id_pengajuan', 'inner');
-        $builder->join('asesmen asm', 'asm.id_asesmen = pa.id_asesmen', 'inner'); // PERBAIKAN: JOIN ke asesmen
+        // Join tables with correct relations for APL1
+        $builder->join('apl1', 'apl1.id_apl1 = observasi.id_apl1', 'inner');
+        $builder->join('asesmen', 'asesmen.id_asesmen = apl1.id_asesmen', 'inner');
         $builder->join('asesor', 'asesor.id_asesor = observasi.id_asesor', 'inner');
         $builder->join('users as asesor_user', 'asesor_user.id = asesor.id_user', 'inner');
-        $builder->join('skema', 'skema.id_skema = asm.id_skema'); // PERBAIKAN: JOIN dari asesmen ke skema
+        $builder->join('skema', 'skema.id_skema = asesmen.id_skema', 'inner');
 
         // Filter by observation ID
         $builder->where('observasi.id_observasi', $id);
@@ -366,17 +364,17 @@ class ObservasiModel extends Model
     }
 
     /**
-     * Get existing observation data for a specific assessee
+     * Get existing observation data for a specific assessee - Updated for APL1
      *
-     * @param int $id_asesi Assessee ID
+     * @param string $id_apl1 APL1 ID
      * @return array
      */
-    public function getExistingObservasi(string $id_asesi): array
+    public function getExistingObservasi(string $id_apl1): array
     {
         $builder = $this->db->table('detail_observasi');
         $builder->select('detail_observasi.id_kuk, detail_observasi.kompeten, detail_observasi.keterangan');
         $builder->join('observasi', 'observasi.id_observasi = detail_observasi.id_observasi', 'inner');
-        $builder->where('observasi.id_asesi', $id_asesi);
+        $builder->where('observasi.id_apl1', $id_apl1);
 
         $result = $builder->get()->getResultArray();
 
@@ -419,18 +417,18 @@ class ObservasiModel extends Model
     }
 
     /**
-     * Get work groups with units for a scheme based on observation ID
+     * Get work groups with units for a scheme based on observation ID - Updated for APL1
      * 
      * @param int $id_observasi Observation ID
      * @return array
      */
     public function getWorkGroupsWithUnitsById(int $id_observasi): array
     {
-        // PERBAIKAN: Get the schema ID related to this observation dengan relasi yang benar
+        // Get the schema ID related to this observation with correct relations
         $observasiQuery = $this->db->table('observasi o')
-            ->select('asm.id_skema') // PERBAIKAN: Ambil id_skema dari asesmen
-            ->join('pengajuan_asesmen pa', 'pa.id_pengajuan = o.id_pengajuan', 'inner')
-            ->join('asesmen asm', 'asm.id_asesmen = pa.id_asesmen', 'inner') // PERBAIKAN: JOIN ke asesmen
+            ->select('asesmen.id_skema')
+            ->join('apl1', 'apl1.id_apl1 = o.id_apl1', 'inner')
+            ->join('asesmen', 'asesmen.id_asesmen = apl1.id_asesmen', 'inner')
             ->where('o.id_observasi', $id_observasi)
             ->get()
             ->getRowArray();
@@ -455,7 +453,7 @@ class ObservasiModel extends Model
         LEFT JOIN kelompok_kerja kk ON kk.id_kelompok = ku.id_kelompok AND kk.id_skema = u.id_skema
         WHERE u.id_skema = ? AND u.status = 'Y'
         ORDER BY COALESCE(kk.id_kelompok, 1), u.kode_unit
-    ";
+        ";
 
         $result = $this->db->query($sql, [$id_skema])->getResultArray();
 
@@ -483,7 +481,7 @@ class ObservasiModel extends Model
     }
 
     /**
-     * Save observation data with details
+     * Save observation data with details - Updated for APL1
      * Unified method to handle different types of observation saves
      * 
      * @param array $masterData Master observation data
@@ -504,7 +502,7 @@ class ObservasiModel extends Model
                 // Check if there's an existing record
                 $existing = $db->table($this->table)
                     ->where('id_asesor', $masterData['id_asesor'])
-                    ->where('id_asesi', $masterData['id_asesi'])
+                    ->where('id_apl1', $masterData['id_apl1']) // Changed from id_asesi to id_apl1
                     ->where('tanggal_observasi', $masterData['tanggal_observasi'])
                     ->get()
                     ->getRow();
@@ -686,6 +684,7 @@ class ObservasiModel extends Model
 
         return true;
     }
+
     /**
      * Get observation data by ID
      */
@@ -710,7 +709,7 @@ class ObservasiModel extends Model
     }
 
     /**
-     * EAGER LOADING: Get observation data with all related information in single query
+     * EAGER LOADING: Get observation data with all related information in single query - Updated for APL1
      * Eliminates N+1 problem when loading observation details
      *
      * @param int $id_observasi Observation ID
@@ -730,18 +729,19 @@ class ObservasiModel extends Model
             o.id_observasi,
             o.tanggal_observasi,
             o.id_asesor,
-            o.id_asesi,
-            o.id_pengajuan,
+            o.id_apl1,
             
             -- Asesor data
             asesor.nomor_registrasi as asesor_nomor_registrasi,
             asesor_user.nama_lengkap as asesor_nama,
             asesor_user.email as asesor_email,
             
-            -- Asesi data
-            asesi.nik as asesi_nik,
-            asesi_user.nama_lengkap as asesi_nama,
-            asesi_user.email as asesi_email,
+            -- Asesi data from APL1
+            apl1.nik as asesi_nik,
+            apl1.nama_siswa as asesi_nama,
+            apl1.email as asesi_email,
+            apl1.no_hp as asesi_phone,
+            apl1.validasi_apl1 as status_validasi,
             
             -- Skema data
             s.id_skema,
@@ -749,10 +749,9 @@ class ObservasiModel extends Model
             s.nama_skema,
             s.jenis_skema,
             
-            -- Pengajuan data
-            pa.status_pengajuan,
-            pa.status as pengajuan_status,
-            pa.tanggal_pengajuan,
+            -- Asesmen data
+            asm.tujuan as tujuan_asesmen,
+            asm.created_at as tanggal_asesmen,
             
             -- Aggregated statistics
             (SELECT COUNT(*) FROM detail_observasi do1 WHERE do1.id_observasi = o.id_observasi) as total_kuk,
@@ -762,10 +761,9 @@ class ObservasiModel extends Model
         FROM observasi o
         INNER JOIN asesor ON asesor.id_asesor = o.id_asesor
         INNER JOIN users asesor_user ON asesor_user.id = asesor.id_user
-        INNER JOIN asesi ON asesi.id_asesi = o.id_asesi
-        INNER JOIN users asesi_user ON asesi_user.id = asesi.id_user
-        INNER JOIN pengajuan_asesmen pa ON pa.id_pengajuan = o.id_pengajuan
-        INNER JOIN skema s ON s.id_skema = pa.id_skema
+        INNER JOIN apl1 ON apl1.id_apl1 = o.id_apl1
+        INNER JOIN asesmen asm ON asm.id_asesmen = apl1.id_asesmen
+        INNER JOIN skema s ON s.id_skema = asm.id_skema
         WHERE o.id_observasi = ?
         ";
 
@@ -783,7 +781,7 @@ class ObservasiModel extends Model
             do.kompeten,
             do.keterangan,
             k.kode_kuk,
-            k.nama_kuk,
+            k.pertanyaan,
             e.kode_elemen,
             e.nama_elemen,
             u.kode_unit,
@@ -873,7 +871,7 @@ class ObservasiModel extends Model
     }
 
     /**
-     * OPTIMIZED: Get DataTable data with eager loading
+     * OPTIMIZED: Get DataTable data with eager loading - Updated for APL1
      * Single query with all joins to eliminate N+1 problem
      *
      * @param array $params DataTable parameters
@@ -886,7 +884,7 @@ class ObservasiModel extends Model
         $length = $params['length'] ?? 10;
         $search = $params['search']['value'] ?? '';
 
-        // Build optimized query with all necessary joins
+        // Build optimized query with all necessary joins for APL1
         $sql = "
         SELECT 
             o.id_observasi,
@@ -896,17 +894,17 @@ class ObservasiModel extends Model
             asesor_user.nama_lengkap as nama_asesor,
             asesor.nomor_registrasi as reg_asesor,
             
-            -- Asesi info  
-            asesi_user.nama_lengkap as nama_asesi,
-            asesi.nik as nik_asesi,
+            -- Asesi info from APL1
+            apl1.nama_siswa as nama_asesi,
+            apl1.nik as nik_asesi,
+            apl1.email as email_asesi,
             
             -- Skema info
             s.kode_skema,
             s.nama_skema,
             
             -- Status info
-            pa.status_pengajuan,
-            pa.status as pengajuan_status,
+            apl1.validasi_apl1 as status_pengajuan,
             
             -- Progress calculation
             COALESCE(progress.total_kuk, 0) as total_kuk,
@@ -919,10 +917,9 @@ class ObservasiModel extends Model
         FROM observasi o
         INNER JOIN asesor ON asesor.id_asesor = o.id_asesor
         INNER JOIN users asesor_user ON asesor_user.id = asesor.id_user
-        INNER JOIN asesi ON asesi.id_asesi = o.id_asesi  
-        INNER JOIN users asesi_user ON asesi_user.id = asesi.id_user
-        INNER JOIN pengajuan_asesmen pa ON pa.id_pengajuan = o.id_pengajuan
-        INNER JOIN skema s ON s.id_skema = pa.id_skema
+        INNER JOIN apl1 ON apl1.id_apl1 = o.id_apl1  
+        INNER JOIN asesmen asm ON asm.id_asesmen = apl1.id_asesmen
+        INNER JOIN skema s ON s.id_skema = asm.id_skema
         LEFT JOIN (
             SELECT 
                 do.id_observasi,
@@ -940,8 +937,8 @@ class ObservasiModel extends Model
         if (!empty($search)) {
             $whereConditions[] = "(
                 asesor_user.nama_lengkap LIKE ? OR
-                asesi_user.nama_lengkap LIKE ? OR  
-                asesi.nik LIKE ? OR
+                apl1.nama_siswa LIKE ? OR  
+                apl1.nik LIKE ? OR
                 s.kode_skema LIKE ? OR
                 s.nama_skema LIKE ?
             )";
@@ -977,7 +974,7 @@ class ObservasiModel extends Model
     }
 
     /**
-     * BATCH LOADING: Get multiple observations with details in single query
+     * BATCH LOADING: Get multiple observations with details in single query - Updated for APL1
      * Useful for reports and bulk operations
      *
      * @param array $observationIds Array of observation IDs
@@ -996,7 +993,7 @@ class ObservasiModel extends Model
             o.id_observasi,
             o.tanggal_observasi,
             asesor_user.nama_lengkap as asesor_nama,
-            asesi_user.nama_lengkap as asesi_nama,
+            apl1.nama_siswa as asesi_nama,
             s.kode_skema,
             s.nama_skema,
             
@@ -1005,17 +1002,16 @@ class ObservasiModel extends Model
             do.kompeten,
             do.keterangan,
             k.kode_kuk,
-            k.nama_kuk,
+          k.pertanyaan,
             e.kode_elemen,
             u.kode_unit
             
         FROM observasi o
         INNER JOIN asesor ON asesor.id_asesor = o.id_asesor
         INNER JOIN users asesor_user ON asesor_user.id = asesor.id_user
-        INNER JOIN asesi ON asesi.id_asesi = o.id_asesi
-        INNER JOIN users asesi_user ON asesi_user.id = asesi.id_user
-        INNER JOIN pengajuan_asesmen pa ON pa.id_pengajuan = o.id_pengajuan
-        INNER JOIN skema s ON s.id_skema = pa.id_skema
+        INNER JOIN apl1 ON apl1.id_apl1 = o.id_apl1
+        INNER JOIN asesmen asm ON asm.id_asesmen = apl1.id_asesmen
+        INNER JOIN skema s ON s.id_skema = asm.id_skema
         LEFT JOIN detail_observasi do ON do.id_observasi = o.id_observasi
         LEFT JOIN kuk k ON k.id_kuk = do.id_kuk
         LEFT JOIN elemen e ON e.id_elemen = k.id_elemen
@@ -1061,18 +1057,19 @@ class ObservasiModel extends Model
     }
 
     /**
-     * Get observation data for PDF generation - PERBAIKAN GET DATA SAJA
+     * Get observation data for PDF generation - Updated for APL1
      */
     public function getObservasiForPDF(int $id_observasi): array
     {
         try {
-            // PERBAIKAN: Get main observasi data dengan relasi yang benar
+            // Get main observasi data with correct relations for APL1
             $observasi = $this->db->table('observasi o')
                 ->select([
                     'o.*',
-                    'asesi.nik as nik_asesi',
-                    'asesi_user.nama_lengkap as nama_asesi',
-                    'asesi_user.email as email_asesi',
+                    'apl1.nik as nik_asesi',
+                    'apl1.nama_siswa as nama_asesi',
+                    'apl1.email as email_asesi',
+                    'apl1.no_hp as phone_asesi',
                     'asesor_user.nama_lengkap as nama_asesor',
                     'asesor_user.email as email_asesor',
                     'skema.nama_skema',
@@ -1082,13 +1079,11 @@ class ObservasiModel extends Model
                     'tuk.nama_tuk',
                     'tuk.jenis_tuk'
                 ])
-                ->join('asesi', 'asesi.id_asesi = o.id_asesi', 'inner')
-                ->join('users as asesi_user', 'asesi_user.id = asesi.id_user', 'inner')
+                ->join('apl1', 'apl1.id_apl1 = o.id_apl1', 'inner')
                 ->join('asesor', 'asesor.id_asesor = o.id_asesor', 'inner')
                 ->join('users as asesor_user', 'asesor_user.id = asesor.id_user', 'inner')
-                ->join('pengajuan_asesmen pa', 'pa.id_pengajuan = o.id_pengajuan', 'inner')
-                ->join('asesmen asm', 'asm.id_asesmen = pa.id_asesmen', 'inner') // PERBAIKAN: JOIN ke asesmen
-                ->join('skema', 'skema.id_skema = asm.id_skema', 'inner') // PERBAIKAN: JOIN dari asesmen ke skema
+                ->join('asesmen asm', 'asm.id_asesmen = apl1.id_asesmen', 'inner')
+                ->join('skema', 'skema.id_skema = asm.id_skema', 'inner')
                 ->join('tuk', 'tuk.id_tuk = asm.id_tuk', 'left') // JOIN ke TUK
                 ->where('o.id_observasi', $id_observasi)
                 ->get()
@@ -1101,7 +1096,7 @@ class ObservasiModel extends Model
                 ];
             }
 
-            // PERBAIKAN: Get detail observasi dengan struktur yang sesuai untuk VIEW yang sudah ada
+            // Get detail observasi dengan struktur yang sesuai untuk VIEW yang sudah ada
             $detailObservasi = $this->getDetailObservasiForPDF($id_observasi, $observasi['id_skema']);
 
             return [
@@ -1126,7 +1121,7 @@ class ObservasiModel extends Model
     }
 
     /**
-     * PERBAIKAN: Get detail observasi dalam format yang sesuai dengan VIEW yang sudah ada
+     * Get detail observasi dalam format yang sesuai dengan VIEW yang sudah ada
      */
     private function getDetailObservasiForPDF(int $id_observasi, int $id_skema): array
     {
@@ -1145,8 +1140,7 @@ class ObservasiModel extends Model
                     e.nama_elemen,
                     k.id_kuk,
                     k.kode_kuk,
-                    k.nama_kuk,
-                    k.nama_kuk as kriteria_unjuk_kerja
+                  k.pertanyaan as kriteria_unjuk_kerja
                 FROM unit u
                 LEFT JOIN kelompok_unit ku ON ku.id_unit = u.id_unit
                 LEFT JOIN kelompok_kerja kk ON kk.id_kelompok = ku.id_kelompok AND kk.id_skema = u.id_skema
@@ -1162,7 +1156,7 @@ class ObservasiModel extends Model
 
             $rawData = $this->db->query($sql, [$id_skema])->getResultArray();
 
-            // PERBAIKAN: Format data sesuai dengan yang diharapkan oleh VIEW yang sudah ada
+            // Format data sesuai dengan yang diharapkan oleh VIEW yang sudah ada
             $structured = [];
 
             foreach ($rawData as $row) {
@@ -1192,7 +1186,6 @@ class ObservasiModel extends Model
                     'id_kuk' => $row['id_kuk'],
                     'id_elemen' => $row['id_elemen'],
                     'kode_kuk' => $row['kode_kuk'],
-                    'nama_kuk' => $row['nama_kuk'],
                     'kriteria_unjuk_kerja' => $row['kriteria_unjuk_kerja'],
                     'nama_elemen' => $row['nama_elemen']
                 ];
@@ -1203,5 +1196,68 @@ class ObservasiModel extends Model
             log_message('error', 'Error getting detail observasi for PDF: ' . $e->getMessage());
             return [];
         }
+    }
+
+    /**
+     * Get APL1 data by ID - New method specific for APL1
+     *
+     * @param string $id_apl1 APL1 ID
+     * @return array|null
+     */
+    public function getApl1Data(string $id_apl1): ?array
+    {
+        return $this->db->table('apl1')
+            ->select([
+                'apl1.*',
+                'asesmen.id_skema',
+                'asesmen.tujuan',
+                'skema.nama_skema',
+                'skema.kode_skema'
+            ])
+            ->join('asesmen', 'asesmen.id_asesmen = apl1.id_asesmen', 'inner')
+            ->join('skema', 'skema.id_skema = asesmen.id_skema', 'inner')
+            ->where('apl1.id_apl1', $id_apl1)
+            ->get()
+            ->getRowArray();
+    }
+
+    /**
+     * Get validated APL1 data for specific schema - New method for APL1
+     *
+     * @param int $id_skema Schema ID
+     * @return array
+     */
+    public function getValidatedApl1BySkema(int $id_skema): array
+    {
+        return $this->db->table('apl1')
+            ->select([
+                'apl1.id_apl1',
+                'apl1.nama_siswa',
+                'apl1.nik',
+                'apl1.email',
+                'apl1.no_hp',
+                'apl1.validasi_apl1'
+            ])
+            ->join('asesmen', 'asesmen.id_asesmen = apl1.id_asesmen', 'inner')
+            ->where('asesmen.id_skema', $id_skema)
+            ->where('apl1.validasi_apl1', 'validated')
+            ->get()
+            ->getResultArray();
+    }
+
+    /**
+     * Check if observation exists for APL1
+     *
+     * @param string $id_apl1 APL1 ID
+     * @param int $id_asesor Asesor ID
+     * @return array|null
+     */
+    public function checkExistingObservation(string $id_apl1, int $id_asesor): ?array
+    {
+        return $this->db->table('observasi')
+            ->where('id_apl1', $id_apl1)
+            ->where('id_asesor', $id_asesor)
+            ->get()
+            ->getRowArray();
     }
 }

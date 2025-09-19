@@ -47,62 +47,27 @@ class APL1Controller extends BaseController
         $this->dynamicDependentModel = new \App\Models\DynamicDependent();
     }
 
-    /**
-     * Display list of APL1 forms
-     */
-    public function index(): string
-    {
-        try {
-            // Get all APL1 data
-            $listAPL1 = $this->apl1Model->findAllAPL1();
-
-            // Get email validation data for today (untuk admin)
-            $listEmailAPL1 = [];
-            // if (in_groups('Admin')) {
-            $listEmailAPL1 = $this->apl1Model->getEmailValidasiToday();
-            // }
-
-            $data = [
-                'siteTitle' => 'Kelola APL 1',
-                'listAPL1' => $listAPL1,
-                'listEmailAPL1' => $listEmailAPL1
-            ];
-
-            return view('admin/kelola_apl1', $data);
-        } catch (\Exception $e) {
-            log_message('error', 'Error in APL1Controller::index(): ' . $e->getMessage());
-
-            // Return empty data structure on error
-            $data = [
-                'siteTitle' => 'Kelola APL 1',
-                'listAPL1' => ['data' => [], 'total' => 0],
-                'listEmailAPL1' => []
-            ];
-
-            return view('admin/kelola_apl1', $data);
-        }
-    }
 
     public function pdf($id_apl1)
     {
-        $dataAPL1 = $this->apl1Model->getAPL1($id_apl1);
-        $listUnit = $this->unitModel->getUnit($dataAPL1['skema_id']);
+        $dataPengajuan = $this->pengajuanAsesmenModel->getPengajuanById($id_apl1);
+    $listUnit = $this->unitModel->getUnit($dataPengajuan['id_skema']);
 
 
-        $jenis_kelamin = ($dataAPL1['jenis_kelamin'] == "Laki-Laki") ? 'Laki-Laki / <span style="text-decoration: line-through;">Perempuan</span>' : '<span style="text-decoration: line-through;">Laki-Laki</span> / Perempuan';
+        $jenis_kelamin = ($dataPengajuan['jenis_kelamin'] == "Laki-Laki") ? 'Laki-Laki / <span style="text-decoration: line-through;">Perempuan</span>' : '<span style="text-decoration: line-through;">Laki-Laki</span> / Perempuan';
 
         $jenis_sertifikasi = '';
 
-        if ($dataAPL1['jenis_skema'] == "KKNI") {
+        if ($dataPengajuan['jenis_skema'] == "KKNI") {
             $jenis_sertifikasi = 'KKNI / <span style="text-decoration: line-through;">Okupasi</span>/<span style="text-decoration: line-through;">Klaster</span>';
-        } elseif ($dataAPL1['jenis_skema'] == "Okupasi") {
+        } elseif ($dataPengajuan['jenis_skema'] == "Okupasi") {
             $jenis_sertifikasi = '<span style="text-decoration: line-through;">KKNI</span>/Okupasi/<span style="text-decoration: line-through;">Klaster</span>';
         } else {
             $jenis_sertifikasi = '<span style="text-decoration: line-through;">KKNI</span>/<span style="text-decoration: line-through;">Okupasi</span>/Klaster';
         }
 
         $tujuan = '';
-        if ($dataAPL1['tujuan'] == "Sertifikasi") {
+        if ($dataPengajuan['tujuan'] == "Sertifikasi") {
             $tujuan = '
              <tr>
               <td colspan="2" rowspan="4">Tujuan Asesmen</td>
@@ -122,7 +87,7 @@ class APL1Controller extends BaseController
             <td><span style="text-decoration: line-through;">Lainya</span></td>
             </tr>
             ';
-        } elseif ($dataAPL1['tujuan'] == "PKT") {
+        } elseif ($dataPengajuan['tujuan'] == "PKT") {
             $tujuan = '
              <tr>
               <td colspan="2" rowspan="4">Tujuan Asesmen</td>
@@ -142,7 +107,7 @@ class APL1Controller extends BaseController
             <td><span style="text-decoration: line-through;">Lainya</span></td>
             </tr>
             ';
-        } elseif ($dataAPL1['tujuan'] == "RPL") {
+        } elseif ($dataPengajuan['tujuan'] == "RPL") {
             $tujuan = '
              <tr>
               <td colspan="2" rowspan="4">Tujuan Asesmen</td>
@@ -207,25 +172,25 @@ class APL1Controller extends BaseController
             ';
         }
 
-        $status_apl1 = '';
-        if ($dataAPL1['validasi_apl1'] == "validated") {
-            $status_apl1 = '
-           Diterima / <span style="text-decoration: line-through;">Tidak Diterima</span>
-            ';
-        } elseif ($dataAPL1['validasi_apl1'] == "unvalidated") {
-            $status_apl1 = '
-           <span style="text-decoration: line-through;">Diterima</span> / Tidak Diterima
-            ';
-        } else {
-            $status_apl1 = '
-           Diterima / Tidak Diterima
-            ';
-        }
+        // $status_apl1 = '';
+        // if ($dataPengajuan['validasi_apl1'] == "validated") {
+        //     $status_apl1 = '
+        //    Diterima / <span style="text-decoration: line-through;">Tidak Diterima</span>
+        //     ';
+        // } elseif ($dataPengajuan['validasi_apl1'] == "unvalidated") {
+        //     $status_apl1 = '
+        //    <span style="text-decoration: line-through;">Diterima</span> / Tidak Diterima
+        //     ';
+        // } else {
+        //     $status_apl1 = '
+        //    Diterima / Tidak Diterima
+        //     ';
+        // }
 
 
-        $nama_admin = (isset($dataAPL1['validator_apl1'])) ? $dataAPL1['validator_apl1'] : '';
+        // $nama_admin = (isset($dataPengajuan['validator_apl1'])) ? $dataPengajuan['validator_apl1'] : '';
 
-        $tanda_tangan_admin = (isset($dataAPL1['ttd_validator_apl1'])) ?  $dataAPL1['ttd_validator_apl1'] : '';
+        // $tanda_tangan_admin = (isset($dataPengajuan['ttd_validator_apl1'])) ?  $dataPengajuan['ttd_validator_apl1'] : '';
 
 
         // Create a new PDF document
@@ -236,7 +201,7 @@ class APL1Controller extends BaseController
         $pdf->SetAuthor('LSP SMK NEGERI 2 Kuningan');
 
         // Set title based on user's full name
-        $pdf->SetTitle('FR.APL.01. ' . $dataAPL1['nama_siswa']);
+        $pdf->SetTitle('FR.APL.01. ');
 
         // Set default header data
         $pdf->SetHeaderData(PDF_HEADER_LOGO, PDF_HEADER_LOGO_WIDTH, 'LEMBAGA SERTIFIKASI PROFESI - P1 SMK NEGERI 2 KUNINGAN', PDF_HEADER_STRING);
@@ -719,9 +684,11 @@ class APL1Controller extends BaseController
         return view('dashboard/validasi_apl1', $data);
     }
 
+    /**
+     * Store validation data AND send notification email automatically.
+     */
     public function store_validasi()
     {
-
         $rules = [
             'validasi_apl1' => [
                 'label' => 'Validasi',
@@ -735,14 +702,39 @@ class APL1Controller extends BaseController
         if (!$this->validate($rules)) {
             return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
         }
+
+        $id_apl1 = $this->request->getVar('id');
+        $validationStatus = $this->request->getVar('validasi_apl1');
+
+        // Data untuk diupdate di database
+        // HANYA baris 'tanggal_validasi' yang dihapus dari sini
         $data = [
-            'validasi_apl1' => $this->request->getVar('validasi_apl1'),
+            'validasi_apl1' => $validationStatus,
             'validasi_admin' => $this->request->getVar('id_admin'),
         ];
 
-        $this->apl1Model->update($this->request->getVar('id'), $data);
+        // 1. Update data validasi di database
+        if (!$this->apl1Model->update($id_apl1, $data)) {
+            session()->setFlashdata('error', 'Gagal memperbarui status validasi di database.');
+            return redirect()->to('kelola_apl1/validasi');
+        }
 
-        session()->setFlashdata('pesan', 'Form APL 1 berhasil divalidasi!');
+        // 2. Kirim email notifikasi secara otomatis
+        try {
+            $asesiData = $this->apl1Model->getAsesiDetailForEmail($id_apl1);
+
+            if ($asesiData) {
+                $this->sendValidationEmail($asesiData, $id_apl1);
+                $this->apl1Model->update($id_apl1, ['email_validasi' => 1]);
+                session()->setFlashdata('pesan', 'Form APL 1 berhasil divalidasi dan email notifikasi telah dikirim!');
+            } else {
+                session()->setFlashdata('warning', 'Form APL 1 berhasil divalidasi, namun data asesi tidak ditemukan untuk pengiriman email.');
+            }
+        } catch (\Exception $e) {
+            log_message('error', 'Gagal kirim email validasi otomatis untuk APL1 ID ' . $id_apl1 . ': ' . $e->getMessage());
+            session()->setFlashdata('warning', 'Form APL 1 berhasil divalidasi, namun email notifikasi gagal dikirim. Anda dapat mencoba mengirim ulang secara manual.');
+        }
+
         return redirect()->to('kelola_apl1/validasi');
     }
 
@@ -914,9 +906,9 @@ class APL1Controller extends BaseController
         $subject = 'Validasi Data Pendaftaran Uji Kompetensi Keahlian';
 
         $emailData = [
-            'nama_asesi' => $nama_asesi,
+            'name' => $nama_asesi,
             'skema' => $skema,
-            'id_apl1' => $id_apl1,
+            'id' => $id_apl1,
             'status_validasi' => $asesi['validasi_apl1'],
             'validator' => $asesi['validator_apl1'] ?? 'Admin',
             'tanggal_validasi' => $asesi['tanggal_validasi'] ?? date('Y-m-d H:i:s')

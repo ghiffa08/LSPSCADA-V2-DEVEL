@@ -9,7 +9,7 @@
             width: '100%'
         });
 
-        // State management
+        // State management for APL1
         const state = {
             id_asesmen: '',
             id_skema: '',
@@ -28,27 +28,66 @@
         // Event handlers
         function initEventHandlers() {
             // Asesmen selection change
-            $('#id_asesmen').on('change', handleAsesmenChange); // Asesi selection change
-            $('#id_asesi').on('change', function() {
-                const asesiId = $(this).val();
-                $('#form_id_asesi').val(asesiId);
+            $('#id_asesmen').on('change', handleAsesmenChange);
 
-                if (state.id_asesmen && asesiId) {
+            // APL1 selection change
+            $('#id_apl1').on('change', function() {
+                const apl1Id = $(this).val();
+                const selectedOption = $(this).find('option:selected');
+
+                console.log('APL1 selection changed:', apl1Id);
+                $('#form_id_apl1').val(apl1Id);
+
+                if (state.id_asesmen && apl1Id) {
+                    const apl1Data = {
+                        id_apl1: apl1Id,
+                        nama_siswa: selectedOption.text().split(' (')[0],
+                        nik: selectedOption.data('nik'),
+                        email: selectedOption.data('email'),
+                        no_hp: selectedOption.data('phone'),
+                        validasi_apl1: selectedOption.data('status')
+                    };
+
+                    console.log('APL1 data:', apl1Data);
+                    showApl1Info(apl1Data);
                     loadObservasiData();
                     saveSettings();
                     saveSessionState();
                 } else {
-                    // Hide form and show appropriate message
                     $('#formObservasi').hide();
                     $('#loadingData').hide();
+                    hideApl1Info();
 
-                    if (!asesiId && state.id_asesmen) {
-                        // Asesi deselected but assessment is still selected
+                    if (!apl1Id && state.id_asesmen) {
                         $('#initialInstructions').hide();
                         $('#emptyDataMessage').hide();
                     }
                 }
-            }); // Tanggal observasi change
+            });
+
+            // Helper function to show APL1 info
+            function showApl1Info(apl1Data) {
+                $('#apl1-nik').text(apl1Data.nik || '-');
+                $('#apl1-email').text(apl1Data.email || '-');
+                $('#apl1-phone').text(apl1Data.no_hp || '-');
+
+                const statusBadge = $('#apl1-status');
+                if (apl1Data.validasi_apl1 === 'validated') {
+                    statusBadge.removeClass().addClass('badge badge-success').text('Tervalidasi');
+                } else {
+                    statusBadge.removeClass().addClass('badge badge-warning').text('Pending');
+                }
+
+                $('#apl1-info').show();
+                console.log('APL1 info displayed');
+            }
+
+            // Helper function to hide APL1 info
+            function hideApl1Info() {
+                $('#apl1-info').hide();
+            }
+
+            // Tanggal observasi change
             $('#tanggal_observasi').on('change', function() {
                 $('#form_tanggal_observasi').val($(this).val());
                 saveSettings();
@@ -63,119 +102,167 @@
             $(document).on('change', '.kuk-checkbox', handleKUKCheckboxChange);
 
             // Keterangan input changes
-            $(document).on('input', '.keterangan-input', debounce(handleKeteranganChange, 500)); // Form submission
+            $(document).on('input', '.keterangan-input', debounce(handleKeteranganChange, 500));
+
+            // Form submission
             $('#formObservasi').submit(handleFormSubmit);
-        } // Main functions
+        }
+
+        // Main functions
         async function handleAsesmenChange() {
             const selectedOption = $(this).find('option:selected');
             state.id_asesmen = $(this).val();
             state.id_skema = selectedOption.data('id-skema');
 
+            console.log('Asesmen changed:', state.id_asesmen, 'Skema:', state.id_skema);
+
             $('#form_id_skema').val(state.id_skema);
             $('#form_id_asesmen').val(state.id_asesmen);
             $('#kode_skema').val(selectedOption.data('kode-skema') || '');
 
-            // Reset asesi dropdown and hide form
-            $('#id_asesi').prop('disabled', true).empty().append('<option value="">-- Memuat Asesi... --</option>');
-            $('#form_id_asesi').val('');
+            // Reset APL1 dropdown and hide form
+            const $apl1Dropdown = $('#id_apl1');
+            $apl1Dropdown.prop('disabled', true)
+                .empty()
+                .append('<option value="">-- Memuat APL1... --</option>');
+
+            $('#form_id_apl1').val('');
             $('#observasiContainer').empty();
             $('#formObservasi').hide();
             $('#loadingData').hide();
             $('#emptyDataMessage').hide();
             resetProgressBar();
 
-            if (!state.id_asesmen) {
-                $('#id_asesi').empty().append('<option value="">-- Pilih Asesmen Terlebih Dahulu --</option>');
+            if (!state.id_asesmen || !state.id_skema) {
+                $apl1Dropdown.empty().append('<option value="">-- Pilih Asesmen Terlebih Dahulu --</option>');
                 $('#initialInstructions').show();
                 return;
             }
 
-            // Hide initial instructions when asesmen is selected
             $('#initialInstructions').hide();
 
             try {
+                console.log('Loading APL1 for skema:', state.id_skema);
+
                 const response = await $.ajax({
-                    url: '<?= base_url('/asesor/observasi/getAsesiByAsesmen') ?>', // PERBAIKAN: URL yang benar
+                    url: '<?= base_url('asesor/api/observasi/getValidatedApl1List') ?>',
                     type: 'GET',
                     data: {
-                        id_asesmen: state.id_asesmen
+                        id_skema: state.id_skema
                     },
                     dataType: 'json'
                 });
 
+                console.log('APL1 response:', response);
+
                 if (response.success) {
-                    populateAsesiDropdown(response.asesi, response);
+                    populateApl1Dropdown(response.data, response);
+
+                    if (response.data && response.data.length > 0) {
+                        showSuccess('Data APL1 berhasil dimuat', `Ditemukan ${response.data.length} siswa tervalidasi`);
+                    } else {
+                        showInfo('Informasi', 'Belum ada siswa (APL1) yang tervalidasi untuk skema ini');
+                    }
                 } else {
-                    showError('Gagal memuat data asesi', response.message);
-                    $('#id_asesi').empty().append('<option value="">-- Error memuat data --</option>');
+                    showError('Gagal memuat data APL1', response.message || 'Unknown error');
+                    $apl1Dropdown.empty().append('<option value="">-- Error memuat data --</option>');
+                    $apl1Dropdown.prop('disabled', true);
                 }
             } catch (error) {
-                console.error('Error loading asesi data:', error);
-                const errorMessage = error.responseJSON?.message || 'Terjadi kesalahan saat memuat data asesi';
+                console.error('Error loading APL1 data:', error);
+                const errorMessage = error.responseJSON?.message || 'Terjadi kesalahan saat memuat data APL1';
                 showError('Error Database', errorMessage);
-                $('#id_asesi').empty().append('<option value="">-- Error memuat data --</option>');
+
+                $apl1Dropdown.empty().append('<option value="">-- Error memuat data --</option>');
+                $apl1Dropdown.prop('disabled', true);
             }
         }
 
-        function populateAsesiDropdown(asesiList, response = {}) {
-            const $asesiDropdown = $('#id_asesi').empty();
+        function populateApl1Dropdown(apl1List, response = {}) {
+            const $apl1Dropdown = $('#id_apl1');
+            $apl1Dropdown.empty();
 
-            if (asesiList && asesiList.length > 0) {
-                $asesiDropdown.append('<option value="">-- Pilih Asesi --</option>');
+            if (apl1List && apl1List.length > 0) {
+                $apl1Dropdown.append('<option value="">-- Pilih Siswa (APL1) --</option>');
 
-                asesiList.forEach(asesi => {
-                    // nama is now alias of nama_lengkap from users table
-                    const displayName = asesi.nama || 'Nama tidak tersedia';
-                    const nik = asesi.nik || 'NIK tidak tersedia';
-                    $asesiDropdown.append(`<option value="${asesi.id_asesi}" data-pengajuan="${asesi.id_pengajuan}">${displayName} (${nik})</option>`);
+                apl1List.forEach(apl1 => {
+                    const displayName = apl1.nama_siswa || 'Nama tidak tersedia';
+                    const nik = apl1.nik || 'NIK tidak tersedia';
+                    const optionText = `${displayName} (${nik})`;
+
+                    $apl1Dropdown.append(`
+                        <option value="${apl1.id_apl1}" 
+                                data-nik="${apl1.nik || ''}"
+                                data-email="${apl1.email || ''}"
+                                data-phone="${apl1.no_hp || ''}"
+                                data-status="${apl1.validasi_apl1 || ''}">
+                            ${optionText}
+                        </option>
+                    `);
                 });
 
-                $asesiDropdown.prop('disabled', false);
+                $apl1Dropdown.prop('disabled', false);
                 $('#emptyDataMessage').hide();
+                $apl1Dropdown.trigger('change.select2');
 
-                // Show success message if provided
                 if (response.message) {
                     showSuccess('Data berhasil dimuat', response.message);
                 }
+
+                console.log('APL1 dropdown populated and enabled with', apl1List.length, 'items');
             } else {
-                $asesiDropdown.append('<option value="">-- Belum Ada Asesi Terdaftar --</option>');
-                $asesiDropdown.prop('disabled', true);
+                $apl1Dropdown.append('<option value="">-- Belum Ada APL1 Tervalidasi --</option>');
+                $apl1Dropdown.prop('disabled', true);
                 $('#emptyDataMessage').show();
 
-                // Show informative message
                 if (response.message) {
                     showInfo('Informasi', response.message);
+                } else {
+                    showInfo('Informasi', 'Belum ada siswa (APL1) yang tervalidasi untuk skema ini.');
                 }
+
+                console.log('No APL1 data available, dropdown disabled');
             }
         }
+
         async function loadObservasiData() {
             const id_asesmen = state.id_asesmen;
-            const id_asesi = $('#id_asesi').val();
+            const id_apl1 = $('#id_apl1').val();
 
-            if (!id_asesmen || !id_asesi) return;
+            if (!id_asesmen || !id_apl1) {
+                console.warn('Missing required data:', {
+                    id_asesmen,
+                    id_apl1
+                });
+                return;
+            }
 
             try {
-                // Hide other elements and show loading
                 $('#initialInstructions').hide();
                 $('#emptyDataMessage').hide();
                 $('#loadingData').show();
                 $('#formObservasi').hide();
 
+                console.log('Loading observasi data with:', {
+                    id_asesmen,
+                    id_apl1,
+                    id_skema: state.id_skema
+                });
+
                 const response = await $.ajax({
-                    url: '<?= base_url('/asesor/observasi/loadObservasi') ?>', // PERBAIKAN: URL yang benar sesuai route
+                    url: '<?= base_url('asesor/api/observasi/loadObservasi') ?>',
                     type: 'GET',
                     data: {
                         id_skema: state.id_skema,
                         id_asesmen: id_asesmen,
-                        id_asesi: id_asesi
+                        id_apl1: id_apl1
                     },
                     dataType: 'json'
                 });
 
-                console.log('loadObservasi response:', response); // Debug log
+                console.log('loadObservasi response:', response);
 
                 if (response.success) {
-                    // Check if observasi data exists
                     let hasObservasi = false;
                     let observasiCount = 0;
 
@@ -188,7 +275,6 @@
                             hasObservasi = keys.length > 0;
                             observasiCount = response.totalKUK || 0;
 
-                            // Convert object to array format for rendering
                             response.observasi = convertObservasiObjectToArray(response.observasi);
                             console.log('Converted observasi to array:', response.observasi);
                         }
@@ -198,7 +284,6 @@
                         renderObservasiTable(response.observasi, response.existing_data);
                         state.totalKUK = response.totalKUK || response.observasi.length;
 
-                        // Store id_observasi if available
                         if (response.id_observasi) {
                             state.id_observasi = response.id_observasi;
                             console.log('Loaded existing id_observasi:', state.id_observasi);
@@ -217,11 +302,16 @@
                 }
             } catch (error) {
                 console.error('Error loading observasi data:', error);
-                
-                // Enhanced error handling
+
                 let errorMessage = 'Terjadi kesalahan saat memuat data observasi';
                 if (error.responseJSON && error.responseJSON.message) {
                     errorMessage = error.responseJSON.message;
+                } else if (error.responseJSON && error.responseJSON.messages) {
+                    if (error.responseJSON.messages.error) {
+                        errorMessage = error.responseJSON.messages.error;
+                    } else {
+                        errorMessage = JSON.stringify(error.responseJSON.messages);
+                    }
                 } else if (error.responseText) {
                     try {
                         const errorResponse = JSON.parse(error.responseText);
@@ -230,33 +320,29 @@
                         errorMessage = error.responseText;
                     }
                 }
-                
+
                 showError('Error Database', errorMessage);
             } finally {
                 $('#loadingData').hide();
             }
         }
 
-        /**
-         * Convert observasi object structure to array format for rendering
-         */
         function convertObservasiObjectToArray(observasiObject) {
             const observasiArray = [];
 
             console.log('Converting observasi object:', observasiObject);
 
-            // PERBAIKAN: Handle new hierarchical structure
             Object.keys(observasiObject).forEach(kelompokKey => {
                 const kelompok = observasiObject[kelompokKey];
-                
+
                 if (kelompok.units) {
                     Object.keys(kelompok.units).forEach(unitKey => {
                         const unit = kelompok.units[unitKey];
-                        
+
                         if (unit.elements) {
                             Object.keys(unit.elements).forEach(elemenKey => {
                                 const element = unit.elements[elemenKey];
-                                
+
                                 if (element.kuks && Array.isArray(element.kuks)) {
                                     element.kuks.forEach(kuk => {
                                         observasiArray.push({
@@ -306,11 +392,11 @@
                     };
 
                     html += `
-                    <div class="card mb-4 shadow-sm">
-                        <div class="card-header bg-primary text-white py-3">
-                            <h5 class="mb-0"><i class="fas fa-layer-group mr-2"></i>${escapeHtml(row.nama_kelompok)}</h5>
-                        </div>
-                        <div class="card-body p-0">`;
+                        <div class="card mb-4 shadow-sm">
+                            <div class="card-header bg-primary text-white py-3">
+                                <h5 class="mb-0"><i class="fas fa-layer-group mr-2"></i>${escapeHtml(row.nama_kelompok)}</h5>
+                            </div>
+                            <div class="card-body p-0">`;
                 }
 
                 // Unit header
@@ -322,12 +408,12 @@
                     currentGroupings.elemen = null;
 
                     html += `
-                    <div class="border-bottom p-3">
-                        <h6 class="font-weight-bold d-flex align-items-center">
-                            <i class="fas fa-cube text-primary mr-2"></i>
-                            <span class="badge badge-light mr-2">${escapeHtml(row.kode_unit)}</span>
-                            ${escapeHtml(row.nama_unit)}
-                        </h6>`;
+                        <div class="border-bottom p-3">
+                            <h6 class="font-weight-bold d-flex align-items-center">
+                                <i class="fas fa-cube text-primary mr-2"></i>
+                                <span class="badge badge-light mr-2">${escapeHtml(row.kode_unit)}</span>
+                                ${escapeHtml(row.nama_unit)}
+                            </h6>`;
                 }
 
                 // Elemen header
@@ -336,10 +422,10 @@
 
                     currentGroupings.elemen = row.id_elemen;
                     html += `
-                    <div class="ml-4 mt-3 mb-2">
-                        <div class="font-weight-bold text-muted">
-                            <i class="fas fa-list-alt mr-2"></i>${escapeHtml(row.nama_elemen)}
-                        </div>`;
+                        <div class="ml-4 mt-3 mb-2">
+                            <div class="font-weight-bold text-muted">
+                                <i class="fas fa-list-alt mr-2"></i>${escapeHtml(row.nama_elemen)}
+                            </div>`;
                 }
 
                 // KUK items
@@ -351,41 +437,41 @@
                     const rowClass = isChecked ? 'bg-success text-white' : '';
 
                     html += `
-                    <div class="kuk-item card mb-2 ml-4 ${rowClass}">
-                        <div class="card-body py-2">
-                            <div class="row align-items-center">
-                                <div class="col-md-7">
-                                    <div class="d-flex align-items-center">
-                                        <div class="custom-control custom-checkbox mr-2">
-                                            <input type="checkbox"
-                                                class="custom-control-input kuk-checkbox"
-                                                id="kuk_${kukId}"
-                                                name="kuk[${kukId}]"
-                                                data-id="${kukId}"
-                                                value="Y"
-                                                ${isChecked ? 'checked' : ''}>
-                                            <label class="custom-control-label" for="kuk_${kukId}"></label>
+                        <div class="kuk-item card mb-2 ml-4 ${rowClass}">
+                            <div class="card-body py-2">
+                                <div class="row align-items-center">
+                                    <div class="col-md-7">
+                                        <div class="d-flex align-items-center">
+                                            <div class="custom-control custom-checkbox mr-2">
+                                                <input type="checkbox"
+                                                    class="custom-control-input kuk-checkbox"
+                                                    id="kuk_${kukId}"
+                                                    name="kuk[${kukId}]"
+                                                    data-id="${kukId}"
+                                                    value="Y"
+                                                    ${isChecked ? 'checked' : ''}>
+                                                <label class="custom-control-label" for="kuk_${kukId}"></label>
+                                            </div>
+                                            <label class="mb-0" for="kuk_${kukId}">${escapeHtml(row.kriteria_unjuk_kerja)}</label>
                                         </div>
-                                        <label class="mb-0" for="kuk_${kukId}">${escapeHtml(row.kriteria_unjuk_kerja)}</label>
                                     </div>
-                                </div>
-                                <div class="col-md-5">
-                                    <div class="input-group input-group-sm">
-                                        <div class="input-group-prepend">
-                                            <span class="input-group-text ${isChecked ? 'border-light bg-success text-white' : ''}">
-                                                <i class="fas fa-comment-dots"></i>
-                                            </span>
+                                    <div class="col-md-5">
+                                        <div class="input-group input-group-sm">
+                                            <div class="input-group-prepend">
+                                                <span class="input-group-text ${isChecked ? 'border-light bg-success text-white' : ''}">
+                                                    <i class="fas fa-comment-dots"></i>
+                                                </span>
+                                            </div>
+                                            <input type="text"
+                                                class="form-control form-control keterangan-input ${isChecked ? 'border-light' : ''}"
+                                                name="keterangan[${kukId}]"
+                                                placeholder="Catatan observasi..."
+                                                value="${escapeHtml(keterangan)}">
                                         </div>
-                                        <input type="text"
-                                            class="form-control form-control keterangan-input ${isChecked ? 'border-light' : ''}"
-                                            name="keterangan[${kukId}]"
-                                            placeholder="Catatan observasi..."
-                                            value="${escapeHtml(keterangan)}">
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>`;
+                        </div>`;
                 }
             });
 
@@ -424,7 +510,6 @@
 
             $btn.html('<i class="fas fa-spinner fa-spin"></i> Memproses...').attr('disabled', true);
 
-            // Ensure observasi settings are saved first to get id_observasi
             if (!state.id_observasi) {
                 console.log('No id_observasi found for batch operation, saving settings first...');
                 const settingsResult = await saveSettings();
@@ -447,7 +532,7 @@
                 id_observasi: state.id_observasi,
                 id_asesmen: parseInt(state.id_asesmen),
                 id_skema: parseInt(state.id_skema),
-                id_asesi: $('#form_id_asesi').val(),
+                id_apl1: $('#form_id_apl1').val(),
                 tanggal_observasi: $('#form_tanggal_observasi').val(),
                 items: {}
             };
@@ -461,9 +546,11 @@
                 };
             });
 
+            console.log('Batch save data:', batchData);
+
             try {
                 const response = await $.ajax({
-                    url: '<?= base_url('/asesor/observasi/save') ?>', // PERBAIKAN: URL yang benar
+                    url: '<?= base_url('asesor/api/observasi/save') ?>',
                     type: 'POST',
                     data: JSON.stringify(batchData),
                     contentType: 'application/json',
@@ -475,12 +562,25 @@
 
                 if (response.success) {
                     showSuccess(checkState ? 'Semua kriteria berhasil dicentang' : 'Semua centang berhasil dihapus');
-                    if (response.csrfHash) state.csrfHash = response.csrfHash;
+                    if (response.token) state.csrfHash = response.token;
                 } else {
                     showError('Gagal menyimpan data', response.message);
                 }
             } catch (error) {
-                showError('Terjadi kesalahan saat menyimpan data');
+                console.error('Batch save error:', error);
+                let errorMessage = 'Terjadi kesalahan saat menyimpan data';
+
+                if (error.responseJSON && error.responseJSON.messages) {
+                    if (error.responseJSON.messages.error) {
+                        errorMessage = error.responseJSON.messages.error;
+                    } else {
+                        errorMessage = JSON.stringify(error.responseJSON.messages);
+                    }
+                } else if (error.responseJSON && error.responseJSON.message) {
+                    errorMessage = error.responseJSON.message;
+                }
+
+                showError(errorMessage);
             } finally {
                 $btn.html(originalBtnText).attr('disabled', false);
             }
@@ -490,27 +590,28 @@
             const data = {
                 save_type: 'settings',
                 id_asesmen: state.id_asesmen,
-                id_asesi: $('#form_id_asesi').val(),
+                id_apl1: $('#form_id_apl1').val(),
                 tanggal_observasi: $('#form_tanggal_observasi').val(),
                 [state.csrfName]: state.csrfHash
             };
 
+            console.log('Saving settings with data:', data);
+
             try {
                 const response = await $.ajax({
-                    url: '<?= base_url('/asesor/observasi/save') ?>', // PERBAIKAN: URL yang benar
+                    url: '<?= base_url('asesor/api/observasi/save') ?>',
                     type: 'POST',
                     data: data,
                     dataType: 'json'
                 });
 
                 if (response.success && response.data && response.data.id_observasi) {
-                    // Store the id_observasi for future KUK saves
                     state.id_observasi = response.data.id_observasi;
                     console.log('Observasi settings saved with ID:', state.id_observasi);
                 }
 
-                if (response.csrfHash) {
-                    state.csrfHash = response.csrfHash;
+                if (response.token) {
+                    state.csrfHash = response.token;
                 }
 
                 return response;
@@ -521,6 +622,7 @@
             }
         }
 
+        // PERBAIKAN: Hapus duplikasi dan perbaiki saveKUK function
         async function saveKUK(id_kuk, kompeten, keterangan) {
             // Ensure observasi settings are saved first to get id_observasi
             if (!state.id_observasi) {
@@ -537,7 +639,7 @@
                 id_observasi: state.id_observasi,
                 id_asesmen: state.id_asesmen,
                 id_skema: state.id_skema,
-                id_asesi: $('#form_id_asesi').val(),
+                id_apl1: $('#form_id_apl1').val(),
                 id_kuk: id_kuk,
                 kompeten: kompeten,
                 keterangan: keterangan,
@@ -545,27 +647,35 @@
                 [state.csrfName]: state.csrfHash
             };
 
+            console.log('Saving KUK with data:', data);
+
             try {
                 const response = await $.ajax({
-                    url: '<?= base_url('/asesor/observasi/save') ?>', // PERBAIKAN: URL yang benar
+                    url: '<?= base_url('asesor/api/observasi/save') ?>',
                     type: 'POST',
                     data: data,
                     dataType: 'json'
                 });
 
-                if (response.csrfHash) {
-                    state.csrfHash = response.csrfHash;
+                if (response.token) {
+                    state.csrfHash = response.token;
                 }
 
                 if (response.success) {
                     console.log('KUK saved successfully:', id_kuk, kompeten);
+                    showAutoSaveIndicator();
                 } else {
                     console.error('KUK save failed:', response);
                     showError('Gagal menyimpan data KUK: ' + (response.message || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Error saving KUK:', error);
-                showError('Gagal menyimpan data KUK');
+                if (error.responseJSON && error.responseJSON.messages) {
+                    const errorMsg = error.responseJSON.messages.error || JSON.stringify(error.responseJSON.messages);
+                    showError('Gagal menyimpan data KUK: ' + errorMsg);
+                } else {
+                    showError('Gagal menyimpan data KUK');
+                }
             }
         }
 
@@ -577,8 +687,8 @@
                 return;
             }
 
-            if (!$('#form_id_asesi').val()) {
-                showError('Silakan pilih asesi terlebih dahulu');
+            if (!$('#form_id_apl1').val()) {
+                showError('Silakan pilih APL1 terlebih dahulu');
                 return;
             }
 
@@ -606,7 +716,7 @@
                     });
 
                     const response = await $.ajax({
-                        url: '<?= base_url('/asesor/observasi/save') ?>', // PERBAIKAN: URL yang benar
+                        url: '<?= base_url('asesor/api/observasi/save') ?>',
                         type: 'POST',
                         data: formData,
                         dataType: 'json'
@@ -614,7 +724,7 @@
 
                     if (response.success) {
                         showSuccess(response.message || 'Data berhasil disimpan');
-                        if (response.csrfHash) state.csrfHash = response.csrfHash;
+                        if (response.token) state.csrfHash = response.token;
                     } else {
                         showError(response.message || 'Gagal menyimpan data');
                     }
@@ -635,14 +745,12 @@
             $('#progress-bar').css('width', `${progressPercent}%`).attr('aria-valuenow', progressPercent);
             $('#progress-text').text(`${progressPercent}%`);
 
-            // Update status text
             const statusText = totalChecked === 0 ? 'Belum ada yang dicentang' :
                 progressPercent === 100 ? 'Semua kriteria telah dicentang' :
                 `${totalChecked} dari ${state.totalKUK} kriteria dicentang`;
 
             $('#data-status').html(`<i class="fas fa-info-circle text-info"></i> ${statusText}`);
 
-            // Update progress bar color
             const progressBar = $('#progress-bar');
             progressBar.removeClass('bg-warning bg-success');
             if (progressPercent === 100) {
@@ -659,7 +767,6 @@
             state.totalKUK = 0;
         }
 
-        // Session state management for better UX
         function saveSessionState() {
             const state_data = {
                 id_asesmen: state.id_asesmen,
@@ -669,13 +776,35 @@
             };
 
             try {
-                sessionStorage.setItem('observasi_state', JSON.stringify(state_data));
+                sessionStorage.setItem('observasi_state_apl1', JSON.stringify(state_data));
             } catch (e) {
                 // Storage might be full or disabled
             }
         }
 
-        // Utility functions optimized for production
+        function showAutoSaveIndicator() {
+            const $indicator = $('<div class="auto-save-indicator">').html(
+                '<i class="fas fa-check text-success"></i> Tersimpan otomatis'
+            ).css({
+                position: 'fixed',
+                top: '20px',
+                right: '20px',
+                background: '#fff',
+                border: '1px solid #28a745',
+                borderRadius: '4px',
+                padding: '8px 12px',
+                zIndex: 9999,
+                fontSize: '14px'
+            });
+
+            $('body').append($indicator);
+
+            setTimeout(() => {
+                $indicator.fadeOut(() => $indicator.remove());
+            }, 2000);
+        }
+
+        // Utility functions
         function escapeHtml(str) {
             if (!str) return '';
             const div = document.createElement('div');
@@ -695,71 +824,66 @@
             };
         }
 
-        // Optimized notification functions
+        // Notification functions
         function showSuccess(message) {
-            Swal.fire({
-                icon: 'success',
-                title: 'Berhasil',
-                text: message,
-                timer: 3000,
-                showConfirmButton: false,
-                toast: true,
-                position: 'top-end'
-            });
-        }
-
-        function showError(title, message = '') {
-            Swal.fire({
-                icon: 'error',
-                title: title,
-                text: message,
-                confirmButtonText: 'OK',
-                customClass: {
-                    confirmButton: 'btn btn-primary'
-                }
-            });
-        }
-
-        function showSuccess(title, message = '') {
-            Swal.fire({
-                icon: 'success',
-                title: title,
-                text: message,
-                timer: 3000,
-                timerProgressBar: true,
-                showConfirmButton: false
-            });
-        }
-
-        function showInfo(title, message = '') {
-            Swal.fire({
-                icon: 'info',
-                title: title,
-                text: message,
-                confirmButtonText: 'Mengerti',
-                customClass: {
-                    confirmButton: 'btn btn-info'
-                }
-            });
-        }
-
-        // Initialize page state
-        function initializePageState() {
-            // Hide loading and form initially
-            $('#loadingData').hide();
-            $('#formObservasi').hide();
-            $('#emptyDataMessage').hide();
-
-            // Show initial instructions
-            $('#initialInstructions').show();
-
-            // Reset dropdowns to default state
-            if (!$('#id_asesmen').val()) {
-                $('#id_asesi').empty().append('<option value="">-- Pilih Asesmen Terlebih Dahulu --</option>').prop('disabled', true);
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Berhasil',
+                    text: message,
+                    timer: 3000,
+                    showConfirmButton: false,
+                    toast: true,
+                    position: 'top-end'
+                });
+            } else {
+                console.log('Success:', message);
             }
         }
 
-        // Network error handler
+        function showError(title, message = '') {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'error',
+                    title: title,
+                    text: message,
+                    confirmButtonText: 'OK',
+                    customClass: {
+                        confirmButton: 'btn btn-primary'
+                    }
+                });
+            } else {
+                console.error('Error:', title, message);
+            }
+        }
+
+        function showInfo(title, message = '') {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'info',
+                    title: title,
+                    text: message,
+                    confirmButtonText: 'Mengerti',
+                    customClass: {
+                        confirmButton: 'btn btn-info'
+                    }
+                });
+            } else {
+                console.log('Info:', title, message);
+            }
+        }
+
+        function initializePageState() {
+            $('#loadingData').hide();
+            $('#formObservasi').hide();
+            $('#emptyDataMessage').hide();
+            $('#initialInstructions').show();
+
+            if (!$('#id_asesmen').val()) {
+                $('#id_apl1').empty().append('<option value="">-- Pilih Asesmen Terlebih Dahulu --</option>').prop('disabled', true);
+            }
+        }
+
         function handleNetworkError(error) {
             const isNetworkError = !error.status || error.status === 0;
             const isServerError = error.status >= 500;
@@ -772,42 +896,24 @@
                 const message = error.responseJSON?.message || 'Terjadi kesalahan. Silakan coba lagi.';
                 showError('Error', message);
             }
-        } // Performance monitoring (production safe)
+        }
+
         function trackPerformance(action, startTime) {
             const duration = performance.now() - startTime;
-            if (duration > 3000) { // Log slow operations
-                // In production, this could send to analytics
+            if (duration > 3000) {
                 if (window.console && window.console.warn) {
                     console.warn(`Slow operation detected: ${action} took ${duration}ms`);
                 }
             }
         }
 
-        // Initialize page state
-        function initializePageState() {
-            // Hide loading and form initially
-            $('#loadingData').hide();
-            $('#formObservasi').hide();
-            $('#emptyDataMessage').hide();
-
-            // Show initial instructions
-            $('#initialInstructions').show();
-
-            // Reset dropdowns to default state
-            if (!$('#id_asesmen').val()) {
-                $('#id_asesi').empty().append('<option value="">-- Pilih Asesmen Terlebih Dahulu --</option>').prop('disabled', true);
-            }
-        }
-
         // Initialize with error boundary
         try {
             initEventHandlers();
-
-            // Initialize page state
             initializePageState();
 
             // Load saved settings if available
-            const savedData = sessionStorage.getItem('observasi_state');
+            const savedData = sessionStorage.getItem('observasi_state_apl1');
             if (savedData) {
                 try {
                     const parsed = JSON.parse(savedData);
@@ -818,8 +924,7 @@
                         $('#tanggal_observasi').val(parsed.tanggal_observasi);
                     }
                 } catch (e) {
-                    // Silent fail for session storage
-                    sessionStorage.removeItem('observasi_state');
+                    sessionStorage.removeItem('observasi_state_apl1');
                 }
             }
         } catch (error) {

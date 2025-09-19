@@ -21,7 +21,6 @@ class KUKModel extends Model
         'id_unit',
         'id_elemen',
         'kode_kuk',
-        'nama_kuk',
         'pertanyaan'
     ];
 
@@ -44,8 +43,7 @@ class KUKModel extends Model
         'id_unit'      => 'required|integer',
         'id_elemen'    => 'required|integer',
         'kode_kuk'     => 'required|max_length[10]',
-        'nama_kuk'     => 'required|max_length[255]',
-        'pertanyaan'   => 'max_length[255]',
+        'pertanyaan'   => 'required|max_length[255]',
     ];
 
     protected $validationMessages = [
@@ -68,10 +66,6 @@ class KUKModel extends Model
             'required'   => 'Kode KUK wajib diisi.',
             'max_length' => 'Kode KUK tidak boleh lebih dari 10 karakter.'
         ],
-        'nama_kuk' => [
-            'required'   => 'Nama KUK wajib diisi.',
-            'max_length' => 'Nama KUK tidak boleh lebih dari 255 karakter.'
-        ],
         'pertanyaan' => [
             'max_length' => 'Pertanyaan tidak boleh lebih dari 500 karakter.'
         ]
@@ -92,7 +86,7 @@ class KUKModel extends Model
     protected $afterDelete    = [];
 
     // Fields that should be searched when using DataTable
-    protected $dataTableSearchFields = ['kuk.nama_kuk', 'skema.nama_skema'];
+    protected $dataTableSearchFields = ['kuk.pertanyaan', 'skema.nama_skema'];
 
     /**
      * Apply joins for DataTable query
@@ -152,6 +146,20 @@ class KUKModel extends Model
     }
 
     /**
+     * Mengambil semua KUK yang relevan untuk sebuah sesi asesmen.
+     */
+    public function getKukForAsesmen(int $idAsesmen): array
+    {
+        return $this->select('kuk.id_kuk, kuk.pertanyaan, unit.nama_unit, elemen.nama_elemen')
+            ->join('asesmen', 'asesmen.id_skema = kuk.id_skema')
+            ->join('unit', 'unit.id_unit = kuk.id_unit')
+            ->join('elemen', 'elemen.id_elemen = kuk.id_elemen')
+            ->where('asesmen.id_asesmen', $idAsesmen)
+            ->orderBy('unit.id_unit, elemen.id_elemen, kuk.id_kuk', 'ASC')
+            ->findAll();
+    }
+
+    /**
      * Get KUK by ID with full relations
      */
     public function getWithRelations(int $id_kuk): ?array
@@ -207,7 +215,7 @@ class KUKModel extends Model
      */
     public function getForExport(): array
     {
-        return $this->select('id_skema, id_unit, id_elemen, kode_kuk, nama_kuk, pertanyaan')
+        return $this->select('id_skema, id_unit, id_elemen, kode_kuk, pertanyaan')
             ->orderBy('id_skema, id_unit, id_elemen, kode_kuk')
             ->findAll();
     }
@@ -224,5 +232,28 @@ class KUKModel extends Model
         }
 
         return $builder->countAllResults() > 0;
+    }
+
+    /**
+     * [BARU] Mengambil daftar KUK hanya untuk navigasi (lebih ringan).
+     */
+    public function getNavigationList(int $id_skema): array
+    {
+        return $this->where('id_skema', $id_skema)
+            ->select('id_kuk, kode_kuk')
+            ->orderBy('id_unit, id_elemen, id_kuk', 'ASC') // Pastikan urutan konsisten
+            ->findAll();
+    }
+
+    /**
+     * [BARU] Mengambil detail lengkap satu KUK beserta relasinya.
+     */
+    public function getDetailKuk(int $id_kuk): ?array
+    {
+        return $this->where('kuk.id_kuk', $id_kuk)
+            ->select('kuk.*, unit.nama_unit, elemen.nama_elemen')
+            ->join('unit', 'unit.id_unit = kuk.id_unit', 'left')
+            ->join('elemen', 'elemen.id_elemen = kuk.id_elemen', 'left')
+            ->first();
     }
 }

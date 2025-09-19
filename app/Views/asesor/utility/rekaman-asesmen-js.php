@@ -2,656 +2,367 @@
     $(document).ready(function() {
         'use strict';
 
-        // Initialize select2
-        $('.select2').select2({
-            placeholder: "Pilih...",
-            allowClear: true,
-            width: '100%'
-        });
-
-        // Configuration - PERBAIKAN: URL endpoints yang benar
+        // --- KONFIGURASI DAN STATE ---
         const config = {
-            baseUrl: '<?= base_url() ?>',
+            baseUrl: '<?= rtrim(base_url(), '/') ?>',
             endpoints: {
-                getAsesi: 'asesor/rekaman-asesmen/getAsesiByAsesmen',
+                getApl1: 'asesor/rekaman-asesmen/getAsesiByAsesmen',
                 loadRekaman: 'asesor/rekaman-asesmen/loadRekamanAsesmen',
-                store: 'asesor/rekaman-asesmen/store', // PERBAIKAN: Endpoint store
-                saveSettings: 'asesor/rekaman-asesmen/store',
-                saveMethod: 'asesor/rekaman-asesmen/store',
-                saveBatch: 'asesor/rekaman-asesmen/store',
-                saveRecommendation: 'asesor/rekaman-asesmen/store',
-                saveComplete: 'asesor/rekaman-asesmen/store'
+                store: 'asesor/rekaman-asesmen/store'
             }
         };
 
-        // State management
         const state = {
-            selectedAsesmen: null,
-            selectedAsesi: null,
-            selectedPengajuan: null,
-            totalUnits: 0,
-            assessedUnits: 0,
+            id_asesmen: null,
+            id_apl1: null,
+            id_skema: null,
             id_rekaman: null,
-            isProcessing: false,
-            csrfHash: '<?= csrf_hash() ?>'
+            csrfHash: '<?= csrf_hash() ?>',
+            csrfName: '<?= csrf_token() ?>'
         };
 
-        // PERBAIKAN: Define updateProgress as global function
-        window.updateProgress = function() {
-            updateUnitStatus();
-
-            const percentage = state.totalUnits > 0 ? (state.assessedUnits / state.totalUnits) * 100 : 0;
-
-            $('#progress-text').text(Math.round(percentage) + '%');
-            $('#progress-bar').css('width', percentage + '%');
-
-            if (state.assessedUnits === 0) {
-                $('#data-status').html('<i class="fas fa-hourglass-start text-warning"></i> Belum ada data');
-            } else if (state.assessedUnits === state.totalUnits) {
-                $('#data-status').html('<i class="fas fa-check-circle text-success"></i> Semua unit terisi');
-            } else {
-                $('#data-status').html(`<i class="fas fa-clock text-info"></i> ${state.assessedUnits}/${state.totalUnits} unit terisi`);
-            }
-        };
-
-        // Initialize
+        // --- INISIALISASI & EVENT BINDING ---
         function init() {
+            $('.select2').select2({
+                width: '100%',
+                placeholder: "-- Silakan Pilih --"
+            });
             bindEvents();
             initializePageState();
         }
 
-        // Bind event handlers
         function bindEvents() {
-            // Asesmen selection
-            $('#id_asesmen').on('change', function() {
-                const selectedOption = $(this).find('option:selected');
-                state.selectedAsesmen = $(this).val();
-
-                $('#form_id_skema').val(selectedOption.data('id-skema'));
-                $('#form_id_asesmen').val(state.selectedAsesmen);
-                $('#kode_skema').val(selectedOption.data('kode-skema') || '');
-
-                if (state.selectedAsesmen) {
-                    loadAsesiOptions(state.selectedAsesmen);
-                } else {
-                    resetAsesiSelection();
-                }
-            });
-
-            // Asesi selection
-            $('#id_asesi').on('change', function() {
-                const asesiId = $(this).val();
-                state.selectedAsesi = asesiId;
-
-                const selectedOption = $(this).find('option:selected');
-                const pengajuanId = selectedOption.data('id-pengajuan');
-                state.selectedPengajuan = pengajuanId;
-
-                $('#form_id_asesi').val(asesiId);
-                $('#form_id_pengajuan').val(pengajuanId);
-
-                if (asesiId && pengajuanId && state.selectedAsesmen) {
-                    loadRekamanData();
-                } else {
-                    hideRekamanForm();
-                    showInitialInstructions();
-                }
-            });
-
-            // Tanggal asesmen change - AUTO SAVE
-            $('#tanggal_asesmen').on('change', function() {
-                $('#form_tanggal_asesmen').val($(this).val());
-                saveSettings();
-            });
-
-            // Form submission
-            $('#formRekamanAsesmen').on('submit', function(e) {
-                e.preventDefault();
-                saveCompleteRekaman();
-            });
-
-            // Bulk actions
-            $('#checkAllMethods').on('click', function() {
-                handleBulkCheck(true);
-            });
-
-            $('#uncheckAllMethods').on('click', function() {
-                handleBulkCheck(false);
-            });
-
-            // Event delegation untuk checkbox yang akan dibuat dinamis - AUTO SAVE
-            $(document).on('change', 'input[type="checkbox"][name^="kompetensi"]', function() {
-                const $checkbox = $(this);
-                const unitId = $checkbox.data('unit-id') || $checkbox.attr('name').match(/\[(\d+)\]/)[1];
-                const method = $checkbox.data('method') || $checkbox.attr('name').match(/\[([^\]]+)\]$/)[1];
-                const isChecked = $checkbox.is(':checked');
-
-                console.log(`Checkbox changed: Unit ${unitId}, Method ${method}, Checked ${isChecked}`); // Debug log
-
-                // Auto save single method
-                saveSingleMethod(unitId, method, isChecked);
-
-                window.updateProgress();
-            });
-
-            // Event delegation untuk textarea rekomendasi - AUTO SAVE dengan debounce
-            $(document).on('change', '#rekomendasi', function() {
-                saveRecommendation();
-            });
-
-            $(document).on('input', '#tindak_lanjut, #catatan', debounce(function() {
-                saveRecommendation();
-            }, 1000));
+            $('#id_asesmen').on('change', handleAsesmenChange);
+            $('#id_apl1').on('change', handleApl1Change);
+            $('#formRekamanAsesmen').on('submit', handleFormSubmit);
+            $('#checkAllMethod').on('click', () => handleBulkMethodCheck(true));
+            $('#clearAllMethod').on('click', () => handleBulkMethodCheck(false));
+            $(document).on('change', '.method-checkbox', debounce(handleMethodChange, 500));
+            $(document).on('input', 'input[name="rekomendasi"], textarea', debounce(handleFinalDataChange, 750));
         }
 
-        // Load asesi options
-        function loadAsesiOptions(asesmenId) {
-            $('#id_asesi').prop('disabled', true).html('<option value="">Loading...</option>');
-            hideEmptyDataMessage();
+        // --- LOGIKA UTAMA: PEMILIHAN & PEMUATAN DATA ---
+
+        function handleAsesmenChange() {
+            const selectedOption = $(this).find('option:selected');
+            state.id_asesmen = $(this).val();
+            state.id_skema = selectedOption.data('id-skema');
+            $('#info-skema-text').text(`${selectedOption.data('nama-skema') || ''} (${selectedOption.data('kode-skema') || ''})`);
+            
+            if (state.id_asesmen) {
+                loadApl1Options(state.id_asesmen);
+            } else {
+                initializePageState();
+            }
+        }
+
+        function handleApl1Change() {
+            state.id_apl1 = $(this).val();
+            if (state.id_apl1) {
+                const selectedOption = $(this).find('option:selected');
+                updateApl1InfoDisplay(selectedOption.data());
+                loadRekamanData();
+            } else {
+                initializePageState();
+            }
+        }
+
+     function loadApl1Options(asesmenId) {
+            const $apl1Select = $('#id_apl1');
+            $apl1Select.prop('disabled', true).html('<option value="">Memuat...</option>').trigger('change.select2');
 
             $.ajax({
-                url: `${config.baseUrl}/${config.endpoints.getAsesi}`, // PERBAIKAN: URL yang benar
+                url: `${config.baseUrl}/${config.endpoints.getApl1}`,
                 type: 'GET',
-                data: {
-                    id_asesmen: asesmenId
-                },
+                data: { id_asesmen: asesmenId },
                 dataType: 'json',
                 success: function(response) {
-                    if (response.success && response.asesi && response.asesi.length > 0) {
+                    // PERBAIKAN DI SINI: Menggunakan response.data, bukan response.asesi
+                    if (response.success && response.data && response.data.length > 0) {
                         let options = '<option value="">-- Pilih Asesi --</option>';
-                        response.asesi.forEach(function(asesi) {
-                            const displayName = asesi.nama_lengkap || asesi.nama_asesi || asesi.nama || 'Nama tidak tersedia';
-                            const nik = asesi.nik || 'NIK tidak tersedia';
-                            options += `<option value="${asesi.id_asesi}" data-id-pengajuan="${asesi.id_pengajuan}">${displayName} (${nik})</option>`;
+                        // DAN DI SINI:
+                        response.data.forEach(function(apl1) {
+                            options += `<option value="${apl1.id_apl1}" 
+                                data-nama="${apl1.nama_asesi || ''}" data-nik="${apl1.nik || ''}"
+                                data-email="${apl1.email || ''}" data-validation="${apl1.status_pengajuan || ''}">
+                                ${apl1.nama_asesi || 'Nama Kosong'} (${apl1.nik || 'NIK Kosong'})
+                            </option>`;
                         });
-                        $('#id_asesi').html(options).prop('disabled', false);
-                        hideEmptyDataMessage();
+                        $apl1Select.html(options).prop('disabled', false);
                     } else {
-                        $('#id_asesi').html('<option value="">-- Belum Ada Asesi Terdaftar --</option>').prop('disabled', true);
+                        $apl1Select.html('<option value="">-- Belum Ada Asesi --</option>');
                         showEmptyDataMessage();
                     }
+                    $apl1Select.trigger('change.select2');
                 },
-                error: function(xhr, status, error) {
-                    console.error('Error loading asesi:', error);
-                    console.error('XHR status:', xhr.status);
-                    console.error('Response text:', xhr.responseText);
-                    $('#id_asesi').html('<option value="">-- Error memuat data --</option>').prop('disabled', true);
-                    showError('Gagal memuat data asesi: ' + error);
+                error: function() {
+                    showError('Gagal Memuat Asesi');
+                    $apl1Select.html('<option value="">-- Gagal Memuat --</option>').trigger('change.select2');
                 }
             });
         }
-
-        // Load rekaman data
-        function loadRekamanData() {
+        
+    function loadRekamanData() {
             showLoading();
+            $.get(`${config.baseUrl}/${config.endpoints.loadRekaman}`, { id_apl1: state.id_apl1 })
+                .done(response => {
+                    if (response.success) {
+                        state.id_rekaman = response.data.rekaman ? response.data.rekaman.id : null;
+                        $('#form_id_rekaman').val(state.id_rekaman);
+                        
+                        renderRekamanStruktur(response.data);
 
-            if (!state.selectedAsesmen || !state.selectedAsesi || !state.selectedPengajuan) {
-                showError('Data tidak lengkap untuk memuat rekaman');
-                hideLoading();
+                        // --- PERBAIKAN DI SINI ---
+                        // Mengisi nilai untuk form rekomendasi, tindak lanjut, dan komentar
+                        if (response.data.rekaman_data) {
+                            const rekaman = response.data.rekaman_data;
+                            // Set radio button Rekomendasi
+                            $(`input[name="rekomendasi"][value="${rekaman.rekomendasi}"]`).prop('checked', true);
+                            // Set textarea
+                            $('textarea[name="tindak_lanjut"]').val(rekaman.tindak_lanjut || '');
+                            $('textarea[name="komentar"]').val(rekaman.komentar || '');
+                        }
+                        
+                        showForm();
+                    } else {
+                        showError(response.message);
+                        initializePageState();
+                    }
+                })
+                .fail(() => {
+                    showError('Gagal memuat struktur rekaman');
+                    initializePageState();
+                });
+        }
+        
+        // --- LOGIKA SIMPAN (SINGLE, BULK, FINAL) ---
+        
+   /**
+         * SINGLE-CHECK AUTO-SAVE (Diperbaiki)
+         * Mengirim payload dengan key 'method_key' dan 'method_value'
+         * agar sesuai dengan yang diharapkan Controller.
+         */
+        async function handleMethodChange() {
+            const checkbox = $(this);
+            const payload = {
+                save_type: 'auto_save_unit',
+                id_apl1: state.id_apl1,
+                id_unit: checkbox.data('unit-id'),
+                // Perbaikan utama ada di 2 baris ini:
+                method_key: checkbox.data('method-key'), 
+                method_value: checkbox.is(':checked') ? 1 : 0
+            };
+            
+            const result = await sendSaveRequest(payload);
+
+            // Setelah auto-save pertama berhasil, simpan id_rekaman yang baru
+            if (result.success && result.data && result.data.id_rekaman) {
+                state.id_rekaman = result.data.id_rekaman;
+            }
+        }
+
+        async function handleBulkMethodCheck(checkState) {
+            if (!state.id_apl1) {
+                return showError('Pilih asesi terlebih dahulu.');
+            }
+            // Pastikan record master sudah ada sebelum bulk save
+            if (!state.id_rekaman) {
+                showToast('info', 'Membuat sesi rekaman...');
+                const firstCheckbox = $('.method-checkbox:first');
+                if (firstCheckbox.length === 0) return showError('Tidak ada unit kompetensi untuk disimpan.');
+                
+                // Panggil auto-save untuk membuat record & mendapatkan id_rekaman
+                const initResult = await autoSaveUnitMethod(
+                    firstCheckbox.data('unit-id'),
+                    firstCheckbox.data('method-key'),
+                    firstCheckbox.is(':checked')
+                );
+
+                if (!state.id_rekaman) { // Periksa kembali state setelah percobaan membuat record
+                    return showError('Gagal memulai sesi rekaman. Coba centang satu kotak secara manual terlebih dahulu.');
+                }
+            }
+            
+            // Lanjutkan proses bulk save
+            showToast('info', 'Menyimpan semua perubahan...');
+            $('.method-checkbox').prop('checked', checkState); // Ubah UI
+
+            const kompetensiData = {};
+            $('.unit-section').each(function() {
+                const unitId = $(this).find('.method-checkbox').first().data('unit-id');
+                const methods = {};
+                $(this).find('.method-checkbox').each(function() {
+                    methods[$(this).data('method-key')] = checkState ? 1 : 0;
+                });
+                kompetensiData[unitId] = methods;
+            });
+
+            const payload = {
+                save_type: 'batch_save_units',
+                id_apl1: state.id_apl1,
+                id_rekaman: state.id_rekaman,
+                kompetensi: kompetensiData
+            };
+            await sendSaveRequest(payload);
+        }
+        
+        async function handleFinalDataChange() {
+            if (!state.id_rekaman) return;
+            const payload = {
+                save_type: 'full_save',
+                id_rekaman: state.id_rekaman,
+                id_apl1: state.id_apl1,
+                rekomendasi: $('input[name="rekomendasi"]:checked').val(),
+                tindak_lanjut: $('textarea[name="tindak_lanjut"]').val(),
+                komentar: $('textarea[name="komentar"]').val(),
+            };
+            await sendSaveRequest(payload, false);
+        }
+
+        async function sendSaveRequest(payload, showSuccessToast = true) {
+            showToast('info', 'Menyimpan...');
+            payload[state.csrfName] = state.csrfHash;
+
+            try {
+                const response = await $.ajax({
+                    url: `${config.baseUrl}/${config.endpoints.store}`,
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(payload),
+                    dataType: 'json'
+                });
+                
+                if (response.csrf_hash) {
+                    state.csrfHash = response.csrf_hash;
+                }
+                if (showSuccessToast) showToast('success', 'Tersimpan!');
+                return { success: true, data: response.data };
+            } catch (error) {
+                const response = error.responseJSON;
+                if (response && response.csrf_hash) {
+                    state.csrfHash = response.csrf_hash;
+                }
+                showToast('error', 'Gagal menyimpan!');
+                console.error("Save failed:", response || error);
+                return { success: false, message: response?.message || 'Gagal menyimpan.' };
+            }
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            const result = await Swal.fire({
+                title: 'Finalisasi Rekaman?', text: "Anda yakin ingin menyimpan final rekaman ini?",
+                icon: 'question', showCancelButton: true, confirmButtonText: 'Ya, Simpan!', cancelButtonText: 'Batal'
+            });
+            if (result.isConfirmed) {
+                const $saveBtn = $('#btnSave');
+                const originalText = $saveBtn.html();
+                $saveBtn.html('<i class="fas fa-spinner fa-spin"></i> Menyimpan...').prop('disabled', true);
+                
+                const payload = {
+                    save_type: 'full_save',
+                    id_apl1: state.id_apl1,
+                    id_rekaman: state.id_rekaman,
+                    rekomendasi: $('input[name="rekomendasi"]:checked').val(),
+                    tindak_lanjut: $('textarea[name="tindak_lanjut"]').val(),
+                    komentar: $('textarea[name="komentar"]').val(),
+                };
+                const saveResult = await sendSaveRequest(payload, false);
+
+                if (saveResult.success) {
+                    Swal.fire('Berhasil!', 'Rekaman asesmen telah difinalisasi.', 'success');
+                    setTimeout(() => window.location.href = `${config.baseUrl}/asesor/rekaman-asesmen`, 1500);
+                } else {
+                    showError(saveResult.message);
+                    $saveBtn.html(originalText).prop('disabled', false);
+                }
+            }
+        }
+
+    /**
+         * FUNGSI RENDER TAMPILAN (Disederhanakan tanpa Kelompok Kerja)
+         */
+        function renderRekamanStruktur(data) {
+            const container = $('#rekamanAsesmenContainer');
+
+            if (!data.units || data.units.length === 0) {
+                container.html('<div class="alert alert-warning">Struktur unit kompetensi tidak ditemukan untuk skema ini.</div>');
                 return;
             }
-
-            // PERBAIKAN: Get skema data dari asesmen selection
-            const skemaData = $('#id_asesmen option:selected');
-            const id_skema = skemaData.data('id-skema');
-
-            // PERBAIKAN: URL yang benar dengan parameter yang diperlukan
-            $.ajax({
-                url: `${config.baseUrl}/${config.endpoints.loadRekaman}`,
-                type: 'GET',
-                data: {
-                    id_skema: id_skema,
-                    id_asesmen: state.selectedAsesmen,
-                    id_asesi: state.selectedAsesi,
-                    id_pengajuan: state.selectedPengajuan
-                },
-                dataType: 'json',
-                success: function(response) {
-                    hideLoading();
-
-                    if (response.success) {
-                        renderRekamanForm(response);
-                        showRekamanForm();
-
-                        // Initialize settings save after loading data
-                        saveSettings();
-
-                        window.updateProgress();
-                    } else {
-                        showError(response.message || 'Gagal memuat data rekaman');
-                    }
-                },
-                error: function(xhr, status, error) {
-                    hideLoading();
-                    console.error('Error loading rekaman:', error);
-                    console.error('XHR status:', xhr.status);
-                    console.error('Response text:', xhr.responseText);
-                    showError('Gagal memuat data rekaman: ' + error);
-                }
-            });
-        }
-
-        // Render rekaman form - PERBAIKAN: Handle existing data dengan benar
-        function renderRekamanForm(data) {
-            const container = $('#rekamanAsesmenContainer');
+            
             let html = '';
 
-            state.totalUnits = data.totalUnits || 0;
-
-            console.log('Rendering form with data:', data); // Debug log
-            console.log('Existing data:', data.existing_data); // Debug log
-
-            if (data.rekaman_asesmen && data.rekaman_asesmen.length > 0) {
-                html = '<div class="table-responsive">';
-                html += '<table class="table table-bordered table-hover">';
-                html += '<thead class="thead-light">';
-                html += '<tr>';
-                html += '<th width="30%">Unit Kompetensi</th>';
-                html += '<th width="10%" class="text-center">Observasi</th>';
-                html += '<th width="10%" class="text-center">Portofolio</th>';
-                html += '<th width="10%" class="text-center">Pihak Ketiga</th>';
-                html += '<th width="10%" class="text-center">Lisan</th>';
-                html += '<th width="10%" class="text-center">Tertulis</th>';
-                html += '<th width="10%" class="text-center">Proyek</th>';
-                html += '<th width="10%" class="text-center">Lainnya</th>';
-                html += '</tr>';
-                html += '</thead>';
-                html += '<tbody>';
-
-                data.rekaman_asesmen.forEach(function(unit) {
-                    const unitId = unit.id_unit;
-                    // PERBAIKAN: Handle existing data dengan key yang benar
-                    const existingData = data.existing_data && data.existing_data[unitId] ? data.existing_data[unitId] : {};
-
-                    console.log(`Unit ${unitId} existing data:`, existingData); // Debug log
-
-                    html += `<tr data-unit-id="${unitId}">`;
-                    html += `<td><strong>${unit.kode_unit}</strong><br><small>${unit.nama_unit}</small></td>`;
-
-                    // Method checkboxes - PERBAIKAN: Periksa nilai dengan benar
-                    const methods = ['observasi', 'portofolio', 'pihak_ketiga', 'lisan', 'tertulis', 'proyek', 'lainnya'];
-                    methods.forEach(function(method) {
-                        // PERBAIKAN: Periksa nilai dengan tepat (1 = checked, 0 atau undefined = unchecked)
-                        const isChecked = existingData[method] === 1;
-                        const checked = isChecked ? 'checked' : '';
-
-                        console.log(`Unit ${unitId}, Method ${method}: value=${existingData[method]}, checked=${checked}`); // Debug log
-
-                        html += `<td class="text-center">`;
-                        html += `<input type="checkbox" name="kompetensi[${unitId}][${method}]" value="1" ${checked} data-unit-id="${unitId}" data-method="${method}">`;
-                        html += `</td>`;
-                    });
-
-                    html += '</tr>';
-                });
-
-                html += '</tbody>';
-                html += '</table>';
-                html += '</div>';
-            } else {
-                html = `
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle mr-2"></i>
-                    Tidak ada unit kompetensi ditemukan untuk skema ini.
-                </div>
-                `;
-            }
+            // Langsung loop melalui setiap unit
+            data.units.forEach(function(unit) {
+                const existingUnitData = data.existing_data ? (data.existing_data[unit.id_unit] || {}) : {};
+                // Panggil fungsi render untuk setiap unit
+                html += renderUnitCard(unit, existingUnitData);
+            });
 
             container.html(html);
-
-            // PERBAIKAN: Populate rekomendasi section dengan data yang benar
-            if (data.existing_recommendation) {
-                $('#rekomendasi').val(data.existing_recommendation.rekomendasi || '');
-                $('#tindak_lanjut').val(data.existing_recommendation.tindak_lanjut || '');
-                $('#catatan').val(data.existing_recommendation.komentar || '');
-            }
-
-            updateUnitStatus();
         }
 
-        // AUTO SAVE: Save settings
-        async function saveSettings() {
-            if (!state.selectedPengajuan) {
-                return;
-            }
+        function renderUnitCard(unit, existingData) {
+            const methods = [
+                { key: 'metode_observasi', label: 'Observasi' }, { key: 'metode_portofolio', label: 'Portofolio' },
+                { key: 'metode_pihak_ketiga', label: 'Pihak Ketiga' }, { key: 'metode_lisan', label: 'Lisan' },
+                { key: 'metode_tertulis', label: 'Tertulis' }, { key: 'metode_proyek', label: 'Proyek' },
+                { key: 'metode_lainnya', label: 'Lainnya' }
+            ];
+            let methodsHtml = methods.map(method => {
+                const isChecked = existingData[method.key] ? 'checked' : '';
+                return `<div class="col-lg-3 col-md-4 col-sm-6 mb-2">
+                    <div class="custom-control custom-checkbox">
+                        <input type="checkbox" class="custom-control-input method-checkbox" 
+                               id="${method.key}_${unit.id_unit}" data-unit-id="${unit.id_unit}" 
+                               data-method-key="${method.key}" ${isChecked}>
+                        <label class="custom-control-label" for="${method.key}_${unit.id_unit}">${method.label}</label>
+                    </div>
+                </div>`;
+            }).join('');
 
-            const data = {
-                save_type: 'settings',
-                id_pengajuan: state.selectedPengajuan,
-                tanggal_asesmen: $('#tanggal_asesmen').val(),
-                [state.csrfName]: state.csrfHash
-            };
-
-            try {
-                const response = await $.ajax({
-                    url: `${config.baseUrl}/${config.endpoints.store}`, // PERBAIKAN: URL yang benar
-                    type: 'POST',
-                    data: data,
-                    dataType: 'json'
-                });
-
-                if (response.success) {
-                    if (response.data && response.data.id_rekaman) {
-                        state.id_rekaman = response.data.id_rekaman;
-                    }
-                    if (response.csrf_hash) state.csrfHash = response.csrf_hash;
-                } else {
-                    console.error('Save settings failed:', response.message);
-                }
-            } catch (error) {
-                console.error('Error saving settings:', error);
-            }
-        }
-
-        // AUTO SAVE: Save single method - PERBAIKAN: URL dan data yang benar
-        async function saveSingleMethod(unitId, method, value) {
-            if (!state.selectedPengajuan) {
-                return;
-            }
-
-            console.log(`Saving single method: Unit ${unitId}, Method ${method}, Value ${value}`);
-
-            const data = {
-                save_type: 'method',
-                id_pengajuan: state.selectedPengajuan,
-                id_unit: unitId,
-                method: method,
-                value: value ? 1 : 0,
-                [state.csrfName]: state.csrfHash
-            };
-
-            try {
-                const response = await $.ajax({
-                    url: `${config.baseUrl}/${config.endpoints.store}`, // PERBAIKAN: URL yang benar
-                    type: 'POST',
-                    data: data,
-                    dataType: 'json'
-                });
-
-                console.log('Save single method response:', response);
-
-                if (response.success) {
-                    console.log(`Successfully saved: Unit ${unitId}, Method ${method}, Value ${data.value}`);
-                    if (response.csrf_hash) state.csrfHash = response.csrf_hash;
-                } else {
-                    console.error('Failed to save single method:', response.message);
-                }
-            } catch (error) {
-                console.error('Error saving method:', error);
-                console.error('XHR status:', error.status);
-                console.error('Response text:', error.responseText);
-            }
-        }
-
-        // AUTO SAVE: Save recommendation - PERBAIKAN: URL yang benar
-        async function saveRecommendation() {
-            if (!state.selectedPengajuan) {
-                return;
-            }
-
-            const data = {
-                save_type: 'recommendation',
-                id_pengajuan: state.selectedPengajuan,
-                rekomendasi: $('#rekomendasi').val(),
-                komentar: $('#catatan').val(),
-                tindak_lanjut: $('#tindak_lanjut').val(),
-                [state.csrfName]: state.csrfHash
-            };
-
-            try {
-                const response = await $.ajax({
-                    url: `${config.baseUrl}/${config.endpoints.store}`, // PERBAIKAN: URL yang benar
-                    type: 'POST',
-                    data: data,
-                    dataType: 'json'
-                });
-
-                if (response.csrf_hash) state.csrfHash = response.csrf_hash;
-            } catch (error) {
-                console.error('Error saving recommendation:', error);
-            }
-        }
-
-        // Bulk check handler - PERBAIKAN: URL yang benar
-        async function handleBulkCheck(checkState) {
-            const $btn = $(checkState ? '#checkAllMethods' : '#uncheckAllMethods');
-            const originalBtnText = $btn.html();
-
-            $btn.html('<i class="fas fa-spinner fa-spin"></i> Memproses...').attr('disabled', true);
-
-            // Ensure settings are saved first
-            if (!state.id_rekaman) {
-                await saveSettings();
-                if (!state.id_rekaman) {
-                    showError('Gagal menyimpan pengaturan rekaman');
-                    $btn.html(originalBtnText).attr('disabled', false);
-                    return;
-                }
-            }
-
-            const $checkboxes = $('input[type="checkbox"][name^="kompetensi"]');
-            $checkboxes.prop('checked', checkState);
-            window.updateProgress();
-
-            const batchData = {
-                save_type: 'batch',
-                id_pengajuan: state.selectedPengajuan,
-                items: {}
-            };
-
-            $checkboxes.each(function() {
-                const name = $(this).attr('name');
-                const unitMatch = name.match(/\[(\d+)\]/);
-                const methodMatch = name.match(/\[([^\]]+)\]$/);
-
-                if (unitMatch && methodMatch) {
-                    const unitId = unitMatch[1];
-                    const method = methodMatch[1];
-
-                    if (!batchData.items[unitId]) {
-                        batchData.items[unitId] = {};
-                    }
-
-                    if (checkState) {
-                        batchData.items[unitId][method] = 1;
-                    }
-                }
-            });
-
-            // Add CSRF token
-            batchData[state.csrfName] = state.csrfHash;
-
-            try {
-                const response = await $.ajax({
-                    url: `${config.baseUrl}/${config.endpoints.store}`, // PERBAIKAN: URL yang benar
-                    type: 'POST',
-                    data: JSON.stringify(batchData),
-                    contentType: 'application/json',
-                    dataType: 'json'
-                });
-
-                if (response.success) {
-                    showSuccess(response.message);
-                    if (response.csrf_hash) state.csrfHash = response.csrf_hash;
-                } else {
-                    showError(response.message || 'Gagal menyimpan data batch');
-                }
-            } catch (error) {
-                console.error('Batch save error:', error);
-                showError('Terjadi kesalahan saat menyimpan data batch');
-            } finally {
-                $btn.html(originalBtnText).attr('disabled', false);
-            }
-        }
-
-        // Save complete rekaman
-        function saveCompleteRekaman() {
-            const rekomendasi = $('#rekomendasi').val();
-
-            if (!rekomendasi) {
-                showError('Rekomendasi wajib diisi sebelum menyelesaikan rekaman.');
-                return;
-            }
-
-            Swal.fire({
-                title: 'Konfirmasi',
-                text: 'Apakah Anda yakin ingin menyelesaikan rekaman asesmen ini?',
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonText: 'Ya, Selesaikan',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // Final save with completion status
-                    const data = {
-                        save_type: 'recommendation',
-                        id_pengajuan: state.selectedPengajuan,
-                        rekomendasi: $('#rekomendasi').val(),
-                        komentar: $('#catatan').val(),
-                        tindak_lanjut: $('#tindak_lanjut').val(),
-                        status: 'completed'
-                    };
-
-                    $.ajax({
-                        url: `${config.baseUrl}/${config.endpoints.store}`,
-                        type: 'POST',
-                        data: data,
-                        dataType: 'json',
-                        success: function(response) {
-                            if (response.success) {
-                                Swal.fire({
-                                    icon: 'success',
-                                    title: 'Berhasil!',
-                                    text: 'Rekaman asesmen telah diselesaikan',
-                                    confirmButtonText: 'OK'
-                                }).then(() => {
-                                    // Redirect or refresh
-                                    window.location.href = config.baseUrl + '/asesor/rekaman-asesmen';
-                                });
-                            } else {
-                                showError(response.message);
-                            }
-                        },
-                        error: function() {
-                            showError('Terjadi kesalahan saat menyelesaikan rekaman');
-                        }
-                    });
-                }
-            });
-        }
-
-        // Update unit status
-        function updateUnitStatus() {
-            state.assessedUnits = 0;
-
-            $('[data-unit-id]').each(function() {
-                const hasChecked = $(this).find('input[type="checkbox"]:checked').length > 0;
-                if (hasChecked) {
-                    state.assessedUnits++;
-                }
-            });
-        }
-
-        // Reset asesi selection
-        function resetAsesiSelection() {
-            $('#id_asesi').html('<option value="">-- Pilih Asesmen Terlebih Dahulu --</option>').prop('disabled', true);
-            state.selectedAsesi = null;
-            state.selectedPengajuan = null;
-            state.id_rekaman = null;
-            hideRekamanForm();
-            hideEmptyDataMessage();
-            showInitialInstructions();
-        }
-
-        // UI Helper functions
-        function showLoading() {
-            $('#loadingState').show();
-            $('#formRekamanAsesmen').hide();
-            $('#initialInstructions').hide();
-            $('#emptyDataMessage').hide();
-        }
-
-        function hideLoading() {
-            $('#loadingState').hide();
-        }
-
-        function showRekamanForm() {
-            $('#formRekamanAsesmen').show();
-            $('#initialInstructions').hide();
-            $('#emptyDataMessage').hide();
-        }
-
-        function hideRekamanForm() {
-            $('#formRekamanAsesmen').hide();
-        }
-
-        function showInitialInstructions() {
-            $('#initialInstructions').show();
-            $('#emptyDataMessage').hide();
-        }
-
-        function showEmptyDataMessage() {
-            $('#emptyDataMessage').show();
-            $('#initialInstructions').hide();
-        }
-
-        function hideEmptyDataMessage() {
-            $('#emptyDataMessage').hide();
+            return `<div class="card mb-3 unit-section">
+                <div class="card-header"><h6 class="mb-0"><span class="badge badge-light mr-2">${unit.kode_unit}</span>${unit.nama_unit}</h6></div>
+                <div class="card-body"><div class="row">${methodsHtml}</div></div>
+            </div>`;
         }
 
         function initializePageState() {
-            $('#loadingState').hide();
-            $('#formRekamanAsesmen').hide();
-            $('#emptyDataMessage').hide();
+            $('#loadingState, #formRekamanAsesmen, #emptyDataMessage, #apl1-info').hide();
             $('#initialInstructions').show();
-
-            if (!$('#id_asesmen').val()) {
-                $('#id_asesi').html('<option value="">-- Pilih Asesmen Terlebih Dahulu --</option>').prop('disabled', true);
-            }
+            $('#id_apl1').prop('disabled', true).html('<option value="">-- Pilih Asesmen --</option>').trigger('change.select2');
+            $('#info-skema-text').text('Pilih Asesmen');
         }
-
-        function showSuccess(message) {
-            if (typeof Swal !== 'undefined') {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Berhasil!',
-                    text: message,
-                    timer: 2000,
-                    showConfirmButton: false,
-                    position: 'top-end',
-                    toast: true
-                });
-            } else {
-                console.log('Success: ' + message);
-            }
+        function showLoading() {
+            $('#loadingState').show();
+            $('#initialInstructions, #formRekamanAsesmen, #emptyDataMessage, #apl1-info').hide();
         }
-
-        function showError(message) {
-            if (typeof Swal !== 'undefined') {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error!',
-                    text: message
-                });
-            } else {
-                alert('Error: ' + message);
-            }
+        function showForm() {
+            $('#formRekamanAsesmen, #apl1-info').show();
+            $('#initialInstructions, #loadingState, #emptyDataMessage').hide();
         }
-
-        // Debounce function for auto-save
+        function showEmptyDataMessage() {
+            $('#emptyDataMessage').show();
+            $('#initialInstructions, #loadingState, #formRekamanAsesmen, #apl1-info').hide();
+        }
+        function updateApl1InfoDisplay(data) {
+            $('#info-nama').text(data.nama || '-');
+            $('#info-nik').text(data.nik || '-');
+            $('#info-email').text(data.email || '-');
+            $('#info-validasi').text(data.validation || '-');
+        }
+        const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2500, timerProgressBar: true });
+        function showToast(icon, title) { Toast.fire({ icon, title }); }
+        function showSuccess(title) { Swal.fire({ icon: 'success', title: title, text: 'Halaman akan dialihkan.' }); }
+        function showError(title, message = '') { Swal.fire({ icon: 'error', title: 'Oops...', text: title + ' ' + message }); }
         function debounce(func, wait) {
             let timeout;
-            return function executedFunction(...args) {
-                const later = () => {
-                    clearTimeout(timeout);
-                    func(...args);
-                };
+            return function(...args) {
                 clearTimeout(timeout);
-                timeout = setTimeout(later, wait);
+                timeout = setTimeout(() => func.apply(this, args), wait);
             };
         }
-
-        // Initialize the module
+        
         init();
     });
 </script>

@@ -19,7 +19,6 @@
     <link rel="stylesheet" href="<?= base_url() ?>assets/stisla/node_modules/datatables.net-bs4/css/dataTables.bootstrap4.min.css">
     <link rel="stylesheet" href="<?= base_url() ?>assets/stisla/node_modules/datatables.net-select-bs4/css/select.bootstrap4.min.css">
     <link rel="stylesheet" href="<?= base_url() ?>assets/stisla/node_modules/bootstrap-icons/bootstrap-icons.css">
-    <link rel="stylesheet" href="<?= base_url() ?>/intro.js/minified/introjs.min.css">
 
     <!-- ===== Template CSS ===== -->
     <link rel="stylesheet" href="<?= base_url() ?>assets/stisla/assets/css/style.css">

@@ -1,7 +1,6 @@
-<!-- Save Unit Modal -->
 <?= form_open('master/unit/save', ['id' => 'add-unit-form']) ?>
 <div class="modal fade" id="addUnitModal" data-backdrop="static" tabindex="-1" aria-labelledby="addUnitModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-md">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Tambah Unit</h5>
@@ -10,14 +9,16 @@
                 </button>
             </div>
             <div class="modal-body">
-                <p class="text-muted">Masukan ID Skema, Kode Unit, Nama Unit, Keterangan dan Status</p>
+                <p class="text-muted">Masukkan data unit kompetensi sesuai dengan skema sertifikasi.</p>
+
+                <input type="hidden" name="id_unit">
 
                 <div class="form-group">
-                    <label>Skema<span class="text-danger">*</span></label>
-                    <select class="form-control select2" name="id_skema" id="id_skema">
+                    <label>Skema Sertifikasi<span class="text-danger">*</span></label>
+                    <select class="form-control select2" name="id_skema" style="width: 100%;">
                         <option value="">Pilih Skema</option>
-                        <?php if (isset($listSkema)): ?>
-                            <?php foreach ($listSkema as $row): ?>
+                        <?php if (isset($listSkema)) : ?>
+                            <?php foreach ($listSkema as $row) : ?>
                                 <option value="<?= $row['id_skema'] ?>"><?= $row['nama_skema'] ?></option>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -27,19 +28,19 @@
 
                 <div class="form-group">
                     <label>Kode Unit<span class="text-danger">*</span></label>
-                    <input type="text" name="kode" class="form-control" id="inputKode" placeholder="Masukan Kode Unit">
+                    <input type="text" name="kode_unit" class="form-control" placeholder="Contoh: J.620100.001.01">
                     <div class="invalid-feedback"></div>
                 </div>
 
                 <div class="form-group">
                     <label>Nama Unit<span class="text-danger">*</span></label>
-                    <textarea class="form-control" name="nama" rows="3" placeholder="Masukan Nama Unit"></textarea>
+                    <textarea class="form-control" name="nama_unit" rows="3" placeholder="Masukan Nama Unit"></textarea>
                     <div class="invalid-feedback"></div>
                 </div>
 
                 <div class="form-group">
-                    <label>Keterangan<span class="text-danger">*</span></label>
-                    <textarea class="form-control" name="keterangan" id="inputDescription" rows="3" placeholder="Masukan Keterangan"></textarea>
+                    <label>Keterangan</label>
+                    <textarea class="form-control" name="keterangan" rows="2" placeholder="Masukan Keterangan (opsional)"></textarea>
                     <div class="invalid-feedback"></div>
                 </div>
 

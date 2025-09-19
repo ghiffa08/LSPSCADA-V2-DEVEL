@@ -89,14 +89,14 @@ class SetTanggal extends DataTableController
             return Services::response()->setStatusCode(404);
         }
 
-        $KukModel = $this->kukModel;
+    $settanggalModel = $this->settanggalModel;
 
         // Start transaction
         $db = \Config\Database::connect();
         $db->transStart();
 
         try {
-            $deleted = $KukModel->delete($id);
+            $deleted =   $settanggalModel->delete($id);
 
             $db->transComplete();
 

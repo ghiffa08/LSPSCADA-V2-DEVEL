@@ -9,10 +9,11 @@ use CodeIgniter\Database\BaseConnection;
 use CodeIgniter\Cache\CacheInterface;
 
 /**
- * ObservasiService - Optimized
+ * ObservasiService - Optimized for APL1
  * 
  * Enhanced service class untuk business logic observasi
  * dengan caching, validation, dan optimasi query
+ * Updated for simplified APL1 table structure
  */
 class ObservasiService
 {
@@ -32,7 +33,7 @@ class ObservasiService
     }
 
     /**
-     * Create or update observation with batch details - OPTIMIZED
+     * Create or update observation with batch details - OPTIMIZED for APL1
      * Enhanced with caching, better validation, and transaction safety
      */
     public function saveObservation(array $data): array
@@ -58,21 +59,20 @@ class ObservasiService
             // Validate foreign key constraints before attempting insert/update
             $this->validateForeignKeys($validatedData);
 
-            // Prepare main observation data
+            // Prepare main observation data for APL1
             $observationData = [
                 'id_asesor' => $validatedData['id_asesor'],
-                'id_asesi' => $validatedData['id_asesi'],
-                'id_pengajuan' => $validatedData['id_pengajuan'],
+                'id_apl1' => $validatedData['id_apl1'], // Changed from id_asesi
                 'tanggal_observasi' => $validatedData['tanggal_observasi'],
                 'updated_at' => date('Y-m-d H:i:s')
             ];
 
             log_message('info', 'ObservasiService observation data: ' . json_encode($observationData));
 
-            // Check if observation already exists
+            // Check if observation already exists for this APL1
             $existingObservation = $this->observasiModel
-                ->where('id_asesi', $validatedData['id_asesi'])
-                ->where('id_pengajuan', $validatedData['id_pengajuan'])
+                ->where('id_apl1', $validatedData['id_apl1']) // Changed from id_asesi
+                ->where('id_asesor', $validatedData['id_asesor'])
                 ->where('tanggal_observasi', $validatedData['tanggal_observasi'])
                 ->first();
 
@@ -146,7 +146,7 @@ class ObservasiService
             log_message('info', 'ObservasiService transaction completed successfully');
 
             // Clear related caches
-            $this->clearObservasiCaches($validatedData['id_asesi'], $validatedData['id_asesor']);
+            $this->clearObservasiCaches($validatedData['id_apl1'], $validatedData['id_asesor']);
 
             // Return success response with summary
             $summary = $this->getObservationSummary($id_observasi);
@@ -177,29 +177,30 @@ class ObservasiService
     }
 
     /**
-     * Get observation with details using eager loading - NO CACHE
+     * Get observation with details using eager loading - Updated for APL1
      * Always fetch fresh data from database
      */
     public function getObservationWithDetails(int $id_observasi): array
     {
         try {
-            // PERBAIKAN: Query dengan relasi yang benar sesuai struktur database
+            // Query dengan relasi yang benar untuk APL1
             $observation = $this->db->table('observasi o')
                 ->select([
                     'o.*',
-                    'asesi_user.nama_lengkap as nama_asesi',
+                    'apl1.nama_siswa as nama_asesi',
+                    'apl1.nik',
+                    'apl1.email as email_asesi',
                     'asesor_user.nama_lengkap as nama_asesor',
+                    'asesor_user.email as email_asesor',
                     'skema.nama_skema',
                     'skema.kode_skema',
                     'skema.id_skema'
                 ])
-                ->join('asesi', 'asesi.id_asesi = o.id_asesi', 'inner')
-                ->join('users as asesi_user', 'asesi_user.id = asesi.id_user', 'inner')
+                ->join('apl1', 'apl1.id_apl1 = o.id_apl1', 'inner')
                 ->join('asesor', 'asesor.id_asesor = o.id_asesor', 'inner')
                 ->join('users as asesor_user', 'asesor_user.id = asesor.id_user', 'inner')
-                ->join('pengajuan_asesmen pa', 'pa.id_pengajuan = o.id_pengajuan', 'inner')
-                ->join('asesmen asm', 'asm.id_asesmen = pa.id_asesmen', 'inner') // PERBAIKAN: JOIN ke asesmen
-                ->join('skema', 'skema.id_skema = asm.id_skema', 'inner') // PERBAIKAN: JOIN dari asesmen ke skema
+                ->join('asesmen asm', 'asm.id_asesmen = apl1.id_asesmen', 'inner')
+                ->join('skema', 'skema.id_skema = asm.id_skema', 'inner')
                 ->where('o.id_observasi', $id_observasi)
                 ->get()
                 ->getRowArray();
@@ -215,7 +216,7 @@ class ObservasiService
             // Get details dengan optimized query
             $details = $this->getOptimizedDetails($id_observasi, $observation['id_skema']);
 
-            // Get summary - PERBAIKAN: calculation langsung tanpa cache
+            // Get summary - calculation langsung tanpa cache
             $summary = $this->calculateObservationSummary($id_observasi);
 
             // Group details by unit untuk UX yang lebih baik
@@ -340,7 +341,6 @@ class ObservasiService
         return $grouped;
     }
 
-
     /**
      * Get optimized details untuk observasi
      */
@@ -353,7 +353,7 @@ class ObservasiService
                 'do.kompeten',
                 'do.keterangan',
                 'k.kode_kuk',
-                'k.nama_kuk',
+                'k.pertanyaan',
                 'e.kode_elemen',
                 'e.nama_elemen',
                 'u.kode_unit',
@@ -371,19 +371,19 @@ class ObservasiService
     }
 
     /**
-     * Get KUK structure for observation form - NO CACHE
+     * Get KUK structure for observation form - Updated for APL1
      * Always return fresh data from database
      */
-    public function getKukStructureForSchema(int $id_skema, string $id_asesi, ?int $id_observasi = null): array
+    public function getKukStructureForSchema(int $id_skema, string $id_apl1, ?int $id_observasi = null): array
     {
         try {
-            // PERBAIKAN: Build structure dengan query yang benar
-            $result = $this->buildKukStructure($id_skema, $id_asesi, $id_observasi);
+            // Build structure dengan query yang benar untuk APL1
+            $result = $this->buildKukStructure($id_skema, $id_apl1, $id_observasi);
 
             // Get existing observasi data if id_observasi provided
             $existingData = [];
             if ($id_observasi) {
-                $existingData = $this->getExistingObservasiData($id_asesi, $id_skema, $id_observasi);
+                $existingData = $this->getExistingObservasiData($id_apl1, $id_skema, $id_observasi);
             }
 
             return [
@@ -403,9 +403,9 @@ class ObservasiService
     }
 
     /**
-     * Build KUK structure dengan relasi yang benar
+     * Build KUK structure dengan relasi yang benar untuk APL1
      */
-    private function buildKukStructure(int $id_skema, string $id_asesi, ?int $id_observasi = null): array
+    private function buildKukStructure(int $id_skema, string $id_apl1, ?int $id_observasi = null): array
     {
         // Query untuk mengambil struktur KUK dengan relasi yang benar
         $sql = "
@@ -420,7 +420,7 @@ class ObservasiService
                 e.nama_elemen,
                 k.id_kuk,
                 k.kode_kuk,
-                k.nama_kuk as kriteria_unjuk_kerja
+                k.pertanyaan as kriteria_unjuk_kerja
             FROM skema s
             INNER JOIN unit u ON u.id_skema = s.id_skema AND u.status = 'Y'
             LEFT JOIN kelompok_unit ku ON ku.id_unit = u.id_unit
@@ -511,9 +511,9 @@ class ObservasiService
     }
 
     /**
-     * Get existing observasi data
+     * Get existing observasi data - Updated for APL1
      */
-    private function getExistingObservasiData(string $id_asesi, int $id_skema, ?int $id_observasi = null): array
+    private function getExistingObservasiData(string $id_apl1, int $id_skema, ?int $id_observasi = null): array
     {
         if (!$id_observasi) {
             return [];
@@ -538,7 +538,7 @@ class ObservasiService
     }
 
     /**
-     * Get observation list with pagination and filtering
+     * Get observation list with pagination and filtering - Updated for APL1
      */
     public function getObservationList(array $filters = [], int $page = 1, int $perPage = 10): array
     {
@@ -546,24 +546,24 @@ class ObservasiService
             $builder = $this->observasiModel
                 ->select([
                     'observasi.*',
-                    'asesi_user.nama_lengkap as nama_asesi',
+                    'apl1.nama_siswa as nama_asesi',
+                    'apl1.nik',
+                    'apl1.email as email_asesi',
                     'asesor_user.nama_lengkap as nama_asesor',
                     'skema.nama_skema',
                     'skema.kode_skema',
                     'skema.id_skema'
                 ])
-                ->join('asesi', 'asesi.id_asesi = observasi.id_asesi', 'inner')
-                ->join('users as asesi_user', 'asesi_user.id = asesi.id_user', 'inner')
+                ->join('apl1', 'apl1.id_apl1 = observasi.id_apl1', 'inner')
                 ->join('asesor', 'asesor.id_asesor = observasi.id_asesor', 'inner')
                 ->join('users as asesor_user', 'asesor_user.id = asesor.id_user', 'inner')
-                ->join('pengajuan_asesmen pa', 'pa.id_pengajuan = observasi.id_pengajuan', 'inner')
-                ->join('asesmen asm', 'asm.id_asesmen = pa.id_asesmen', 'inner') // PERBAIKAN: JOIN ke asesmen
-                ->join('skema', 'skema.id_skema = asm.id_skema', 'inner'); // PERBAIKAN: JOIN dari asesmen ke skema
+                ->join('asesmen asm', 'asm.id_asesmen = apl1.id_asesmen', 'inner')
+                ->join('skema', 'skema.id_skema = asm.id_skema', 'inner');
 
             // Apply filters
             if (!empty($filters['search'])) {
                 $builder->groupStart()
-                    ->like('asesi_user.nama_lengkap', $filters['search'])
+                    ->like('apl1.nama_siswa', $filters['search'])
                     ->orLike('asesor_user.nama_lengkap', $filters['search'])
                     ->orLike('skema.nama_skema', $filters['search'])
                     ->groupEnd();
@@ -614,7 +614,7 @@ class ObservasiService
     }
 
     /**
-     * Enhanced input validation and sanitization
+     * Enhanced input validation and sanitization - Updated for APL1
      */
     private function validateAndSanitizeInput(array $data): array
     {
@@ -622,8 +622,8 @@ class ObservasiService
             // Sanitize scalar inputs
             $sanitized = [];
 
-            // Required fields validation
-            $requiredFields = ['id_asesor', 'id_asesi', 'id_pengajuan', 'tanggal_observasi'];
+            // Required fields validation for APL1
+            $requiredFields = ['id_asesor', 'id_apl1', 'tanggal_observasi']; // Removed id_pengajuan
             foreach ($requiredFields as $field) {
                 if (!isset($data[$field]) || empty($data[$field])) {
                     return ['error' => "Field {$field} wajib diisi"];
@@ -636,14 +636,9 @@ class ObservasiService
                 return ['error' => 'ID Asesor tidak valid'];
             }
 
-            $sanitized['id_asesi'] = trim(strip_tags($data['id_asesi']));
-            if (empty($sanitized['id_asesi'])) {
-                return ['error' => 'ID Asesi tidak valid'];
-            }
-
-            $sanitized['id_pengajuan'] = filter_var($data['id_pengajuan'], FILTER_VALIDATE_INT);
-            if (!$sanitized['id_pengajuan']) {
-                return ['error' => 'ID Pengajuan tidak valid'];
+            $sanitized['id_apl1'] = trim(strip_tags($data['id_apl1'])); // Changed from id_asesi
+            if (empty($sanitized['id_apl1'])) {
+                return ['error' => 'ID APL1 tidak valid'];
             }
 
             // Validate date
@@ -682,7 +677,7 @@ class ObservasiService
     }
 
     /**
-     * Validate foreign key constraints before save
+     * Validate foreign key constraints before save - Updated for APL1
      */
     private function validateForeignKeys(array $data): void
     {
@@ -692,28 +687,21 @@ class ObservasiService
             throw new \Exception("Asesor dengan ID {$data['id_asesor']} tidak ditemukan");
         }
 
-        // Check if asesi exists
-        $asesi = $this->db->table('asesi')->where('id_asesi', $data['id_asesi'])->get()->getRowArray();
-        if (!$asesi) {
-            throw new \Exception("Asesi dengan ID {$data['id_asesi']} tidak ditemukan");
+        // Check if APL1 exists and is validated
+        $apl1 = $this->db->table('apl1')->where('id_apl1', $data['id_apl1'])->get()->getRowArray();
+        if (!$apl1) {
+            throw new \Exception("APL1 dengan ID {$data['id_apl1']} tidak ditemukan");
         }
 
-        // Check if pengajuan exists
-        $pengajuan = $this->db->table('pengajuan_asesmen')->where('id_pengajuan', $data['id_pengajuan'])->get()->getRowArray();
-        if (!$pengajuan) {
-            throw new \Exception("Pengajuan asesmen dengan ID {$data['id_pengajuan']} tidak ditemukan");
-        }
-
-        // Validate that pengajuan belongs to the asesi
-        if ($pengajuan['id_asesi'] !== $data['id_asesi']) {
-            throw new \Exception("Pengajuan asesmen tidak sesuai dengan asesi yang dipilih");
+        if ($apl1['validasi_apl1'] !== 'validated') {
+            throw new \Exception("APL1 belum tervalidasi");
         }
 
         log_message('info', 'ObservasiService foreign key validation passed');
     }
 
     /**
-     * Optimized batch upsert for detail observasi
+     * Optimized batch upsert for detail observasi - Updated for APL1
      */
     private function optimizedUpsertDetails(int $idObservasi, array $details): void
     {
@@ -732,7 +720,7 @@ class ObservasiService
             $existingMap[$detail['id_kuk']] = $detail;
         }
 
-        // PERBAIKAN: Get KUK details dengan JOIN ke skema
+        // Get KUK details dengan JOIN ke skema
         $kukIds = array_column($details, 'id_kuk');
         $kukDetails = $this->db->table('kuk k')
             ->select('k.id_kuk, u.id_skema')
@@ -804,7 +792,7 @@ class ObservasiService
     }
 
     /**
-     * Update observasi progress and status - PERBAIKAN
+     * Update observasi progress and status
      */
     private function updateObservasiProgress(int $idObservasi): void
     {
@@ -918,20 +906,20 @@ class ObservasiService
     }
 
     /**
-     * Clear observasi related caches
+     * Clear observasi related caches - Updated for APL1
      */
-    private function clearObservasiCaches(string $idAsesi, int $idAsesor): void
+    private function clearObservasiCaches(string $idApl1, int $idAsesor): void
     {
         try {
-            // Clear specific caches - since deleteMatching doesn't exist, we clear individual keys
+            // Clear specific caches for APL1
             $keysToDelete = [
-                "observasi_structure_asesi_{$idAsesi}",
-                "observasi_structure_kuk_{$idAsesi}",
-                "observasi_summary_{$idAsesi}",
+                "observasi_structure_apl1_{$idApl1}",
+                "observasi_structure_kuk_{$idApl1}",
+                "observasi_summary_{$idApl1}",
                 "observasi_summary_{$idAsesor}",
                 "asesor_stats_{$idAsesor}",
-                "asesi_by_skema_{$idAsesor}",
-                "kuk_structure_asesi_{$idAsesi}"
+                "apl1_by_skema_{$idAsesor}",
+                "kuk_structure_apl1_{$idApl1}"
             ];
 
             foreach ($keysToDelete as $key) {
@@ -987,7 +975,7 @@ class ObservasiService
             // Clear caches
             $observasi = $this->db->table('observasi')->where('id_observasi', $idObservasi)->get()->getRowArray();
             if ($observasi) {
-                $this->clearObservasiCaches($observasi['id_asesi'], $observasi['id_asesor']);
+                $this->clearObservasiCaches($observasi['id_apl1'], $observasi['id_asesor']); // Changed from id_asesi
             }
 
             return [
@@ -1026,9 +1014,11 @@ class ObservasiService
 
         // Get KUK details to get id_skema for each KUK
         $kukIds = array_keys($items);
-        $kukDetails = $this->db->table('kuk')
-            ->select('id_kuk, id_skema')
-            ->whereIn('id_kuk', $kukIds)
+        $kukDetails = $this->db->table('kuk k')
+            ->select('k.id_kuk, u.id_skema')
+            ->join('elemen e', 'e.id_elemen = k.id_elemen', 'inner')
+            ->join('unit u', 'u.id_unit = e.id_unit', 'inner')
+            ->whereIn('k.id_kuk', $kukIds)
             ->get()
             ->getResultArray();
 
@@ -1076,11 +1066,11 @@ class ObservasiService
     }
 
     /**
-     * Get asesi list untuk skema tertentu dengan caching
+     * Get validated APL1 list untuk skema tertentu dengan caching - New method for APL1
      */
-    public function getAsesiBySkema(int $idSkema): array
+    public function getValidatedApl1BySkema(int $idSkema): array
     {
-        $cacheKey = "asesi_by_skema_{$idSkema}";
+        $cacheKey = "apl1_by_skema_{$idSkema}";
 
         $cached = $this->cache->get($cacheKey);
         if ($cached !== null) {
@@ -1088,20 +1078,28 @@ class ObservasiService
         }
 
         try {
-            $result = $this->observasiModel->getAsesiBySkema($idSkema);
+            $result = $this->observasiModel->getValidatedApl1BySkema($idSkema);
 
             // Cache for 15 minutes
             $this->cache->save($cacheKey, $result, 900);
 
             return $result;
         } catch (\Exception $e) {
-            log_message('error', 'Error getting asesi by skema: ' . $e->getMessage());
+            log_message('error', 'Error getting validated APL1 by skema: ' . $e->getMessage());
             return [];
         }
     }
 
     /**
-     * Get observasi statistics untuk asesor dengan caching
+     * Alias method for backward compatibility
+     */
+    public function getApl1BySkema(int $idSkema): array
+    {
+        return $this->getValidatedApl1BySkema($idSkema);
+    }
+
+    /**
+     * Get observasi statistics untuk asesor dengan caching - Updated for APL1
      */
     public function getAsesorObservasiStats(int $idAsesor): array
     {
@@ -1199,9 +1197,11 @@ class ObservasiService
                     ->update($saveData);
             } else {
                 // Get id_skema for this KUK
-                $kukDetail = $this->db->table('kuk')
-                    ->select('id_skema')
-                    ->where('id_kuk', $idKuk)
+                $kukDetail = $this->db->table('kuk k')
+                    ->select('u.id_skema')
+                    ->join('elemen e', 'e.id_elemen = k.id_elemen', 'inner')
+                    ->join('unit u', 'u.id_unit = e.id_unit', 'inner')
+                    ->where('k.id_kuk', $idKuk)
                     ->get()
                     ->getRowArray();
 
@@ -1225,7 +1225,7 @@ class ObservasiService
             // Clear caches
             $observasi = $this->db->table('observasi')->where('id_observasi', $idObservasi)->get()->getRowArray();
             if ($observasi) {
-                $this->clearObservasiCaches($observasi['id_asesi'], $observasi['id_asesor']);
+                $this->clearObservasiCaches($observasi['id_apl1'], $observasi['id_asesor']); // Changed from id_asesi
             }
 
             return [
@@ -1279,7 +1279,7 @@ class ObservasiService
             }
 
             // Clear caches
-            $this->clearObservasiCaches($observasi['id_asesi'], $observasi['id_asesor']);
+            $this->clearObservasiCaches($observasi['id_apl1'], $observasi['id_asesor']); // Changed from id_asesi
 
             return [
                 'success' => true,
@@ -1302,21 +1302,8 @@ class ObservasiService
     public function clearAllCaches(): bool
     {
         try {
-            // Since deleteMatching doesn't exist, we'll use clean() to clear all cache
-            // or manually delete known cache keys
-            $knownCacheKeys = [
-                'observasi_structure_asesi_',
-                'observasi_structure_kuk_',
-                'observasi_summary_',
-                'kuk_structure_',
-                'asesi_by_skema_',
-                'asesor_observasi_stats_'
-            ];
-
-            // For production, we could implement a more sophisticated approach
-            // For now, we'll clear the entire cache as it's safer
+            // Clear all cache as it's safer for APL1 migration
             $this->cache->clean();
-
             return true;
         } catch (\Exception $e) {
             log_message('error', 'Error clearing all observasi caches: ' . $e->getMessage());
@@ -1325,7 +1312,7 @@ class ObservasiService
     }
 
     /**
-     * Get observasi progress report
+     * Get observasi progress report - Updated for APL1
      */
     public function getProgressReport(int $idAsesor, ?string $dateFrom = null, ?string $dateTo = null): array
     {
@@ -1364,6 +1351,63 @@ class ObservasiService
                 'success' => false,
                 'message' => 'Gagal mengambil laporan progress: ' . $e->getMessage(),
                 'data' => []
+            ];
+        }
+    }
+
+    /**
+     * Get APL1 details with validation - New method for APL1
+     */
+    public function getApl1Details(string $idApl1): array
+    {
+        try {
+            $apl1Data = $this->observasiModel->getApl1Data($idApl1);
+
+            if (!$apl1Data) {
+                return [
+                    'success' => false,
+                    'message' => 'Data APL1 tidak ditemukan'
+                ];
+            }
+
+            if ($apl1Data['validasi_apl1'] !== 'validated') {
+                return [
+                    'success' => false,
+                    'message' => 'APL1 belum tervalidasi'
+                ];
+            }
+
+            return [
+                'success' => true,
+                'data' => $apl1Data
+            ];
+        } catch (\Exception $e) {
+            log_message('error', 'Error getting APL1 details: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Gagal mengambil detail APL1: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Check if observation exists for APL1 - New method
+     */
+    public function checkExistingObservation(string $idApl1, int $idAsesor): array
+    {
+        try {
+            $existing = $this->observasiModel->checkExistingObservation($idApl1, $idAsesor);
+
+            return [
+                'success' => true,
+                'exists' => $existing !== null,
+                'data' => $existing
+            ];
+        } catch (\Exception $e) {
+            log_message('error', 'Error checking existing observation: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Gagal mengecek observasi yang ada: ' . $e->getMessage()
             ];
         }
     }

@@ -2,954 +2,343 @@
 
 namespace App\Controllers;
 
-use Config\Database;
+use CodeIgniter\RESTful\ResourceController;
+use App\Services\RekamanAsesmenService;
+use App\Models\AsesorModel;
+use App\Models\SkemaModel;
+
+use App\Models\RekamanAsesmenModel;
 use App\Services\PDFService;
 use App\Services\QRCodeService;
-use CodeIgniter\API\ResponseTrait;
-use CodeIgniter\RESTful\ResourceController;
+use ZipArchive;
 
 class RekamanAsesmenController extends ResourceController
 {
-    use ResponseTrait;
-
-    // Services
-    protected QRCodeService $qrCodeService;
-    protected PDFService $pdfService;
-
-    // Models
-    protected object $asesmenModel;
-    protected object $skemaModel;
-    protected object $rekamanAsesmenModel;
-    protected object $rekamanAsesmenKompetensiModel;
-    protected object $pengajuanAsesmenModel;
-    protected object $asesorModel;
-    protected object $unitModel;
-
-    // Context
+    protected RekamanAsesmenService $rekamanService;
     protected int $id_asesor;
-    protected $db;
+    protected RekamanAsesmenModel $rekamanModel;
+    protected PDFService $pdfService;
+    protected QRCodeService $qrCodeService;
 
     public function __construct()
     {
-        helper(['auth', 'form']);
-        $this->initializeServices();
-        $this->initializeModels();
-        $this->initializeUserContext();
-        $this->initializeDatabase();
-    }
-
-    private function initializeServices(): void
-    {
-        $this->qrCodeService = new QRCodeService();
+        helper('auth');
+        $this->rekamanService = new RekamanAsesmenService();
+        $this->rekamanModel = new RekamanAsesmenModel();
         $this->pdfService = new PDFService();
-    }
+        $this->qrCodeService = new QRCodeService();
 
-    private function initializeModels(): void
-    {
-        $this->asesmenModel = model('AsesmenModel');
-        $this->skemaModel = model('SkemaModel');
-        $this->rekamanAsesmenModel = model('RekamanAsesmenModel');
-        $this->rekamanAsesmenKompetensiModel = model('RekamanAsesmenKompetensiModel');
-        $this->pengajuanAsesmenModel = model('PengajuanAsesmenModel');
-        $this->asesorModel = model('AsesorModel');
-        $this->unitModel = model('UnitModel');
-    }
-
-    private function initializeUserContext(): void
-    {
-        $this->id_asesor = user()->id ?? 0;
-
-        if ($this->id_asesor === 0) {
-            throw new \RuntimeException('User tidak terautentikasi');
+        // Mengambil ID Asesor dari user yang sedang login
+        $asesorModel = new AsesorModel();
+        $asesor = $asesorModel->where('id_user', user()->id)->first();
+        if (!$asesor) {
+            // Sebaiknya ditangani dengan baik, misal redirect atau pesan error
+            throw new \RuntimeException('Akses ditolak: Anda bukan seorang asesor.');
         }
-
-        if (!in_groups(['Asesor', 'Admin'])) {
-            throw new \RuntimeException('Akses ditolak: Anda tidak memiliki izin sebagai asesor');
-        }
-    }
-
-    private function initializeDatabase(): void
-    {
-        $this->db = Database::connect();
+        $this->id_asesor = (int)$asesor['id_asesor'];
     }
 
     /**
-     * Display listing of rekaman asesmen - SAMA SEPERTI OBSERVASI
+     * Menampilkan halaman manajemen Rekaman Asesmen untuk Admin.
+     * (Diadaptasi dari PMO)
      */
     public function index()
     {
-        try {
-            // Get asesor info dengan skema (SAMA SEPERTI OBSERVASI)
-            $asesorInfo = $this->asesorModel->getWithSkema($this->getCurrentAsesorId());
+        $request = service('request');
+        $asesorModel = new AsesorModel();
+        $skemaModel = new SkemaModel(); // Gunakan model skema
 
-            if (!$asesorInfo) {
-                throw new \Exception('Data asesor tidak ditemukan untuk user ID: ' . $this->id_asesor);
-            }
+        // Ambil data untuk dropdown filter
+        $data['asesor_list'] = $asesorModel->select('asesor.id_asesor, users.nama_lengkap as nama_asesor')
+            ->join('users', 'users.id = asesor.id_user')
+            ->orderBy('users.nama_lengkap', 'ASC')
+            ->findAll();
 
-            if (empty($asesorInfo['id_skema'])) {
-                throw new \Exception('Asesor belum memiliki skema kompetensi yang ditetapkan');
-            }
+        $data['skema_list'] = $skemaModel->select('id_skema, nama_skema')
+            ->orderBy('nama_skema', 'ASC')
+            ->findAll();
 
-            $id_skema = $asesorInfo['id_skema'];
+        // Simpan nilai filter dari URL
+        $data['filters'] = [
+            'id_asesor'      => $request->getGet('id_asesor'),
+            'id_skema'       => $request->getGet('id_skema'),
+            'tanggal_dari'   => $request->getGet('tanggal_dari'),
+            'tanggal_sampai' => $request->getGet('tanggal_sampai'),
+        ];
 
-            // Get skema data
-            $skema = $this->skemaModel->find($id_skema);
+        $data['siteTitle'] = 'Manajemen Rekaman Asesmen';
 
-            if (!$skema) {
-                throw new \Exception('Skema sertifikasi dengan ID ' . $id_skema . ' tidak ditemukan');
-            }
+        // Pastikan view ini ada: app/Views/admin/rekaman_asesmen_list.php
+        return view('admin/rekaman_asesmen_list', $data);
+    }
 
-            // Get asesmen data (SAMA SEPERTI OBSERVASI)
-            $asesmen = [];
-            $method_used = '';
+    public function ceklist()
+    {
+        $asesorModel = model('AsesorModel');
+        $asesmenModel = model('AsesmenModel');
 
-            try {
-                $db = \Config\Database::connect();
-                $asesmen = $db->table('asesmen')
-                    ->select('asesmen.id_asesmen, asesmen.tujuan, asesmen.id_skema, skema.nama_skema, skema.kode_skema')
-                    ->join('skema', 'asesmen.id_skema = skema.id_skema', 'left')
-                    ->where('asesmen.id_skema', $id_skema)
-                    ->get()
-                    ->getResultArray();
+        // 1. Ambil data asesor yang sedang login, termasuk skema yang diampu
+        $asesorData = $asesorModel->getWithSkema($this->id_asesor);
 
-                $method_used = 'JOIN Query';
-            } catch (\Exception $e) {
-                log_message('error', 'RekamanAsesmen::index - Method 1 failed: ' . $e->getMessage());
-            }
+        // 2. Ambil ID Skema dari data asesor
+        $id_skema_asesor = $asesorData['id_skema'] ?? null;
 
-            if (empty($asesmen)) {
-                try {
-                    $asesmen = $this->asesmenModel
-                        ->where('id_skema', $id_skema)
-                        ->findAll();
-
-                    $method_used = 'Simple Query + Manual Join';
-
-                    foreach ($asesmen as &$item) {
-                        $item['nama_skema'] = $skema['nama_skema'];
-                        $item['kode_skema'] = $skema['kode_skema'];
-                    }
-                } catch (\Exception $e) {
-                    log_message('error', 'RekamanAsesmen::index - Method 2 failed: ' . $e->getMessage());
-                }
-            }
-
-            // Validate asesmen data structure
-            $validAsesmen = [];
-            foreach ($asesmen as $a) {
-                if (isset($a['id_asesmen']) && !empty($a['id_asesmen'])) {
-                    if (!isset($a['nama_skema'])) $a['nama_skema'] = $skema['nama_skema'];
-                    if (!isset($a['kode_skema'])) $a['kode_skema'] = $skema['kode_skema'];
-                    $validAsesmen[] = $a;
-                }
-            }
-
-            if (empty($validAsesmen)) {
-                throw new \Exception('Tidak ada asesmen yang tersedia untuk skema ini');
-            }
-
-            // Prepare data for view
-            $data = [
-                'siteTitle' => 'Rekaman Asesmen Kompetensi',
-                'asesor' => $asesorInfo,
-                'skema' => [
-                    'id_skema' => $id_skema,
-                    'nama_skema' => $asesorInfo['nama_skema'] ?? $skema['nama_skema'],
-                    'kode_skema' => $asesorInfo['kode_skema'] ?? $skema['kode_skema'],
-                    'jenis_skema' => $asesorInfo['jenis_skema'] ?? $skema['jenis_skema'] ?? ''
-                ],
-                'asesmen' => $validAsesmen,
-                'debug_info' => [
-                    'user_id' => $this->id_asesor,
-                    'asesor_id' => $this->getCurrentAsesorId(),
-                    'method_used' => $method_used
-                ]
-            ];
-
-            return view('asesor/rekaman_kompetensi', $data);
-        } catch (\Exception $e) {
-            log_message('error', 'RekamanAsesmen::index - Exception: ' . $e->getMessage());
-            log_message('error', 'RekamanAsesmen::index - Stack trace: ' . $e->getTraceAsString());
-
-            return view('asesor/rekaman_kompetensi', [
-                'siteTitle' => 'Rekaman Asesmen Kompetensi',
-                'asesor' => $asesorInfo ?? [],
-                'skema' => [],
-                'asesmen' => [],
-                'error_message' => $e->getMessage()
-            ]);
+        $asesmenList = [];
+        // 3. Hanya cari data asesmen JIKA asesor memiliki skema
+        if ($id_skema_asesor) {
+            $asesmenList = $asesmenModel
+                ->select('asesmen.id_asesmen, asesmen.tujuan, asesmen.id_skema, skema.nama_skema, skema.kode_skema')
+                ->join('skema', 'skema.id_skema = asesmen.id_skema', 'inner') // inner join untuk data valid
+                ->where('asesmen.id_skema', $id_skema_asesor) // Filter berdasarkan skema asesor
+                ->findAll();
         }
+
+        // 4. Kirim data yang sudah difilter ke view
+        $data = [
+            'siteTitle' => 'Rekaman Asesmen Kompetensi',
+            'asesor'    => $asesorData,
+            'asesmen'   => $asesmenList,
+        ];
+
+        return view('asesor/rekaman_kompetensi', $data);
     }
 
     /**
-     * Get asesi by asesmen - PERBAIKAN: Tanpa asesor_asesmen
+     * API: Mengambil daftar APL1 (asesi) yang sudah divalidasi per asesmen.
      */
     public function getAsesiByAsesmen()
     {
         if (!$this->request->isAJAX()) {
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'Request tidak valid'
-            ])->setStatusCode(400);
+            return $this->failUnauthorized();
         }
 
         $id_asesmen = $this->request->getGet('id_asesmen');
-
         if (!$id_asesmen) {
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'ID Asesmen diperlukan'
-            ]);
+            return $this->fail('ID Asesmen diperlukan.', 400);
         }
 
-        try {
-            // PERBAIKAN: Query tanpa asesor_asesmen
-            // Validasi bahwa asesmen ini sesuai dengan skema asesor
-            $currentAsesorId = $this->getCurrentAsesorId();
-            $asesorInfo = $this->asesorModel->getWithSkema($currentAsesorId);
-
-            if (!$asesorInfo || !$asesorInfo['id_skema']) {
-                return $this->response->setJSON([
-                    'success' => false,
-                    'message' => 'Asesor belum memiliki skema yang ditetapkan'
-                ]);
-            }
-
-            // Validasi bahwa asesmen ini untuk skema yang sama dengan asesor
-            $asesmen = $this->asesmenModel->find($id_asesmen);
-            if (!$asesmen || $asesmen['id_skema'] != $asesorInfo['id_skema']) {
-                return $this->response->setJSON([
-                    'success' => false,
-                    'message' => 'Asesmen tidak sesuai dengan skema asesor'
-                ]);
-            }
-
-            // Query asesi untuk asesmen ini
-            $asesiList = $this->db->table('pengajuan_asesmen pa')
-                ->select('
-                    pa.id_pengajuan,
-                    pa.id_asesi,
-                    pa.id_asesmen,
-                    pa.status_pengajuan,
-                    a.nik,
-                    u.nama_lengkap as nama_asesi,
-                    u.email
-                ')
-                ->join('asesi a', 'a.id_asesi = pa.id_asesi', 'inner')
-                ->join('users u', 'u.id = a.id_user', 'inner')
-                ->where('pa.id_asesmen', $id_asesmen)
-                ->where('pa.status_pengajuan', 'diterima')
-                ->orderBy('u.nama_lengkap', 'ASC')
-                ->get()
-                ->getResultArray();
-
-            if (empty($asesiList)) {
-                return $this->response->setJSON([
-                    'success' => true,
-                    'asesi' => [],
-                    'message' => 'Belum ada asesi terdaftar untuk asesmen ini'
-                ]);
-            }
-
-            return $this->response->setJSON([
-                'success' => true,
-                'asesi' => $asesiList,
-                'message' => 'Data asesi berhasil dimuat'
-            ]);
-        } catch (\Exception $e) {
-            log_message('error', 'Error getting asesi by asesmen: ' . $e->getMessage());
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'Gagal memuat data asesi: ' . $e->getMessage()
-            ]);
-        }
+        $result = $this->rekamanService->getApl1ByAsesmen((int)$id_asesmen);
+        return $this->respond($result);
     }
 
     /**
-     * Load rekaman data - PERBAIKAN: Tanpa asesor_asesmen
+     * API: Memuat data rekaman (struktur skema & data checklist yang ada).
      */
     public function loadRekamanAsesmen()
     {
         if (!$this->request->isAJAX()) {
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'Request tidak valid'
-            ])->setStatusCode(400);
+            return $this->failUnauthorized();
+        }
+
+        $id_apl1 = $this->request->getGet('id_apl1');
+        if (!$id_apl1) {
+            return $this->fail('ID APL1 diperlukan.', 400);
+        }
+
+        $result = $this->rekamanService->getRekamanWithDetailsByApl1($id_apl1, $this->id_asesor);
+        return $this->respond($result);
+    }
+
+    /**
+     * Endpoint tunggal untuk menyimpan semua jenis data.
+     */
+    public function store()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->failUnauthorized();
+        }
+
+        $data = $this->request->getJSON(true);
+        if (!$data) {
+            return $this->fail('Invalid JSON data.', 400);
+        }
+
+        $id_apl1 = $data['id_apl1'] ?? null;
+        if (empty($id_apl1)) {
+            return $this->fail('ID APL1 diperlukan.', 400);
         }
 
         try {
-            $id_skema = $this->request->getGet('id_skema');
-            $id_asesmen = $this->request->getGet('id_asesmen');
-            $id_asesi = $this->request->getGet('id_asesi');
-            $id_pengajuan = $this->request->getGet('id_pengajuan');
+            // Dapatkan atau buat record master
+            $rekaman = $this->rekamanService->getOrCreateRekaman($id_apl1, $this->id_asesor);
+            if (!$rekaman) {
+                return $this->fail('Gagal memproses record rekaman.', 500);
+            }
+            $id_rekaman = $rekaman['id'];
 
-            // Validation
-            if (!$id_skema || !$id_asesmen || !$id_asesi || !$id_pengajuan) {
-                return $this->response->setJSON([
-                    'success' => false,
-                    'message' => 'Parameter tidak lengkap'
-                ]);
+            $saveType = $data['save_type'] ?? 'full_save';
+            $message = '';
+            $resultData = ['id_rekaman' => $id_rekaman];
+
+            switch ($saveType) {
+                case 'auto_save_unit':
+                    $this->rekamanService->saveUnitKompetensi($id_rekaman, $data['id_unit'], [
+                        $data['method_key'] => $data['method_value']
+                    ]);
+                    $message = 'Perubahan disimpan.';
+                    break;
+
+                case 'batch_save_units':
+                    $this->rekamanService->saveBatchKompetensi($id_rekaman, $data['kompetensi']);
+                    $message = 'Semua perubahan berhasil disimpan.';
+                    break;
+
+                // --- TAMBAHKAN CASE INI ---
+                case 'full_save':
+                    $this->rekamanService->saveFinalData($id_rekaman, $data);
+                    $message = 'Rekomendasi dan komentar berhasil disimpan.';
+                    break;
+
+                    // Anda bisa menambahkan case 'full_save' jika perlu
             }
 
-            // PERBAIKAN: Validasi pengajuan tanpa asesor_asesmen
-            $pengajuan = $this->db->table('pengajuan_asesmen pa')
-                ->select('
-                    pa.id_pengajuan,
-                    pa.id_asesi,
-                    pa.id_asesmen,
-                    pa.status_pengajuan,
-                    u.nama_lengkap as nama_asesi,
-                    u.email,
-                    asm.id_skema,
-                    s.nama_skema,
-                    s.kode_skema
-                ')
-                ->join('asesi a', 'a.id_asesi = pa.id_asesi', 'inner')
-                ->join('users u', 'u.id = a.id_user', 'inner')
-                ->join('asesmen asm', 'asm.id_asesmen = pa.id_asesmen', 'inner')
-                ->join('skema s', 's.id_skema = asm.id_skema', 'inner')
-                ->where('pa.id_pengajuan', $id_pengajuan)
-                ->where('pa.id_asesi', $id_asesi)
-                ->where('asm.id_asesmen', $id_asesmen)
-                ->where('asm.id_skema', $id_skema)
-                ->where('pa.status_pengajuan', 'diterima')
-                ->get()
-                ->getRowArray();
-
-            if (!$pengajuan) {
-                return $this->response->setJSON([
-                    'success' => false,
-                    'message' => 'Data pengajuan asesmen tidak ditemukan'
-                ]);
-            }
-
-            // Validasi bahwa asesmen ini sesuai dengan skema asesor
-            $currentAsesorId = $this->getCurrentAsesorId();
-            $asesorInfo = $this->asesorModel->getWithSkema($currentAsesorId);
-
-            if (!$asesorInfo || $asesorInfo['id_skema'] != $id_skema) {
-                return $this->response->setJSON([
-                    'success' => false,
-                    'message' => 'Asesmen tidak sesuai dengan skema asesor'
-                ]);
-            }
-
-            // Get unit kompetensi for the schema
-            $units = $this->unitModel->getUnitsByScheme($id_skema);
-
-            if (empty($units)) {
-                return $this->response->setJSON([
-                    'success' => false,
-                    'message' => 'Tidak ada unit kompetensi ditemukan untuk skema ini'
-                ]);
-            }
-
-            // Get existing rekaman asesmen if any
-            $existingRekaman = $this->rekamanAsesmenModel
-                ->where('id_pengajuan', $id_pengajuan)
-                ->where('deleted_at', null)
-                ->first();
-
-            $existingData = [];
-            $existingRecommendation = null;
-
-            if ($existingRekaman) {
-                // Get kompetensi data
-                $kompetensiData = $this->rekamanAsesmenKompetensiModel
-                    ->where('id_rekaman', $existingRekaman['id'])
-                    ->findAll();
-
-                foreach ($kompetensiData as $item) {
-                    $existingData[$item['id_unit']] = [
-                        'observasi' => (int)$item['metode_observasi'],
-                        'portofolio' => (int)$item['metode_portofolio'],
-                        'pihak_ketiga' => (int)$item['metode_pihak_ketiga'],
-                        'lisan' => (int)$item['metode_lisan'],
-                        'tertulis' => (int)$item['metode_tertulis'],
-                        'proyek' => (int)$item['metode_proyek'],
-                        'lainnya' => (int)$item['metode_lainnya']
-                    ];
-                }
-
-                // Get recommendation data
-                $existingRecommendation = [
-                    'rekomendasi' => $existingRekaman['rekomendasi'],
-                    'tindak_lanjut' => $existingRekaman['tindak_lanjut'],
-                    'komentar' => $existingRekaman['komentar']
-                ];
-            }
-
-            return $this->response->setJSON([
-                'success' => true,
-                'rekaman_asesmen' => $units,
-                'existing_data' => $existingData,
-                'existing_recommendation' => $existingRecommendation,
-                'totalUnits' => count($units),
-                'pengajuan' => $pengajuan
+            return $this->respond([
+                'success'   => true,
+                'message'   => $message,
+                'data'      => $resultData,
+                'csrf_hash' => csrf_hash() // Selalu kirim token baru
             ]);
         } catch (\Exception $e) {
-            log_message('error', 'Error loading rekaman asesmen: ' . $e->getMessage());
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'Gagal memuat data rekaman: ' . $e->getMessage()
-            ]);
+            return $this->fail($e->getMessage(), 500);
         }
     }
 
     /**
-     * Generate PDF for rekaman asesmen - PERBAIKAN: Handle missing signatures
+     * Menghasilkan file PDF untuk satu Rekaman Asesmen.
      */
     public function pdf(int $id = null)
     {
         try {
-            log_message('info', 'RekamanAsesmenController: Starting PDF generation for rekaman ID: ' . $id);
-
-            // Validate input
-            if (!$id || !filter_var($id, FILTER_VALIDATE_INT)) {
-                throw new \Exception('ID Rekaman tidak valid');
+            if (!$id) {
+                throw new \Exception('ID Rekaman tidak valid atau tidak diberikan.');
             }
 
-            // PERBAIKAN: Get data dengan method yang diperbaiki
-            $result = $this->getRekamanAsesmenForPDF($id);
+            // Panggil helper untuk menyiapkan semua data PDF
+            $viewData = $this->_preparePdfData($id);
 
-            if (!$result['success']) {
-                throw new \Exception($result['message'] ?? 'Data rekaman tidak ditemukan');
-            }
-
-            $data = $result['data'];
-
-            // Validasi data yang diperlukan untuk PDF
-            if (empty($data['rekaman'])) {
-                throw new \Exception('Data rekaman kosong');
-            }
-
-            // Debug: Log data structure
-            log_message('info', 'RekamanAsesmenController: rekaman data: ' . json_encode($data['rekaman']));
-            log_message('info', 'RekamanAsesmenController: kompetensi count: ' . count($data['kompetensi'] ?? []));
-
-            // Ensure helper is loaded
-            helper('observasi');
-
-            // PERBAIKAN: Generate QR codes hanya jika ada signature dan tidak kosong
-            if (!empty($data['rekaman']['ttd_asesi']) && trim($data['rekaman']['ttd_asesi']) !== '') {
-                $data['qr_asesi'] = $this->qrCodeService->generate(
-                    base_url('/scan/tanda-tangan-asesi/' . $data['rekaman']['ttd_asesi']),
-                    'logolsp.png'
-                );
-            } else {
-                $data['qr_asesi'] = null; // Tidak ada QR code jika tidak ada tanda tangan
-            }
-
-            if (!empty($data['rekaman']['ttd_asesor']) && trim($data['rekaman']['ttd_asesor']) !== '') {
-                $data['qr_asesor'] = $this->qrCodeService->generate(
-                    base_url('/scan/tanda-tangan-asesor/' . $data['rekaman']['ttd_asesor']),
-                    'logolsp.png'
-                );
-            } else {
-                $data['qr_asesor'] = null; // Tidak ada QR code jika tidak ada tanda tangan
-            }
-
-            // Generate PDF dengan data yang sudah diperbaiki
-            $this->generatePdf($data);
+            $this->generatePdf($viewData);
         } catch (\Exception $e) {
-            log_message('error', 'RekamanAsesmenController PDF Error: ' . $e->getMessage());
-            log_message('error', 'Stack trace: ' . $e->getTraceAsString());
-
-            // Set flash message dan redirect
-            session()->setFlashdata('error', 'Gagal generate PDF: ' . $e->getMessage());
-            header('Location: ' . previous_url());
-            exit();
+            log_message('error', '[RekamanAsesmenController::pdf] Error: ' . $e->getMessage());
+            session()->setFlashdata('error', 'Gagal membuat PDF: ' . $e->getMessage());
+            return redirect()->back();
         }
     }
 
     /**
-     * Get rekaman data for PDF - PERBAIKAN: Handle missing signature fields
+     * Menghasilkan dan mengunduh file ZIP dari beberapa PDF Rekaman Asesmen.
+     * (Diadaptasi dari PMO)
      */
-    private function getRekamanAsesmenForPDF(int $id_rekaman): array
+    public function batchPdf()
     {
-        try {
-            // Get main rekaman data dengan semua relasi
-            $rekaman = $this->db->table('rekaman_asesmen ra')
-                ->select('
-                    ra.*,
-                    pa.id_asesi,
-                    pa.id_asesmen,
-                    a.nik,
-                    u.nama_lengkap as nama_asesi,
-                    u.email as email_asesi,
-                    asm.tujuan,
-                    asm.id_skema,
-                    asm.id_tuk,
-                    s.nama_skema,
-                    s.kode_skema,
-                    s.jenis_skema,
-                    tuk.nama_tuk,
-                    tuk.jenis_tuk
-                ')
-                ->join('pengajuan_asesmen pa', 'pa.id_pengajuan = ra.id_pengajuan', 'inner')
-                ->join('asesi a', 'a.id_asesi = pa.id_asesi', 'inner')
-                ->join('users u', 'u.id = a.id_user', 'inner')
-                ->join('asesmen asm', 'asm.id_asesmen = pa.id_asesmen', 'inner')
-                ->join('skema s', 's.id_skema = asm.id_skema', 'inner')
-                ->join('tuk', 'tuk.id_tuk = asm.id_tuk', 'inner')
-                ->where('ra.id', $id_rekaman)
-                ->where('ra.deleted_at', null)
-                ->get()
-                ->getRowArray();
+        $rekamanIds = $this->request->getPost('rekaman_ids');
 
-            if (!$rekaman) {
-                return [
-                    'success' => false,
-                    'message' => 'Data rekaman tidak ditemukan'
-                ];
-            }
-
-            // PERBAIKAN: Get asesor info berdasarkan skema
-            $asesorInfo = $this->db->table('asesor')
-                ->select('
-                    asesor.nomor_registrasi,
-                    asesor_user.nama_lengkap as nama_asesor,
-                    asesor_user.email as email_asesor
-                ')
-                ->join('users asesor_user', 'asesor_user.id = asesor.id_user', 'inner')
-                ->where('asesor.id_skema', $rekaman['id_skema'])
-                ->get()
-                ->getRowArray();
-
-            if (!$asesorInfo) {
-                return [
-                    'success' => false,
-                    'message' => 'Data asesor tidak ditemukan untuk skema ini'
-                ];
-            }
-
-            // Merge asesor info ke rekaman
-            $rekaman = array_merge($rekaman, $asesorInfo);
-
-            // PERBAIKAN: Handle missing signature fields - set default values
-            $rekaman['ttd_asesi'] = $rekaman['ttd_asesi'] ?? '';
-            $rekaman['ttd_asesor'] = $rekaman['ttd_asesor'] ?? '';
-            $rekaman['tanggal_asesmen'] = $rekaman['tanggal_asesmen'] ?? $rekaman['created_at'] ?? date('Y-m-d');
-
-            // Get kompetensi details
-            $kompetensi = $this->db->table('rekaman_asesmen_kompetensi rak')
-                ->select('
-                    rak.*,
-                    u.kode_unit,
-                    u.nama_unit
-                ')
-                ->join('unit u', 'u.id_unit = rak.id_unit', 'inner')
-                ->where('rak.id_rekaman', $id_rekaman)
-                ->orderBy('u.kode_unit', 'ASC')
-                ->get()
-                ->getResultArray();
-
-            // Format data untuk PDF (sama seperti observasi)
-            $pdfData = [
-                'success' => true,
-                'data' => [
-                    'rekaman' => $rekaman,
-                    'kompetensi' => $kompetensi,
-                    // Format sama seperti observasi untuk compatibility
-                    'observasi' => [
-                        'nama_skema' => $rekaman['nama_skema'],
-                        'kode_skema' => $rekaman['kode_skema'],
-                        'nama_tuk' => $rekaman['nama_tuk'],
-                        'jenis_tuk' => $rekaman['jenis_tuk'],
-                        'nama_asesor' => $rekaman['nama_asesor'],
-                        'nama_asesi' => $rekaman['nama_asesi'],
-                        'tanggal_asesmen' => $rekaman['tanggal_asesmen'],
-                        'ttd_asesi' => $rekaman['ttd_asesi'], // Sudah di-handle di atas
-                        'ttd_asesor' => $rekaman['ttd_asesor'] // Sudah di-handle di atas
-                    ],
-                    'skema' => [
-                        'nama_skema' => $rekaman['nama_skema'],
-                        'kode_skema' => $rekaman['kode_skema'],
-                        'jenis_skema' => $rekaman['jenis_skema']
-                    ]
-                ]
-            ];
-
-            return $pdfData;
-        } catch (\Exception $e) {
-            log_message('error', 'Error getting rekaman for PDF: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => 'Gagal memuat data rekaman: ' . $e->getMessage()
-            ];
+        if (empty($rekamanIds) || !is_array($rekamanIds)) {
+            session()->setFlashdata('error', 'Tidak ada ID rekaman yang dipilih atau format tidak valid.');
+            return redirect()->back();
         }
+
+        $rekamanIds = array_map('intval', $rekamanIds);
+        $tempDir = WRITEPATH . 'uploads/temp_pdf_rekaman_' . uniqid();
+        if (!is_dir($tempDir)) {
+            mkdir($tempDir, 0777, true);
+        }
+
+        $pdfFiles = [];
+
+        foreach ($rekamanIds as $rekamanId) {
+            try {
+                // Panggil helper untuk menyiapkan data PDF
+                $viewData = $this->_preparePdfData($rekamanId);
+
+                // Buat nama file yang aman
+                $safeNamaAsesi = preg_replace('/[^a-zA-Z0-9_-]/', '_', $viewData['rekaman']['nama_asesi']);
+                $filename = "FR.AK.02_Rekaman_{$safeNamaAsesi}_{$rekamanId}.pdf";
+                $filePath = $tempDir . '/' . $filename;
+
+                // Generate dan simpan PDF ke direktori sementara
+                $this->pdfService->generateAndSave(['pdf/rekaman_page1', 'pdf/rekaman_page2'], $viewData, $filePath);
+
+                if (file_exists($filePath)) {
+                    $pdfFiles[] = $filePath;
+                }
+            } catch (\Exception $e) {
+                log_message('error', "Batch PDF Rekaman: Gagal membuat PDF untuk ID {$rekamanId}. Error: " . $e->getMessage());
+            }
+        }
+
+        if (empty($pdfFiles)) {
+            $this->cleanup($tempDir);
+            session()->setFlashdata('error', 'Gagal membuat file PDF untuk di-zip. Silakan coba lagi.');
+            return redirect()->back();
+        }
+
+        // Buat file ZIP
+        $zipFileName = 'Laporan_Rekaman_Asesmen_Batch_' . date('Y-m-d_His') . '.zip';
+        $zipPath = $tempDir . '/' . $zipFileName;
+
+        $zip = new ZipArchive();
+        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== TRUE) {
+            $this->cleanup($tempDir);
+            session()->setFlashdata('error', 'Gagal membuat file ZIP.');
+            return redirect()->back();
+        }
+
+        foreach ($pdfFiles as $file) {
+            $zip->addFile($file, basename($file));
+        }
+        $zip->close();
+
+        // Baca konten ZIP, hapus direktori sementara, lalu kirimkan file untuk diunduh
+        $zipData = file_get_contents($zipPath);
+        $this->cleanup($tempDir);
+
+        return $this->response->download($zipFileName, $zipData);
     }
 
     /**
-     * Generate PDF output - SAMA SEPERTI OBSERVASI
+     * Helper privat untuk menyiapkan data PDF.
+     * (Diadaptasi dari PMO)
+     */
+    private function _preparePdfData(int $id): array
+    {
+        $result = $this->rekamanModel->getRekamanForPDF($id);
+        if (empty($result) || !$result['success']) {
+            throw new \Exception($result['message'] ?? 'Data untuk pembuatan PDF tidak ditemukan.');
+        }
+
+        $viewData = $result['data'];
+
+        // Generate QR Code jika ada tanda tangan
+        if (!empty($viewData['rekaman']['tanda_tangan_asesi'])) {
+            $viewData['qr_asesi'] = $this->qrCodeService->generate(
+                base_url('/scan/validasi/asesi/' . $viewData['rekaman']['tanda_tangan_asesi'])
+            );
+        }
+
+        return $viewData;
+    }
+
+    /**
+     * Helper privat untuk memanggil PDF service.
      */
     private function generatePdf(array $data): void
     {
-        $views = [
-            'pdf/rekaman_page1',
-            'pdf/rekaman_page2'
-        ];
-
-        $filename = 'FR.AK.02. REKAMAN ASESMEN KOMPETENSI';
-        $this->pdfService->generateMultiPagePdf($views, $data, $filename);
+        $views = ['pdf/rekaman_page1', 'pdf/rekaman_page2'];
+        $namaFile = "FR.AK.02 - REKAMAN ASESMEN - " . strtoupper($data['rekaman']['nama_asesi'] ?? 'Asesi');
+        $this->pdfService->generateMultiPagePdf($views, $data, $namaFile);
     }
 
     /**
-     * Helper method untuk mendapatkan current asesor ID
+     * Helper untuk membersihkan direktori sementara.
+     * (Diadaptasi dari PMO)
      */
-    private function getCurrentAsesorId(): ?int
+    private function cleanup(string $dirPath): void
     {
-        $asesorModel = model('AsesorModel');
-        $asesor = $asesorModel->getByUserId($this->id_asesor);
-        return $asesor ? $asesor['id_asesor'] : null;
-    }
-
-    /**
-     * Store rekaman asesmen data - AUTO SAVE SYSTEM - PERBAIKAN LENGKAP
-     */
-    public function store()
-    {
-        // Security check
-        if (!$this->request->isAJAX()) {
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'Request tidak valid'
-            ])->setStatusCode(400);
+        if (!is_dir($dirPath)) return;
+        $files = array_diff(scandir($dirPath), ['.', '..']);
+        foreach ($files as $file) {
+            (is_dir("$dirPath/$file")) ? $this->cleanup("$dirPath/$file") : unlink("$dirPath/$file");
         }
-
-        // Get request data - support both POST and JSON
-        $rawInput = $this->request->getBody();
-        $jsonData = json_decode($rawInput, true);
-        $postData = $this->request->getPost();
-
-        // Determine request type
-        $requestType = $postData['save_type'] ?? ($jsonData['save_type'] ?? 'full');
-
-        // Log incoming request for debugging
-        log_message('info', 'RekamanAsesmen store() called with type: ' . $requestType);
-        log_message('info', 'POST data: ' . json_encode($postData));
-        log_message('info', 'JSON data: ' . json_encode($jsonData));
-
-        try {
-            switch ($requestType) {
-                case 'settings':
-                    return $this->saveSettings($postData, $jsonData);
-
-                case 'method':
-                    return $this->saveSingleMethod($postData, $jsonData);
-
-                case 'batch':
-                    return $this->saveBatchMethods($postData, $jsonData);
-
-                case 'recommendation':
-                    return $this->saveRecommendation($postData, $jsonData);
-
-                case 'full':
-                default:
-                    return $this->saveFullRekaman($postData, $jsonData);
-            }
-        } catch (\Exception $e) {
-            log_message('error', 'Error in rekaman save: ' . $e->getMessage());
-            log_message('error', 'Stack trace: ' . $e->getTraceAsString());
-            return $this->response->setJSON([
-                'success' => false,
-                'message' => 'Terjadi kesalahan sistem: ' . $e->getMessage()
-            ]);
-        }
-    }
-
-    /**
-     * Save rekaman settings (master data only)
-     */
-    private function saveSettings($postData, $jsonData)
-    {
-        $data = array_merge($postData, $jsonData ?? []);
-
-        // Validate required fields
-        if (empty($data['id_pengajuan'])) {
-            return $this->fail('ID Pengajuan diperlukan');
-        }
-
-        try {
-            $this->db->transBegin();
-
-            // Check if rekaman exists
-            $existing = $this->rekamanAsesmenModel
-                ->where('id_pengajuan', $data['id_pengajuan'])
-                ->where('deleted_at', null)
-                ->first();
-
-            $rekamanData = [
-                'id_pengajuan' => $data['id_pengajuan'],
-                'tanggal_asesmen' => $data['tanggal_asesmen'] ?? date('Y-m-d'),
-                'updated_at' => date('Y-m-d H:i:s')
-            ];
-
-            if ($existing) {
-                $this->rekamanAsesmenModel->update($existing['id'], $rekamanData);
-                $id_rekaman = $existing['id'];
-            } else {
-                $rekamanData['created_at'] = date('Y-m-d H:i:s');
-                $rekamanData['status'] = 'draft';
-                $id_rekaman = $this->rekamanAsesmenModel->insert($rekamanData);
-            }
-
-            $this->db->transCommit();
-
-            return $this->respond([
-                'success' => true,
-                'message' => 'Rekaman asesmen berhasil disimpan',
-                'data' => [
-                    'id_rekaman' => $id_rekaman
-                ],
-                'csrf_hash' => csrf_hash()
-            ]);
-        } catch (\Exception $e) {
-            $this->db->transRollback();
-            log_message('error', 'RekamanAsesmen saveSettings Error: ' . $e->getMessage());
-            return $this->fail('Gagal menyimpan rekaman: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Save single method change
-     */
-    private function saveSingleMethod($postData, $jsonData)
-    {
-        $data = array_merge($postData, $jsonData ?? []);
-
-        // Validate required fields
-        $required = ['id_pengajuan', 'id_unit', 'method', 'value'];
-        foreach ($required as $field) {
-            if (!isset($data[$field])) {
-                return $this->fail("Field {$field} diperlukan");
-            }
-        }
-
-        try {
-            $this->db->transBegin();
-
-            // Get or create rekaman
-            $rekaman = $this->getOrCreateRekaman($data['id_pengajuan']);
-            if (!$rekaman) {
-                return $this->fail('Gagal membuat rekaman asesmen');
-            }
-
-            // Update single method
-            $this->updateSingleMethod($rekaman['id'], $data['id_unit'], $data['method'], $data['value']);
-
-            $this->db->transCommit();
-
-            return $this->respond([
-                'success' => true,
-                'message' => 'Metode berhasil disimpan',
-                'csrf_hash' => csrf_hash()
-            ]);
-        } catch (\Exception $e) {
-            $this->db->transRollback();
-            log_message('error', 'RekamanAsesmen saveSingleMethod Error: ' . $e->getMessage());
-            return $this->fail('Gagal menyimpan metode: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Helper: Get or create rekaman
-     */
-    private function getOrCreateRekaman($id_pengajuan)
-    {
-        $existing = $this->rekamanAsesmenModel
-            ->where('id_pengajuan', $id_pengajuan)
-            ->where('deleted_at', null)
-            ->first();
-
-        if ($existing) {
-            return $existing;
-        }
-
-        // Create new rekaman
-        $rekamanData = [
-            'id_pengajuan' => $id_pengajuan,
-            'tanggal_asesmen' => date('Y-m-d'),
-            'status' => 'draft',
-            'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s')
-        ];
-
-        $id_rekaman = $this->rekamanAsesmenModel->insert($rekamanData);
-
-        return $this->rekamanAsesmenModel->find($id_rekaman);
-    }
-
-    /**
-     * Helper: Update single method
-     */
-    private function updateSingleMethod($id_rekaman, $id_unit, $method, $value)
-    {
-        // Get existing kompetensi record
-        $existing = $this->rekamanAsesmenKompetensiModel
-            ->where('id_rekaman', $id_rekaman)
-            ->where('id_unit', $id_unit)
-            ->first();
-
-        $methodData = [
-            'metode_observasi' => 0,
-            'metode_portofolio' => 0,
-            'metode_pihak_ketiga' => 0,
-            'metode_lisan' => 0,
-            'metode_tertulis' => 0,
-            'metode_proyek' => 0,
-            'metode_lainnya' => 0,
-            'updated_at' => date('Y-m-d H:i:s')
-        ];
-
-        if ($existing) {
-            // Update existing - preserve other methods
-            $methodData = [
-                'metode_observasi' => $existing['metode_observasi'],
-                'metode_portofolio' => $existing['metode_portofolio'],
-                'metode_pihak_ketiga' => $existing['metode_pihak_ketiga'],
-                'metode_lisan' => $existing['metode_lisan'],
-                'metode_tertulis' => $existing['metode_tertulis'],
-                'metode_proyek' => $existing['metode_proyek'],
-                'metode_lainnya' => $existing['metode_lainnya'],
-                'updated_at' => date('Y-m-d H:i:s')
-            ];
-
-            // Update specific method
-            $methodData['metode_' . $method] = $value ? 1 : 0;
-
-            $this->rekamanAsesmenKompetensiModel->update($existing['id'], $methodData);
-        } else {
-            // Create new record
-            $methodData['id_rekaman'] = $id_rekaman;
-            $methodData['id_unit'] = $id_unit;
-            $methodData['metode_' . $method] = $value ? 1 : 0;
-            $methodData['created_at'] = date('Y-m-d H:i:s');
-
-            $this->rekamanAsesmenKompetensiModel->insert($methodData);
-        }
-    }
-
-    /**
-     * Save batch methods
-     */
-    private function saveBatchMethods($postData, $jsonData)
-    {
-        $data = $jsonData ?? $postData;
-
-        if (empty($data['id_pengajuan']) || empty($data['items'])) {
-            return $this->fail('ID Pengajuan dan items diperlukan');
-        }
-
-        try {
-            $this->db->transBegin();
-
-            // Get or create rekaman
-            $rekaman = $this->getOrCreateRekaman($data['id_pengajuan']);
-            if (!$rekaman) {
-                return $this->fail('Gagal membuat rekaman asesmen');
-            }
-
-            // Process batch items
-            foreach ($data['items'] as $id_unit => $methods) {
-                $this->upsertUnitMethods($rekaman['id'], $id_unit, $methods);
-            }
-
-            $this->db->transCommit();
-
-            return $this->respond([
-                'success' => true,
-                'message' => 'Metode batch berhasil disimpan',
-                'csrf_hash' => csrf_hash()
-            ]);
-        } catch (\Exception $e) {
-            $this->db->transRollback();
-            log_message('error', 'RekamanAsesmen saveBatchMethods Error: ' . $e->getMessage());
-            return $this->fail('Gagal menyimpan metode batch: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Save recommendation data
-     */
-    private function saveRecommendation($postData, $jsonData)
-    {
-        $data = array_merge($postData, $jsonData ?? []);
-
-        if (empty($data['id_pengajuan'])) {
-            return $this->fail('ID Pengajuan diperlukan');
-        }
-
-        try {
-            $this->db->transBegin();
-
-            // Get or create rekaman
-            $rekaman = $this->getOrCreateRekaman($data['id_pengajuan']);
-            if (!$rekaman) {
-                return $this->fail('Gagal membuat rekaman asesmen');
-            }
-
-            // Update recommendation
-            $updateData = [
-                'updated_at' => date('Y-m-d H:i:s')
-            ];
-
-            if (isset($data['rekomendasi'])) {
-                $updateData['rekomendasi'] = $data['rekomendasi'];
-            }
-            if (isset($data['komentar'])) {
-                $updateData['komentar'] = $data['komentar'];
-            }
-            if (isset($data['tindak_lanjut'])) {
-                $updateData['tindak_lanjut'] = $data['tindak_lanjut'];
-            }
-
-            $this->rekamanAsesmenModel->update($rekaman['id'], $updateData);
-
-            $this->db->transCommit();
-
-            return $this->respond([
-                'success' => true,
-                'message' => 'Rekomendasi berhasil disimpan',
-                'csrf_hash' => csrf_hash()
-            ]);
-        } catch (\Exception $e) {
-            $this->db->transRollback();
-            log_message('error', 'RekamanAsesmen saveRecommendation Error: ' . $e->getMessage());
-            return $this->fail('Gagal menyimpan rekomendasi: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Helper: Upsert unit methods
-     */
-    private function upsertUnitMethods($id_rekaman, $id_unit, $methods)
-    {
-        // Get existing kompetensi record
-        $existing = $this->rekamanAsesmenKompetensiModel
-            ->where('id_rekaman', $id_rekaman)
-            ->where('id_unit', $id_unit)
-            ->first();
-
-        $methodData = [
-            'metode_observasi' => isset($methods['observasi']) ? 1 : 0,
-            'metode_portofolio' => isset($methods['portofolio']) ? 1 : 0,
-            'metode_pihak_ketiga' => isset($methods['pihak_ketiga']) ? 1 : 0,
-            'metode_lisan' => isset($methods['lisan']) ? 1 : 0,
-            'metode_tertulis' => isset($methods['tertulis']) ? 1 : 0,
-            'metode_proyek' => isset($methods['proyek']) ? 1 : 0,
-            'metode_lainnya' => isset($methods['lainnya']) ? 1 : 0,
-            'updated_at' => date('Y-m-d H:i:s')
-        ];
-
-        if ($existing) {
-            $this->rekamanAsesmenKompetensiModel->update($existing['id'], $methodData);
-        } else {
-            $methodData['id_rekaman'] = $id_rekaman;
-            $methodData['id_unit'] = $id_unit;
-            $methodData['created_at'] = date('Y-m-d H:i:s');
-
-            $this->rekamanAsesmenKompetensiModel->insert($methodData);
-        }
+        rmdir($dirPath);
     }
 }

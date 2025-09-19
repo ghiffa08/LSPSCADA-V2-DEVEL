@@ -194,3 +194,44 @@ function formatStatus(string $status): string
         return 'Diterima / Tidak Diterima';
     }
 }
+
+if (!function_exists('format_tanggal_indonesia')) {
+    /**
+     * Format date to Indonesian format
+     * 
+     * @param string $date
+     * @return string
+     */
+    function format_tanggal_indonesia(string $date): string
+    {
+        if (empty($date)) {
+            return '-';
+        }
+
+        $bulan = [
+            1 => 'Januari',
+            'Februari',
+            'Maret',
+            'April',
+            'Mei',
+            'Juni',
+            'Juli',
+            'Agustus',
+            'September',
+            'Oktober',
+            'November',
+            'Desember'
+        ];
+
+        $timestamp = strtotime($date);
+        if ($timestamp === false) {
+            return '-';
+        }
+
+        $hari = date('d', $timestamp);
+        $bulan_idx = (int)date('m', $timestamp);
+        $tahun = date('Y', $timestamp);
+
+        return $hari . ' ' . $bulan[$bulan_idx] . ' ' . $tahun;
+    }
+}

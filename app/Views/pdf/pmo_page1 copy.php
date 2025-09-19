@@ -74,7 +74,7 @@
     <!-- Info Table -->
     <table cellpadding="4">
         <tr>
-            <td rowspan="2" width="25%">Skema Sertifikasi<br><?= $jenisSertifikasiFormatted ?></td>
+            <td rowspan="2" width="25%">Skema Sertifikasi<br></td>
             <td width="10%">Judul</td>
             <td width="5%">:</td>
             <td width="60%"><?= esc($observasi['nama_skema'] ?? '-') ?></td>

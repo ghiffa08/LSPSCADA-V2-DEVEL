@@ -14,258 +14,159 @@ class FeedbackAsesiModel extends Model
     protected $useAutoIncrement = true;
     protected $returnType       = 'array';
     protected $useSoftDeletes   = false;
-    protected $protectFields    = false;
+    protected $protectFields    = true;
     protected $allowedFields    = [
         'id_asesor',
-        'id_asesi',
         'id_skema',
+        'id_asesi',
+        'id_pengajuan',
         'tanggal_mulai',
         'tanggal_selesai',
-        'catatan_lain',
-        'created_at',
-        'updated_at'
+        'catatan_lain'
     ];
-
-    protected bool $allowEmptyInserts = false;
-    protected bool $updateOnlyChanged = true;
-
-    protected array $casts = [];
-    protected array $castHandlers = [];
 
     // Dates
     protected $useTimestamps = true;
-    protected $dateFormat    = 'datetime';
     protected $createdField  = 'created_at';
     protected $updatedField  = 'updated_at';
-    protected $deletedField  = 'deleted_at';
 
-    // Validation
-    protected $validationRules      = [];
-    protected $validationMessages   = [];
-    protected $skipValidation       = false;
-    protected $cleanValidationRules = true;
-
-    // Callbacks
-    protected $allowCallbacks = true;
-    protected $beforeInsert   = [];
-    protected $afterInsert    = [];
-    protected $beforeUpdate   = [];
-    protected $afterUpdate    = [];
-    protected $beforeFind     = [];
-    protected $afterFind      = [];
-    protected $beforeDelete   = [];
-    protected $afterDelete    = [];
-
-    // Fields that should be searched when using DataTable
-    protected $dataTableSearchFields = ['feedback_asesi.id_asesor'];
+    protected $dataTableSearchFields = ['asesor_user.nama_lengkap', 'asesi_user.nama_lengkap', 'skema.nama_skema'];
 
     /**
-     * Apply joins for DataTable query
-     *
-     * @param object $builder Query builder instance
-     * @return object
+     * Menerapkan join untuk query DataTable dengan struktur tabel baru
      */
     protected function applyDataTableJoins($builder)
     {
-        return $builder->join('asesi', 'asesi.id_asesi = feedback_asesi.id_asesi')
-            ->join('users as asesi_user', 'asesi_user.id_user = asesi.user_id')
-            ->join('skema', 'skema.id_skema = feedback_asesi.id_skema')
-            ->join('users as asesor', 'asesor.id_user = feedback_asesi.id_asesor');
+        return $builder
+            // Join untuk Asesi
+            ->join('asesi', 'asesi.id_asesi = feedback_asesi.id_asesi', 'inner')
+            ->join('users as asesi_user', 'asesi_user.id = asesi.id_user', 'inner')
+            // Join untuk Asesor
+            ->join('asesor', 'asesor.id_asesor = feedback_asesi.id_asesor', 'inner')
+            ->join('users as asesor_user', 'asesor_user.id = asesor.id_user', 'inner')
+            // Join untuk Skema
+            ->join('skema', 'skema.id_skema = feedback_asesi.id_skema', 'inner');
     }
 
     /**
-     * Apply custom select fields for DataTable query
-     *
-     * @param object $builder Query builder instance
-     * @return object
+     * Menerapkan select field kustom untuk query DataTable
      */
     protected function applyDataTableSelects($builder)
     {
         return $builder->select(
             'feedback_asesi.*, 
-            asesor.fullname AS nama_asesor, 
-            asesi_user.fullname AS nama_asesi, 
+            asesor_user.nama_lengkap AS nama_asesor, 
+            asesi_user.nama_lengkap AS nama_asesi,
             skema.nama_skema'
         );
     }
 
     /**
-     * Get feedback data by ID with full details
-     *
-     * @param int $id_feedback ID of the feedback
-     * @return array|null Feedback data or null if not found
+     * Mengambil semua komponen/pertanyaan feedback yang aktif (Tidak ada perubahan, sudah baik)
      */
-    public function getById(int $id): ?array
+    public function getKomponenFeedback(): array
     {
-        $builder = $this->db->table('feedback_asesi');
+        return $this->db->table('komponen_feedback')
+            ->where('deleted_at', null)
+            ->orderBy('urutan', 'ASC')
+            ->get()
+            ->getResultArray();
+    }
 
-        $builder->select([
-            'feedback_asesi.*',
-            'asesor.fullname AS nama_asesor',
-            'asesor.tanda_tangan AS ttd_asesor',
-            'asesi_user.fullname AS nama_asesi',
-            'asesi_user.tanda_tangan AS ttd_asesi',
-            'skema.nama_skema',
-            'skema.kode_skema'
-        ]);
+    /**
+     * Mengambil data feedback yang sudah ada berdasarkan id_feedback (Tidak ada perubahan, sudah baik)
+     */
+    public function getExistingFeedback(int $id_feedback): array
+    {
+        $result = $this->db->table('detail_feedback_asesi')
+            ->select('id_komponen, jawaban, komentar')
+            ->where('id_feedback', $id_feedback)
+            ->get()
+            ->getResultArray();
 
-        // Join tables
-        $builder->join('asesi', 'asesi.id_asesi = feedback_asesi.id_asesi');
-        $builder->join('users as asesi_user', 'asesi_user.id_user = asesi.user_id');
-        $builder->join('skema', 'skema.id_skema = feedback_asesi.id_skema');
-        $builder->join('users as asesor', 'asesor.id_user = feedback_asesi.id_asesor');
-
-        // Filter by feedback ID
-        $builder->where('feedback_asesi.id_feedback', $id);
-
-        $result = $builder->get()->getRowArray();
-
-        // Convert binary signatures to base64
-        if ($result) {
-            if (!empty($result['ttd_asesi'])) {
-                $result['ttd_asesi_base64'] = 'data:image/png;base64,' . base64_encode($result['ttd_asesi']);
-            }
-            if (!empty($result['ttd_asesor'])) {
-                $result['ttd_asesor_base64'] = 'data:image/png;base64,' . base64_encode($result['ttd_asesor']);
-            }
+        $formatted = [];
+        foreach ($result as $row) {
+            // PERBAIKAN: Konversi jawaban dari tinyint(0/1) ke char('T'/'Y') jika perlu
+            // Anggap saja di DB disimpan 'Y' dan 'T' dalam bentuk char/varchar
+            $formatted[$row['id_komponen']] = [
+                'jawaban'  => $row['jawaban'] === '1' ? 'Y' : ($row['jawaban'] === '0' ? 'T' : $row['jawaban']),
+                'komentar' => $row['komentar']
+            ];
         }
-
-        return $result;
+        return $formatted;
     }
 
     /**
-     * Get feedback details by feedback ID
+     * Menyimpan data feedback (master & detail) dalam satu transaksi.
+     * Metode ini sekarang menggunakan id_pengajuan sebagai kunci untuk UPSERT.
      *
-     * @param int $id_feedback ID of the feedback
-     * @return array Feedback details
+     * @param array $masterData Data untuk tabel feedback_asesi
+     * @param array $detailData Data untuk tabel detail_feedback_asesi
+     * @return int|bool ID feedback yang baru dibuat/diupdate, atau false jika gagal.
      */
-    public function getFeedbackDetails(int $id_feedback): array
-    {
-        $builder = $this->db->table('detail_feedback_asesi');
-        $builder->select('detail_feedback_asesi.*, komponen_feedback.pernyataan');
-        $builder->join('komponen_feedback', 'komponen_feedback.id_komponen = detail_feedback_asesi.id_komponen', 'left');
-        $builder->where('detail_feedback_asesi.id_feedback', $id_feedback);
-        $builder->orderBy('komponen_feedback.urutan', 'ASC');
-
-        return $builder->get()->getResultArray();
-    }
-
-    /**
-     * Get feedback details by feedback ID with komponen information
-     *
-     * @param int $id_feedback ID of the feedback
-     * @return array Feedback details with komponen information
-     */
-    public function getFeedbackDetailsByIdWithKomponen(int $id_feedback): array
-    {
-        $builder = $this->db->table('detail_feedback_asesi');
-        $builder->select('
-            detail_feedback_asesi.*,
-            komponen_feedback.pernyataan,
-            komponen_feedback.urutan
-        ');
-        $builder->join('komponen_feedback', 'komponen_feedback.id_komponen = detail_feedback_asesi.id_komponen', 'left');
-        $builder->where('detail_feedback_asesi.id_feedback', $id_feedback);
-        $builder->orderBy('komponen_feedback.urutan', 'ASC');
-
-        return $builder->get()->getResultArray();
-    }
-
-    /**
-     * Save feedback data with details
-     *
-     * @param array $masterData Master feedback data
-     * @param array|null $detailData Detail feedback data
-     * @return bool|array Returns inserted ID on success or boolean success status
-     */
-    public function saveFeedbackData(array $masterData, ?array $detailData = null)
+    public function saveFeedbackData(array $masterData, array $detailData)
     {
         $db = $this->db;
         $db->transStart();
 
         try {
-            // Get or create the master feedback record
-            $id_feedback = $masterData['id_feedback'] ?? null;
-
-            if (!$id_feedback) {
-                // Check if there's an existing record
-                $existing = $db->table($this->table)
-                    ->where('id_asesi', $masterData['id_asesi'])
-                    ->where('id_skema', $masterData['id_skema'])
-                    ->get()
-                    ->getRow();
-
-                if ($existing) {
-                    $id_feedback = $existing->id_feedback;
-                    $masterData['updated_at'] = date('Y-m-d H:i:s');
-                    $db->table($this->table)
-                        ->where('id_feedback', $id_feedback)
-                        ->update($masterData);
-                } else {
-                    $masterData['created_at'] = date('Y-m-d H:i:s');
-                    $masterData['updated_at'] = date('Y-m-d H:i:s');
-                    $db->table($this->table)->insert($masterData);
-                    $id_feedback = $db->insertID();
-                }
-            } else {
-                $masterData['updated_at'] = date('Y-m-d H:i:s');
-                $db->table($this->table)
-                    ->where('id_feedback', $id_feedback)
-                    ->update($masterData);
+            // PERBAIKAN UTAMA: Gunakan id_pengajuan untuk mencari data yang sudah ada
+            if (empty($masterData['id_pengajuan'])) {
+                throw new \Exception("ID Pengajuan wajib diisi.");
             }
 
-            // Process detail data if provided
-            if ($detailData && isset($detailData['komponen'])) {
-                $this->saveDetailData($id_feedback, $detailData['komponen'], $detailData['komentar'] ?? []);
+            $existing = $this->where('id_pengajuan', $masterData['id_pengajuan'])->first();
+
+            $id_feedback = null;
+            if ($existing) {
+                // Jika sudah ada, update data master
+                $id_feedback = $existing['id_feedback'];
+                $this->update($id_feedback, $masterData);
+            } else {
+                // Jika belum ada, buat record baru
+                if ($this->save($masterData) === false) {
+                    $errors = $this->errors();
+                    throw new \Exception("Gagal menyimpan data master: " . implode(', ', $errors));
+                }
+                $id_feedback = $this->getInsertID();
+            }
+
+            if (!$id_feedback) {
+                throw new \Exception("Gagal mendapatkan ID Feedback setelah operasi save.");
+            }
+
+            // Hapus detail lama untuk id_feedback ini
+            $db->table('detail_feedback_asesi')->where('id_feedback', $id_feedback)->delete();
+
+            // Sisipkan detail baru secara batch
+            $batchData = [];
+            if (!empty($detailData['jawaban']) && is_array($detailData['jawaban'])) {
+                foreach ($detailData['jawaban'] as $id_komponen => $jawaban) {
+                    $batchData[] = [
+                        'id_feedback' => $id_feedback,
+                        'id_komponen' => $id_komponen,
+                        'jawaban'     => $jawaban, // Jawaban harus 'Y' atau 'T'
+                        'komentar'    => $detailData['komentar'][$id_komponen] ?? null,
+                    ];
+                }
+            }
+
+            if (!empty($batchData)) {
+                $db->table('detail_feedback_asesi')->insertBatch($batchData);
             }
 
             $db->transComplete();
 
-            return [
-                'id_feedback' => $id_feedback,
-                'success' => true
-            ];
+            if ($db->transStatus() === false) {
+                log_message('error', 'Transaksi penyimpanan feedback gagal.');
+                return false;
+            }
+
+            return $id_feedback;
         } catch (\Exception $e) {
             $db->transRollback();
-            log_message('error', 'Error in saveFeedbackData: ' . $e->getMessage());
-            throw $e;
+            log_message('error', 'Error di saveFeedbackData: ' . $e->getMessage());
+            throw $e; // Lanjutkan melempar exception ke controller
         }
-    }
-
-    /**
-     * Save detail feedback data
-     *
-     * @param int $id_feedback ID of the feedback
-     * @param array $komponen Component data (id_komponen => jawaban)
-     * @param array $komentar Comment data (id_komponen => komentar)
-     * @return bool Success status
-     */
-    private function saveDetailData(int $id_feedback, array $komponen, array $komentar): bool
-    {
-        $table = 'detail_feedback_asesi';
-        $db = $this->db;
-
-        // Delete existing details for this feedback
-        $db->table($table)
-            ->where('id_feedback', $id_feedback)
-            ->delete();
-
-        // Prepare batch data for insertion
-        $batch_data = [];
-        foreach ($komponen as $id_komponen => $jawaban) {
-            $batch_data[] = [
-                'id_feedback' => $id_feedback,
-                'id_komponen' => $id_komponen,
-                'jawaban' => $jawaban,
-                'komentar' => $komentar[$id_komponen] ?? '',
-                'created_at' => date('Y-m-d H:i:s')
-            ];
-        }
-
-        if (!empty($batch_data)) {
-            $db->table($table)->insertBatch($batch_data);
-        }
-
-        return true;
     }
 }

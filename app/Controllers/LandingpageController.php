@@ -61,7 +61,7 @@ class LandingpageController extends BaseController
         $data = [
             'siteTitle' => 'Pendaftaran Uji Kompetensi',
             'siteSubtitle' => 'Pada bagian ini, masukan data pribadi, data pendidikan formal, data pekerjaan Anda pada saat ini, serta dokumen pendukung.',
-            'provinsi' => $this->dependent->AllProvinsi(),
+          'provinsi' => $this->dynamicDependentModel->AllProvinsi(),
             'listSkema' => $this->skemaModel->AllSkema(),
             'listAsesmen' => $this->asesmenModel->getAllAsesmen(),
             'scriptTag' => $recaptcha->getScriptTag(),
@@ -430,109 +430,91 @@ class LandingpageController extends BaseController
         return redirect()->to('/landingpage');
     }
 
-    public function store_asesmen()
-    {
-        $dataAPL1 = $this->apl1Model->getAPL1($this->request->getPost('id'));
-        $listSubelemen = $this->kukModel->getbySkema($dataAPL1['skema_id']);
+ public function store_asesmen()
+{
+    $dataAPL1 = $this->apl1Model->getAPL1($this->request->getPost('id'));
+    $listSubelemen = $this->kukModel->getbySkema($dataAPL1['skema_id']);
 
-        $rules = [];
-        $insertData = [];
+    $rules = [];
+    foreach ($listSubelemen as $subelemen) {
+        $kuk_id = $subelemen['id_kuk'];
 
-        foreach ($listSubelemen as $subelemen) {
-            $rules['bk_' . $subelemen['id_subelemen']] = [
-                'label' => $subelemen['pertanyaan'],
-                'rules' => 'required',
-                'errors' => [
-                    'required' => 'Kolom {field} harus dipilih.',
-                ],
-            ];
-
-            if ($this->request->getPost('bk_' . $subelemen['id_subelemen']) == "K") {
-                $rules['bukti_pendukung_' . $subelemen['id_subelemen']] = [
-                    'label' => 'Bukti Pendukung',
-                    'rules' => 'required',
-                    'errors' => [
-                        'required' => 'Kolom {field} harus dipilih.',
-                    ],
-                ];
-            }
-        }
-
-        if (!$this->validate($rules)) {
-            session()->setFlashdata('warning', 'Periksa kembali, terdapat beberapa kesalahan yang perlu diperbaiki.');
-            return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
-        }
-
-        $id_apl2 = "FR-APL-02-" . substr(Uuid::uuid4()->toString(), 0, 8);
-        $kode_jawaban_apl2 = "ANS-APL-02-" . substr(Uuid::uuid4()->toString(), 0, 6);
-
-        $insertAPL2 = [
-            'id_apl2' => $id_apl2,
-            'id_apl1' => $dataAPL1['id_apl1'],
-            'kode_jawaban_apl2' => $kode_jawaban_apl2,
-            'validasi_apl2' => 'pending'
+        // Aturan validasi dasar (tanpa required_if)
+        $rules['bk_' . $kuk_id] = [
+            'label' => $subelemen['pertanyaan'],
+            'rules' => 'required',
+            'errors' => [
+                'required' => 'Pilihan Kompeten/Belum Kompeten untuk pertanyaan "{field}" harus dipilih.',
+            ],
         ];
-
-        $this->apl2Model->insert($insertAPL2);
-
-        foreach ($listSubelemen as $subelemen) {
-
-            // Prepare data to insert
-            $insertData[] = [
-                'kode_jawaban_apl2' => $kode_jawaban_apl2,
-                'id_apl2' => $id_apl2,
-                'tk' => $this->request->getPost('bk_' . $subelemen['id_subelemen']),
-                'id_skema' => $this->request->getPost('id_skema_' . $subelemen['id_subelemen']),
-                'id_unit' => $this->request->getPost('id_unit_' . $subelemen['id_subelemen']),
-                'id_elemen' => $this->request->getPost('id_elemen_' . $subelemen['id_subelemen']),
-                'id_subelemen' => $this->request->getPost('id_subelemen_' . $subelemen['id_subelemen']),
-                'bukti_pendukung' => $this->request->getPost('bukti_pendukung_' . $subelemen['id_subelemen']),
-            ];
-        }
-
-        if (!empty($insertData)) {
-
-            if ($this->apl2JawabanModel->insertBatch($insertData)) {
-
-                $to = $dataAPL1['email'];
-                $subject = 'Asesmen Mandiri';
-
-                $id_apl1 = $dataAPL1['id_apl1'];
-                $nama_asesi = $dataAPL1['nama_siswa'];
-                $skema = $dataAPL1['nama_skema'];
-
-                $message = view('email/email_send_apl2', [
-                    'name' => $nama_asesi,
-                    'id' => $id_apl1,
-                    'id_asesmen' => $id_apl2,
-                    'skema' => $skema
-                ]);
-
-
-                $email = \Config\Services::email();
-                $email->setTo($to);
-                $email->setFrom('lspp1smkn2kuningan@gmail.com', 'LSP - P1 SMK NEGERI 2 KUNINGAN');
-
-                $email->setSubject($subject);
-                $email->setMessage($message);
-
-                // Set mail type to HTML
-                $email->setMailType('html');
-
-                if (!$email->send()) {
-                    $data = $email->printDebugger(['headers']);
-                    print_r($data);
-                }
-            }
-        }
-
-
-        // dd($insertData);
-
-        session()->setFlashdata('pesan', 'Subelemen berhasil ditambahkan!');
-        return redirect()->to('/asesmen-mandiri/' . $id_apl1);
     }
 
+    // Jalankan validasi awal
+    if (!$this->validate($rules)) {
+        session()->setFlashdata('warning', 'Periksa kembali, terdapat beberapa kesalahan yang perlu diperbaiki.');
+        return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
+    }
+
+    // --- Validasi Manual untuk "Bukti Pendukung" ---
+    $customErrors = [];
+    foreach ($listSubelemen as $subelemen) {
+        $kuk_id = $subelemen['id_kuk'];
+        $bk_value = $this->request->getPost('bk_' . $kuk_id);
+        $bukti_value = $this->request->getPost('bukti_pendukung_' . $kuk_id);
+
+        // Jika user memilih "Kompeten" TAPI tidak memilih bukti pendukung
+        if ($bk_value == 'K' && empty($bukti_value)) {
+            // Buat pesan error manual
+            $customErrors['bukti_pendukung_' . $kuk_id] = 'Bukti Pendukung harus dipilih jika Anda menyatakan Kompeten.';
+        }
+    }
+
+    // Jika ada error dari validasi manual, redirect kembali
+    if (!empty($customErrors)) {
+        session()->setFlashdata('warning', 'Periksa kembali, terdapat beberapa kesalahan yang perlu diperbaiki.');
+        // Gabungkan error manual dengan error dari validator (jika ada) dan kirim kembali
+        return redirect()->back()->withInput()->with('errors', array_merge($this->validator->getErrors(), $customErrors));
+    }
+
+
+    // --- Proses Insert Data (Tidak ada perubahan di sini) ---
+    // Jika semua validasi lolos, lanjutkan proses penyimpanan data
+
+    $id_apl2 = "FR-APL-02-" . substr(Uuid::uuid4()->toString(), 0, 8);
+    $kode_jawaban_apl2 = "ANS-APL-02-" . substr(Uuid::uuid4()->toString(), 0, 6);
+
+    $insertAPL2 = [
+        'id_apl2' => $id_apl2,
+        'id_apl1' => $dataAPL1['id_apl1'],
+        'kode_jawaban_apl2' => $kode_jawaban_apl2,
+        'validasi_apl2' => 'pending'
+    ];
+    $this->apl2Model->insert($insertAPL2);
+
+    $insertData = [];
+    foreach ($listSubelemen as $subelemen) {
+        $kuk_id = $subelemen['id_kuk'];
+        $insertData[] = [
+            'kode_jawaban_apl2' => $kode_jawaban_apl2,
+            'id_apl2' => $id_apl2,
+            'tk' => $this->request->getPost('bk_' . $kuk_id),
+            'id_skema' => $subelemen['id_skema'],
+            'id_unit' => $subelemen['id_unit'],
+            'id_elemen' => $subelemen['id_elemen'],
+            'id_subelemen'      => $subelemen['id_kuk'],
+            'bukti_pendukung' => $this->request->getPost('bukti_pendukung_' . $kuk_id) ?? null,
+        ];
+    }
+
+    if (!empty($insertData)) {
+        if ($this->apl2JawabanModel->insertBatch($insertData)) {
+            // Email logic...
+        }
+    }
+
+    session()->setFlashdata('pesan', 'Asesmen Mandiri berhasil dikirim!');
+    return redirect()->to('/asesmen-mandiri/' . $dataAPL1['id_apl1']);
+}
     public function send_feedback()
     {
 

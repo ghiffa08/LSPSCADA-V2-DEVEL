@@ -48,7 +48,6 @@ use Myth\Auth\Models\UserModel as MythUserModel;
 
 
 
-
 /**
  * Class BaseController
  *

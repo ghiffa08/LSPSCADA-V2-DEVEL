@@ -1,4 +1,4 @@
-<?= $this->extend("layouts/asesi/layout-app"); ?>
+<?= $this->extend("layouts/landingpage/layout-2") ?>
 <?= $this->section("content"); ?>
 <div class="row">
     <div class="col-12">
@@ -27,55 +27,37 @@
             </div>
 
             <div class="card-body">
-                <!-- Informasi Asesi & Skema (readonly) -->
                 <div class="card border-left-primary mb-4">
                     <div class="card-body">
                         <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label class="font-weight-bold"><i class="fas fa-user text-primary mr-1"></i>Nama Asesi</label>
-                                    <input type="text" class="form-control bg-light" id="nama_asesi" value="<?= user()->fullname ?? '-' ?>" readonly>
-                                </div>
+                            <div class="col-md-6 form-group">
+                                <label class="font-weight-bold"><i class="fas fa-user text-primary mr-1"></i>Nama Asesi</label>
+                                <input type="text" class="form-control bg-light" value="<?= esc($pengajuan['nama_asesi']) ?? '-' ?>" readonly>
                             </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label class="font-weight-bold"><i class="fas fa-user-tie text-primary mr-1"></i>Nama Asesor</label>
-                                    <input type="text" class="form-control bg-light" id="nama_asesor" value="<?= $asesmen['nama_asesor'] ?? '-' ?>" readonly>
-                                </div>
+                            <div class="col-md-6 form-group">
+                                <label class="font-weight-bold"><i class="fas fa-user-tie text-primary mr-1"></i>Nama Asesor</label>
+                                <input type="text" class="form-control bg-light" value="<?= esc($pengajuan['nama_asesor']) ?? '-' ?>" readonly>
                             </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label class="font-weight-bold"><i class="fas fa-bookmark text-primary mr-1"></i>Skema Sertifikasi</label>
-                                    <input type="text" class="form-control bg-light" id="nama_skema" value="<?= $asesmen['nama_skema'] ?? '-' ?>" readonly>
-                                </div>
+                            <div class="col-md-6 form-group">
+                                <label class="font-weight-bold"><i class="fas fa-bookmark text-primary mr-1"></i>Skema Sertifikasi</label>
+                                <input type="text" class="form-control bg-light" value="<?= esc($pengajuan['nama_skema']) ?? '-' ?>" readonly>
                             </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label class="font-weight-bold"><i class="fas fa-hashtag text-primary mr-1"></i>Kode Skema</label>
-                                    <input type="text" class="form-control bg-light" id="kode_skema" value="<?= $asesmen['kode_skema'] ?? '-' ?>" readonly>
-                                </div>
+                            <div class="col-md-6 form-group">
+                                <label class="font-weight-bold"><i class="fas fa-hashtag text-primary mr-1"></i>Kode Skema</label>
+                                <input type="text" class="form-control bg-light" value="<?= esc($pengajuan['kode_skema']) ?? '-' ?>" readonly>
                             </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label class="font-weight-bold"><i class="fas fa-calendar-alt text-primary mr-1"></i>Tanggal Mulai</label>
-                                    <input type="date" class="form-control" name="tanggal_mulai" id="tanggal_mulai" value="<?= $feedback['tanggal_mulai'] ?? date('Y-m-d') ?>">
-                                </div>
+                            <div class="col-md-6 form-group">
+                                <label class="font-weight-bold"><i class="fas fa-calendar-alt text-primary mr-1"></i>Tanggal Mulai</label>
+                                <input type="date" class="form-control" id="tanggal_mulai_display" value="<?= $feedback['tanggal_mulai'] ?? date('Y-m-d') ?>">
                             </div>
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label class="font-weight-bold"><i class="fas fa-calendar-check text-primary mr-1"></i>Tanggal Selesai</label>
-                                    <input type="date" class="form-control" name="tanggal_selesai" id="tanggal_selesai" value="<?= $feedback['tanggal_selesai'] ?? date('Y-m-d') ?>">
-                                </div>
+                            <div class="col-md-6 form-group">
+                                <label class="font-weight-bold"><i class="fas fa-calendar-check text-primary mr-1"></i>Tanggal Selesai</label>
+                                <input type="date" class="form-control" id="tanggal_selesai_display" value="<?= $feedback['tanggal_selesai'] ?? date('Y-m-d') ?>">
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Progress Bar -->
                 <div id="progress-container" class="card mb-4 border-left-primary">
                     <div class="card-body py-3">
                         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -93,26 +75,17 @@
                     </div>
                 </div>
 
-                <!-- Loading Indicator -->
-                <div id="loadingData" class="text-center py-5">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="sr-only">Loading...</span>
-                    </div>
-                    <p class="mt-2">Memuat data umpan balik...</p>
-                </div>
-
-                <!-- Form Feedback -->
-                <form action="<?= base_url('/api/feedback-asesi/save') ?>" method="POST" id="formFeedback" style="display: none;">
+                <form action="<?= base_url('/api/feedback-asesi/save') ?>" method="POST" id="formFeedback">
                     <?= csrf_field() ?>
-                    <input type="hidden" name="id_feedback" id="form_id_feedback" value="<?= $feedback['id_feedback'] ?? '' ?>">
-                    <input type="hidden" name="id_asesmen" id="form_id_asesmen" value="<?= $asesmen['id_asesmen'] ?? '' ?>">
-                    <input type="hidden" name="id_skema" id="form_id_skema" value="<?= $asesmen['id_skema'] ?? '' ?>">
-                    <input type="hidden" name="id_asesi" id="form_id_asesi" value="<?= $id_asesi ?>">
-                    <input type="hidden" name="id_asesor" id="form_id_asesor" value="<?= $asesmen['id_asesor'] ?? '' ?>">
+
+                    <input type="hidden" name="id_pengajuan" value="<?= esc($pengajuan['id_pengajuan']) ?>">
+                    <input type="hidden" name="id_asesi" value="<?= esc($pengajuan['id_asesi']) ?>">
+                    <input type="hidden" name="id_asesor" value="<?= esc($pengajuan['id_asesor']) ?>">
+                    <input type="hidden" name="id_skema" value="<?= esc($pengajuan['id_skema']) ?>">
+
                     <input type="hidden" name="tanggal_mulai" id="form_tanggal_mulai" value="<?= $feedback['tanggal_mulai'] ?? date('Y-m-d') ?>">
                     <input type="hidden" name="tanggal_selesai" id="form_tanggal_selesai" value="<?= $feedback['tanggal_selesai'] ?? date('Y-m-d') ?>">
 
-                    <!-- Toolbar Buttons -->
                     <div class="d-flex justify-content-between mb-3">
                         <div class="btn-group">
                             <button type="button" class="btn btn-primary" id="checkAll">
@@ -132,396 +105,237 @@
                         </div>
                     </div>
 
-                    <!-- Feedback Container -->
                     <div id="feedbackContainer" class="card shadow-sm">
                         <div class="table-responsive">
-                            <table class="table table-bordered">
+                            <table class="table table-bordered mb-0">
                                 <thead class="bg-light">
                                     <tr>
                                         <th width="5%">No</th>
                                         <th width="50%">Pernyataan</th>
-                                        <th width="15%">Jawaban</th>
+                                        <th width="15%" class="text-center">Jawaban</th>
                                         <th width="30%">Komentar</th>
                                     </tr>
                                 </thead>
                                 <tbody id="feedbackTableBody">
-                                    <!-- Content will be generated by JavaScript -->
                                 </tbody>
                             </table>
                         </div>
                     </div>
 
-                    <!-- Catatan Lain Section -->
                     <div class="card shadow-sm mt-4">
                         <div class="card-header bg-light">
                             <h6 class="m-0 font-weight-bold text-primary">Catatan Lain</h6>
                         </div>
                         <div class="card-body">
-                            <textarea name="catatan_lain" id="catatan_lain" class="form-control" rows="4" placeholder="Masukkan catatan tambahan jika ada..."><?= $feedback['catatan_lain'] ?? '' ?></textarea>
+                            <textarea name="catatan_lain" id="catatan_lain" class="form-control" rows="4" placeholder="Masukkan catatan tambahan jika ada..."><?= esc($feedback['catatan_lain'] ?? '') ?></textarea>
                         </div>
                     </div>
                 </form>
-            </div>
-
-            <div class="card-footer bg-white">
-                <div class="text-muted text-center">
-                    <i class="fas fa-comment-alt mr-1"></i> Umpan balik ini penting untuk peningkatan kualitas layanan asesmen.
-                </div>
             </div>
         </div>
     </div>
 </div>
 <?= $this->endSection(); ?>
 
-<?= $this->section('js') ?>
+<?= $this->section('scripts') ?>
 <script>
-$(document).ready(function() {
-    // Variables
-    let feedbackData = {};
-    let totalKomponen = 0;
-    let komponen = [];
-    const id_asesi = $('#form_id_asesi').val();
-    const id_skema = $('#form_id_skema').val();
-    const id_feedback = $('#form_id_feedback').val();
+    $(document).ready(function() {
+        // PENJELASAN: Data diambil langsung dari variabel PHP yang di-render oleh controller.
+        // Tidak ada lagi AJAX call untuk memuat data awal. Ini lebih cepat & efisien.
+        const komponenData = <?= json_encode($komponen) ?>;
+        const existingAnswers = <?= json_encode($existingAnswers) ?>;
+        const totalKomponen = komponenData.length;
 
-    // Initial data loading
-    loadKomponenFeedback();
+        /**
+         * Merender form feedback berdasarkan data komponen dan jawaban yang ada.
+         */
+        function renderFeedbackForm(komponen, existingData) {
+            const tableBody = $('#feedbackTableBody');
+            tableBody.empty();
 
-    // Observe date changes
-    $('#tanggal_mulai, #tanggal_selesai').on('change', function() {
-        const id = $(this).attr('id');
-        const formId = 'form_' + id;
-        const value = $(this).val();
-        $('#' + formId).val(value);
-
-        // If this is an auto-save, trigger it
-        autoSave();
-    });
-
-    // Load komponen feedback
-    function loadKomponenFeedback() {
-        // Show loading indicator
-        $('#loadingData').show();
-        $('#formFeedback').hide();
-        $('#progress-container').show();
-        $('#data-status').html('<i class="fas fa-sync fa-spin text-primary"></i> Memuat data...');
-
-        // Get komponen list from API
-        $.ajax({
-            url: '<?= base_url('api/feedback-asesi/get-komponen') ?>',
-            type: 'GET',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            success: function(response) {
-                if (response.success) {
-                    komponen = response.komponen;
-                    totalKomponen = komponen.length;
-
-                    // If feedback ID exists, load existing data
-                    if (id_feedback) {
-                        loadExistingFeedback(id_feedback);
-                    } else {
-                        // Check if there's already feedback for this asesi and skema
-                        checkExistingFeedback();
-                    }
-                } else {
-                    showError('Gagal memuat komponen umpan balik');
-                }
-            },
-            error: function(xhr) {
-                showError('Terjadi kesalahan saat memuat komponen');
-                console.error(xhr.responseText);
+            if (komponen.length === 0) {
+                tableBody.append('<tr><td colspan="4" class="text-center">Komponen feedback tidak ditemukan.</td></tr>');
+                return;
             }
-        });
-    }
 
-    // Check if feedback already exists
-    function checkExistingFeedback() {
-        $.ajax({
-            url: '<?= base_url('api/feedback-asesi/check-existing') ?>',
-            type: 'GET',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            data: {
-                id_asesi: id_asesi,
-                id_skema: id_skema
-            },
-            success: function(response) {
-                if (response.success) {
-                    if (response.exists && response.id_feedback) {
-                        // Set the feedback ID and load existing data
-                        $('#form_id_feedback').val(response.id_feedback);
-                        loadExistingFeedback(response.id_feedback);
-                    } else {
-                        // No existing data, render empty form
-                        renderFeedbackForm(komponen, {});
-                    }
-                } else {
-                    showError('Gagal memeriksa data umpan balik');
-                }
-            },
-            error: function(xhr) {
-                showError('Terjadi kesalahan saat memeriksa data');
-                console.error(xhr.responseText);
-            }
-        });
-    }
+            komponen.forEach(function(item, index) {
+                const rowNumber = index + 1;
+                const itemId = item.id_komponen;
+                const existingItem = existingData[itemId] || {};
+                const jawaban = existingItem.jawaban || '';
+                const komentar = existingItem.komentar || '';
 
-    // Load existing feedback data
-    function loadExistingFeedback(id_feedback) {
-        $.ajax({
-            url: '<?= base_url('api/feedback-asesi/load-feedback') ?>',
-            type: 'GET',
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            data: {
-                id_feedback: id_feedback
-            },
-            success: function(response) {
-                if (response.success) {
-                    const feedback = response.feedback || {};
-
-                    // Update form fields
-                    $('#catatan_lain').val(feedback.catatan_lain || '');
-
-                    if (feedback.tanggal_mulai) {
-                        $('#tanggal_mulai').val(feedback.tanggal_mulai);
-                        $('#form_tanggal_mulai').val(feedback.tanggal_mulai);
-                    }
-
-                    if (feedback.tanggal_selesai) {
-                        $('#tanggal_selesai').val(feedback.tanggal_selesai);
-                        $('#form_tanggal_selesai').val(feedback.tanggal_selesai);
-                    }
-
-                    // Render the form with existing data
-                    renderFeedbackForm(komponen, response.existing_data || {});
-                } else {
-                    showError('Gagal memuat data umpan balik');
-                }
-            },
-            error: function(xhr) {
-                showError('Terjadi kesalahan saat memuat data');
-                console.error(xhr.responseText);
-            }
-        });
-    }
-
-    // Render feedback form with components and existing data
-    function renderFeedbackForm(komponen, existingData) {
-        const tableBody = $('#feedbackTableBody');
-        tableBody.empty();
-
-        // Generate rows for each komponen
-        komponen.forEach(function(item, index) {
-            const rowNumber = index + 1;
-            const itemId = item.id_komponen;
-            const existingItem = existingData[itemId] || {};
-            const existingJawaban = existingItem.jawaban || '';
-            const existingKomentar = existingItem.komentar || '';
-
-            // Create row HTML
-            const row = `
-                <tr data-id="${itemId}">
-                    <td class="text-center">${rowNumber}</td>
-                    <td>${item.pernyataan}</td>
-                    <td class="text-center">
+                // PERBAIKAN: name input radio diubah menjadi 'jawaban[...]' agar sesuai dengan struktur data detail di controller
+                const row = `
+                <tr>
+                    <td class="text-center align-middle">${rowNumber}</td>
+                    <td class="align-middle">${item.pernyataan}</td>
+                    <td class="text-center align-middle">
                         <div class="btn-group btn-group-toggle" data-toggle="buttons">
-                            <label class="btn btn-outline-success ${existingJawaban === 'Y' ? 'active' : ''}">
-                                <input type="radio" name="komponen[${itemId}]" value="Y" ${existingJawaban === 'Y' ? 'checked' : ''}> Ya
+                            <label class="btn btn-outline-success ${jawaban === 'Y' ? 'active' : ''}">
+                                <input type="radio" name="jawaban[${itemId}]" value="Y" ${jawaban === 'Y' ? 'checked' : ''}> Ya
                             </label>
-                            <label class="btn btn-outline-danger ${existingJawaban === 'T' ? 'active' : ''}">
-                                <input type="radio" name="komponen[${itemId}]" value="T" ${existingJawaban === 'T' ? 'checked' : ''}> Tidak
+                            <label class="btn btn-outline-danger ${jawaban === 'T' ? 'active' : ''}">
+                                <input type="radio" name="jawaban[${itemId}]" value="T" ${jawaban === 'T' ? 'checked' : ''}> Tidak
                             </label>
                         </div>
                     </td>
-                    <td>
-                        <textarea class="form-control feedback-komentar" name="komentar[${itemId}]" rows="1" placeholder="Komentar (opsional)">${existingKomentar}</textarea>
+                    <td class="align-middle">
+                        <textarea class="form-control feedback-komentar" name="komentar[${itemId}]" rows="1" placeholder="Komentar...">${komentar}</textarea>
                     </td>
-                </tr>
-            `;
+                </tr>`;
+                tableBody.append(row);
+            });
 
-            tableBody.append(row);
-        });
-
-        // Hide loading indicator and show form
-        $('#loadingData').hide();
-        $('#formFeedback').show();
-
-        // Update progress
-        updateProgress();
-
-        // Attach change event to radio buttons for auto-save and progress update
-        $('input[type=radio]').on('change', function() {
             updateProgress();
-            autoSave();
-        });
-
-        // Attach blur event to textareas for auto-save
-        $('.feedback-komentar').on('blur', function() {
-            autoSave();
-        });
-
-        // Attach blur event to textarea for catatan_lain
-        $('#catatan_lain').on('blur', function() {
-            autoSave();
-        });
-    }
-
-    // Update progress bar
-    function updateProgress() {
-        const filled = $('input[type=radio]:checked').length;
-        const percent = totalKomponen ? Math.round((filled / totalKomponen) * 100) : 0;
-
-        $('#progress-bar').css('width', percent + '%').attr('aria-valuenow', percent);
-        $('#progress-text').text(percent + '%');
-
-        // Update status text
-        if (percent === 0) {
-            $('#data-status').html('<i class="fas fa-exclamation-circle text-warning"></i> Belum ada yang diisi');
-        } else if (percent < 100) {
-            $('#data-status').html(`<i class="fas fa-spinner text-primary"></i> Terisi ${filled} dari ${totalKomponen}`);
-        } else {
-            $('#data-status').html('<i class="fas fa-check-circle text-success"></i> Semua terisi');
+            attachEventListeners();
         }
 
-        // Change progress bar color based on percentage
-        const $progressBar = $('#progress-bar');
-        $progressBar.removeClass('bg-danger bg-warning bg-primary bg-success');
+        /**
+         * Memasang event listener ke elemen-elemen form.
+         */
+        function attachEventListeners() {
+            // Event untuk input tanggal (display) yang akan mengupdate input tanggal (hidden)
+            $('#tanggal_mulai_display, #tanggal_selesai_display').on('change', function() {
+                const targetId = $(this).attr('id').replace('_display', '');
+                $('#form_' + targetId).val($(this).val());
+                autoSave();
+            });
 
-        if (percent < 25) {
-            $progressBar.addClass('bg-danger');
-        } else if (percent < 50) {
-            $progressBar.addClass('bg-warning');
-        } else if (percent < 100) {
-            $progressBar.addClass('bg-primary');
-        } else {
-            $progressBar.addClass('bg-success');
+            // Event untuk auto-save pada input di dalam tabel
+            $('#feedbackTableBody').on('change', 'input[type=radio]', function() {
+                updateProgress();
+                autoSave();
+            });
+            $('#feedbackTableBody').on('blur', '.feedback-komentar', autoSave);
+            $('#catatan_lain').on('blur', autoSave);
+
+            // Event untuk tombol toolbar
+            $('#checkAll').on('click', function() {
+                $('input[value="Y"]').prop('checked', true).parent().addClass('active');
+                $('input[value="T"]').prop('checked', false).parent().removeClass('active');
+                updateProgress();
+                autoSave();
+            });
+
+            $('#uncheckAll').on('click', function() {
+                $('input[value="Y"]').prop('checked', false).parent().removeClass('active');
+                $('input[value="T"]').prop('checked', true).parent().addClass('active');
+                updateProgress();
+                autoSave();
+            });
+
+            // Event untuk submit form manual
+            $('#formFeedback').on('submit', function(e) {
+                e.preventDefault();
+                submitForm(this);
+            });
         }
-    }
 
-    // Auto-save functionality using AJAX
-    function autoSave() {
-        // Prepare form data
-        const formData = $('#formFeedback').serialize();
+        /**
+         * Memperbarui progress bar pengisian.
+         */
+        function updateProgress() {
+            if (totalKomponen === 0) return;
 
-        // Send data to server
-        $.ajax({
-            url: '<?= base_url('/api/feedback-asesi/save') ?>',
-            type: 'POST',
-            data: formData,
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            success: function(response) {
-                if (response.success) {
-                    // Update feedback ID if it's a new record
-                    if (response.result && response.result.id_feedback) {
-                        $('#form_id_feedback').val(response.result.id_feedback);
-                    }
+            const filled = $('input[type=radio]:checked').length;
+            const percent = Math.round((filled / totalKomponen) * 100);
 
-                    // Update CSRF token
-                    $('input[name="<?= csrf_token() ?>"]').val(response.token);
+            $('#progress-bar').css('width', percent + '%').attr('aria-valuenow', percent);
+            $('#progress-text').text(percent + '%');
 
-                    // Show subtle success indicator (no popups for auto-save)
-                    $('#data-status').html('<i class="fas fa-check text-success"></i> Data tersimpan');
-                    setTimeout(function() {
-                        updateProgress();
-                    }, 2000);
-                } else {
-                    console.error('Auto-save failed:', response.message);
-                }
-            },
-            error: function(xhr) {
-                console.error('Auto-save error:', xhr.responseText);
+            const $progressBar = $('#progress-bar');
+            $progressBar.removeClass('bg-danger bg-warning bg-primary bg-success');
+
+            if (percent === 100) {
+                $('#data-status').html('<i class="fas fa-check-circle text-success"></i> Semua terisi');
+                $progressBar.addClass('bg-success');
+            } else if (percent > 50) {
+                $('#data-status').html(`<i class="fas fa-spinner text-primary"></i> Terisi ${filled} dari ${totalKomponen}`);
+                $progressBar.addClass('bg-primary');
+            } else if (percent > 0) {
+                $('#data-status').html(`<i class="fas fa-spinner text-warning"></i> Terisi ${filled} dari ${totalKomponen}`);
+                $progressBar.addClass('bg-warning');
+            } else {
+                $('#data-status').html('<i class="fas fa-exclamation-circle text-danger"></i> Belum ada yang diisi');
+                $progressBar.addClass('bg-danger');
             }
-        });
-    }
+        }
 
-    // Handle full form submission
-    $('#formFeedback').on('submit', function(e) {
-        e.preventDefault();
+        // Debounce function untuk mencegah autoSave terlalu sering dipanggil
+        let autoSaveTimeout;
 
-        // Show loading on button
-        const btnSave = $('#btnSave');
-        const btnText = btnSave.html();
-        btnSave.html('<i class="fas fa-spinner fa-spin"></i> Menyimpan...').prop('disabled', true);
+        function autoSave() {
+            clearTimeout(autoSaveTimeout);
+            $('#data-status').html('<i class="fas fa-sync fa-spin text-primary"></i> Menyimpan...');
 
-        // Submit form data
-        $.ajax({
-            url: $(this).attr('action'),
-            type: 'POST',
-            data: $(this).serialize(),
-            headers: {
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            success: function(response) {
-                btnSave.html(btnText).prop('disabled', false);
-
-                if (response.success) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Berhasil',
-                        text: response.message || 'Umpan balik berhasil disimpan',
-                        showConfirmButton: true
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            window.location.href = '<?= base_url('dashboard') ?>';
+            autoSaveTimeout = setTimeout(() => {
+                $.ajax({
+                    url: $('#formFeedback').attr('action'),
+                    type: 'POST',
+                    data: $('#formFeedback').serialize(),
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $('input[name="<?= csrf_token() ?>"]').val(response.token);
+                            $('#data-status').html('<i class="fas fa-check text-success"></i> Data tersimpan');
+                            setTimeout(() => updateProgress(), 2000);
+                        } else {
+                            $('#data-status').html('<i class="fas fa-times-circle text-danger"></i> Gagal simpan');
                         }
-                    });
-                } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Gagal',
-                        text: response.message || 'Gagal menyimpan umpan balik'
-                    });
-                }
-            },
-            error: function(xhr) {
-                btnSave.html(btnText).prop('disabled', false);
-
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'Terjadi kesalahan saat menyimpan data'
+                    },
+                    error: function() {
+                        $('#data-status').html('<i class="fas fa-times-circle text-danger"></i> Error');
+                    }
                 });
-                console.error(xhr.responseText);
-            }
-        });
+            }, 1000); // Jeda 1 detik sebelum menyimpan
+        }
+
+        /**
+         * Mengirim form secara manual saat tombol simpan ditekan.
+         */
+        function submitForm(form) {
+            const btnSave = $('#btnSave');
+            const btnText = btnSave.html();
+            btnSave.html('<i class="fas fa-spinner fa-spin"></i> Menyimpan...').prop('disabled', true);
+
+            $.ajax({
+                url: $(form).attr('action'),
+                type: 'POST',
+                data: $(form).serialize(),
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Berhasil!',
+                            text: response.message || 'Umpan balik berhasil disimpan.',
+                            showConfirmButton: false,
+                            timer: 2000
+                        }).then(() => {
+                            window.location.href = '<?= base_url('dashboard') ?>';
+                        });
+                    } else {
+                        Swal.fire('Gagal', response.message || 'Gagal menyimpan data.', 'error');
+                    }
+                },
+                error: function(xhr) {
+                    Swal.fire('Error', 'Terjadi kesalahan sistem. Coba lagi nanti.', 'error');
+                    console.error(xhr.responseText);
+                },
+                complete: function() {
+                    btnSave.html(btnText).prop('disabled', false);
+                }
+            });
+        }
+
+        // Inisialisasi
+        renderFeedbackForm(komponenData, existingAnswers);
+
     });
-
-    // Check All button
-    $('#checkAll').on('click', function() {
-        $('input[value="Y"]').prop('checked', true).parent().addClass('active');
-        $('input[value="T"]').prop('checked', false).parent().removeClass('active');
-        updateProgress();
-        autoSave();
-    });
-
-    // Uncheck All button (set all to No)
-    $('#uncheckAll').on('click', function() {
-        $('input[value="Y"]').prop('checked', false).parent().removeClass('active');
-        $('input[value="T"]').prop('checked', true).parent().addClass('active');
-        updateProgress();
-        autoSave();
-    });
-
-    // Helper function to show error message
-    function showError(message) {
-        $('#loadingData').hide();
-        $('#formFeedback').hide();
-
-        Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: message
-        });
-
-        $('#data-status').html('<i class="fas fa-exclamation-circle text-danger"></i> Gagal memuat data');
-    }
-});
 </script>
 <?= $this->endSection(); ?>

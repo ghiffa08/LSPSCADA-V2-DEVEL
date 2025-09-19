@@ -5,112 +5,103 @@ namespace App\Controllers\Api;
 use Config\Services;
 use CodeIgniter\HTTP\ResponseInterface;
 use App\Controllers\DataTableController;
+use CodeIgniter\API\ResponseTrait; // Gunakan ini untuk respons API yang standar
 
 class Skema extends DataTableController
 {
+    use ResponseTrait; // Tambahkan trait ini
 
     public function __construct()
     {
         parent::__construct();
-
         $this->model = $this->skemaModel;
 
-        // Optional: Define custom column mapping for complex ordering
+        // Perbaikan: Kunci array tidak boleh duplikat
         $this->columnMap = [
-            0 => null, // No ordering for index column
-            1 => 'skema.id_skema',
-            1 => 'skema.kode_skema',
-            2 => 'skema.nama_skema',
-            2 => 'skema.jenis_skema',
-            3 => 'skema.status',
-            4 => null // No ordering for action column
+            0 => null, // No
+            1 => 'kode_skema',
+            2 => 'nama_skema',
+            3 => 'jenis_skema',
+            4 => 'status',
+            5 => null // Aksi
         ];
     }
 
     /**
      * Save or update skema data
+     * Disederhanakan dengan validasi CodeIgniter
      */
     public function save(): ResponseInterface
     {
-        // Hanya izinkan request AJAX
         if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
+            return $this->failNotFound('Halaman tidak ditemukan');
         }
 
-        $modelName = \App\Models\SkemaModel::class;
-        $data = $this->request->getPost();
-
-        // Format data yang akan disimpan
-        $formattedData = [
-            'id_skema'     => $data['id_skema'] ?? null,
-            'kode_skema'   => $data['kode_skema'],
-            'nama_skema'   => $data['nama_skema'],
-            'jenis_skema'  => $data['jenis_skema'],
-            'status'       => $data['status']
+        // Aturan validasi
+        $rules = [
+            'kode_skema' => 'required|max_length[20]',
+            'nama_skema' => 'required|max_length[255]',
+            'jenis_skema' => 'required|in_list[KKNI,Okupasi,Klaster]',
+            'status' => 'required|in_list[Y,N]'
         ];
 
-        // Callback sebelum simpan (opsional)
-        $beforeSave = function ($data) {
-            // Misalnya, validasi atau manipulasi data
-            return $data;
-        };
+        // Jalankan validasi
+        if (!$this->validate($rules)) {
+            // Jika validasi gagal, kirim error
+            return $this->failValidationErrors($this->validator->getErrors());
+        }
 
-        // Callback sesudah simpan (opsional)
-        $afterSave = function ($data, $id) {
-            // Misalnya, logging atau update tabel lain
-        };
+        // Ambil data yang sudah divalidasi
+        $data = $this->validator->getValidated();
+        $id = $this->request->getPost('id_skema');
 
-        // Simpan data
-        $result = $this->dataService->save(
-            $modelName,
-            $formattedData,
-            'id_skema',
-            $beforeSave,
-            $afterSave
-        );
+        try {
+            if (!empty($id)) {
+                // Proses Update
+                $this->model->update($id, $data);
+                $message = 'Skema berhasil diperbarui.';
+            } else {
+                // Proses Insert
+                $this->model->insert($data);
+                $message = 'Skema berhasil ditambahkan.';
+            }
 
-        // Kembalikan response JSON
-        return $this->dataService->response($result, $result['code']);
+            return $this->respondCreated([
+                'status' => true,
+                'message' => $message
+            ]);
+        } catch (\Exception $e) {
+            return $this->failServerError('Terjadi kesalahan pada server: ' . $e->getMessage());
+        }
     }
 
     /**
      * Delete skema
+     * Disederhanakan untuk respons yang lebih konsisten
      */
     public function delete($id = null): ResponseInterface
     {
         if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
+            return $this->failNotFound();
         }
 
-        $skemaModel = $this->skemaModel;
-
-        // Start transaction
-        $db = \Config\Database::connect();
-        $db->transStart();
+        $skema = $this->model->find($id);
+        if (!$skema) {
+            return $this->failNotFound('Data skema tidak ditemukan.');
+        }
 
         try {
-            $deleted = $skemaModel->delete($id);
-
-            $db->transComplete();
-
-            if ($deleted) {
-                return $this->dataService->response([
+            if ($this->model->delete($id)) {
+                return $this->respondDeleted([
                     'status' => true,
-                    'message' => 'Skema deleted successfully'
+                    'message' => 'Skema berhasil dihapus.'
                 ]);
-            } else {
-                return $this->dataService->response([
-                    'status' => false,
-                    'message' => 'Failed to delete skema'
-                ], 400);
             }
-        } catch (\Exception $e) {
-            $db->transRollback();
 
-            return $this->dataService->response([
-                'status' => false,
-                'message' => 'An error occurred: ' . $e->getMessage()
-            ], 500);
+            return $this->fail('Gagal menghapus skema.', 400);
+        } catch (\Exception $e) {
+            // Tangani error jika ada constraint foreign key
+            return $this->failServerError('Gagal menghapus skema. Data ini mungkin digunakan di tabel lain.');
         }
     }
 
@@ -121,33 +112,18 @@ class Skema extends DataTableController
     public function getById($id = null): ResponseInterface
     {
         if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
+            return $this->failNotFound();
         }
 
-        $skemaModel = new $this->skemaModel;
-        $skema = $skemaModel->find($id);
+        $data = $this->model->find($id);
 
-        if (!$skema) {
-            return $this->dataService->response([
-                'status' => false,
-                'message' => 'skema not found'
-            ], 404);
+        if (!$data) {
+            return $this->failNotFound('Data skema tidak ditemukan');
         }
 
-        return $this->dataService->response([
+        return $this->respond([
             'status' => true,
-            'data' => $skema
+            'data' => $data
         ]);
-    }
-
-    public function get($id): ResponseInterface
-    {
-        $skema = $this->skemaModel->find($id);
-
-        if (!$skema) {
-            return $this->response->setStatusCode(404)->setJSON(['error' => 'Skema tidak ditemukan']);
-        }
-
-        return $this->response->setJSON($skema);
     }
 }

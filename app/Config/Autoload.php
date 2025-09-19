@@ -98,6 +98,8 @@ class Autoload extends AutoloadConfig
      * @var list<string>
      */
     public $helpers = [
+        'auth',
+        'url',
         'email',
         'form',
         'captcha',
@@ -110,6 +112,7 @@ class Autoload extends AutoloadConfig
         'application',
         'documents',
         'observasi',
-        'excel_import'
+        'excel_import',
+        'asesi_helper'
     ];
 }

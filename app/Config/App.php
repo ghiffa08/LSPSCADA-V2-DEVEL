@@ -31,7 +31,7 @@ class App extends BaseConfig
      */
 
     // public string $baseURL = 'https://1db7-202-46-68-178.ngrok-free.app/Scada_LSPAPP/public/';
-    public string $baseURL = 'http://localhost:8080/';
+    public string $baseURL = 'https://lsp.smkn2-kng.sch.id/apps/';
     // public string $baseURL = 'http://lsp.apps.smkn2-kng.sch.id/';
     // public string $baseURL = 'http://localhost/SCADA_LSPAPP/public/';
 

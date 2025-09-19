@@ -3390,6 +3390,266 @@ body.layout-3 .main-footer {
   padding-right: 0;
 }
 
+/* 4.4 Layout - Final untuk Layout 4 (Responsive & Sesuai Gambar) */
+
+/* Pengaturan Navbar Utama & Sekunder */
+body.layout-4 .navbar {
+  left: 0;
+  right: 0;
+}
+body.layout-4 .navbar-bg {
+  z-index: 889;
+  height: 70px;
+}
+body.layout-4 .navbar.navbar-secondary {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.03);
+  background-color: #fff;
+  top: 70px;
+  padding: 0;
+  z-index: 889;
+}
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item.active > .nav-link {
+  color: #3056d3;
+}
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item.active > .nav-link:before {
+  left: 35px;
+  right: 0;
+}
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item:first-child .nav-link {
+  margin-left: 0;
+}
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item:last-child .nav-link {
+  margin-right: 0;
+}
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item > .nav-link {
+  color: #868e96;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  height: 70px;
+  padding: 0;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  margin-left: 15px;
+  margin-right: 15px;
+  position: relative;
+}
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item > .nav-link.has-dropdown {
+  margin-right: 35px;
+}
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item > .nav-link.has-dropdown:after {
+  content: "\f054";
+  font-family: "Font Awesome 5 Free";
+  font-weight: 900;
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  transform: translate(0, -50%);
+  font-size: 12px;
+  transition: all 0.5s;
+  right: -20px;
+}
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item > .nav-link:before {
+  content: " ";
+  position: absolute;
+  left: initial;
+  right: initial;
+  bottom: 0;
+  height: 2px;
+  background-color: #3056d3;
+  transition: all 0.5s;
+}
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item > .nav-link span {
+  line-height: 74px;
+}
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item > .nav-link i {
+  width: 30px;
+  font-size: 16px;
+}
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item > .nav-link:hover {
+  color: #191d21 !important;
+}
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item .dropdown-menu {
+  padding: 0;
+}
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item .dropdown-menu .nav-item .nav-link {
+  color: #6c757d;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  padding: 7px !important;
+  padding-left: 20px !important;
+  padding-right: 20px !important;
+}
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item .dropdown-menu .nav-item .nav-link.has-dropdown:after {
+  content: "\f054";
+  font-family: "Font Awesome 5 Free";
+  font-weight: 900;
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  transform: translate(0, -50%);
+  font-size: 12px;
+  transition: all 0.5s;
+  right: 15px;
+}
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item .dropdown-menu .nav-item:hover > .nav-link {
+  background-color: #fcfcfd;
+  color: #191d21;
+}
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item .dropdown-menu .nav-item:hover > .dropdown-menu {
+  display: block !important;
+  top: -5px;
+  left: 200px;
+}
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item .dropdown-menu .nav-item.active > .nav-link,
+body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item .dropdown-menu .nav-item .nav-link:focus {
+  background-color: #3056d3;
+  color: #fff;
+}
+
+/* Pengaturan Wrapper Utama */
+body.layout-4 .main-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 0 50px;
+}
+
+/* Pengaturan Sidebar */
+body.layout-4 .main-sidebar {
+  background-color: #fff;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.03);
+  position: static;
+  margin-top: 170px;
+  width: 250px;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 15px 0;
+  flex-shrink: 0;
+}
+
+/* Pengaturan Menu di dalam Sidebar */
+body.layout-4 .main-sidebar .sidebar-menu {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+body.layout-4 .main-sidebar .sidebar-menu li.menu-header {
+  padding: 15px 25px 10px 25px;
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #191d21;
+}
+body.layout-4 .main-sidebar .sidebar-menu li a {
+  padding: 12px 25px;
+  display: flex;
+  align-items: center;
+  color: #5d636b;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  position: relative;
+  transition: all 0.2s ease-in-out;
+}
+body.layout-4 .main-sidebar .sidebar-menu li a i {
+  width: 25px;
+  text-align: center;
+  margin-right: 10px;
+  font-size: 16px;
+  color: #868e96;
+  transition: all 0.2s ease-in-out;
+}
+body.layout-4 .main-sidebar .sidebar-menu li a:hover {
+  color: #3056d3;
+  background-color: transparent;
+}
+body.layout-4 .main-sidebar .sidebar-menu li a:hover i {
+  color: #3056d3;
+}
+body.layout-4 .main-sidebar .sidebar-menu li.active > a,
+body.layout-4 .main-sidebar .sidebar-menu li.active > a:hover {
+  color: #3056d3;
+  font-weight: 700;
+  background-color: transparent;
+}
+body.layout-4 .main-sidebar .sidebar-menu li.active > a i {
+  color: #3056d3;
+}
+body.layout-4 .main-sidebar .sidebar-menu li ul.dropdown-menu {
+  background-color: transparent;
+  box-shadow: none;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+body.layout-4 .main-sidebar .sidebar-menu li ul.dropdown-menu li a {
+  padding-left: 55px;
+  font-weight: 500;
+  font-size: 13px;
+}
+body.layout-4 .main-sidebar .sidebar-menu li ul.dropdown-menu li a:hover {
+  color: #3056d3;
+  background-color: transparent;
+}
+body.layout-4 .main-sidebar .sidebar-menu li ul.dropdown-menu li.active > a {
+  color: #3056d3;
+  font-weight: 600;
+  background-color: transparent;
+}
+body.layout-4 .main-sidebar .sidebar-menu li a .badge {
+  margin-left: auto;
+  background-color: #fc544b; /* Stisla danger color */
+  color: #fff;
+  font-size: 11px;
+  padding: 3px 7px;
+  border-radius: 30px;
+}
+
+/* Pengaturan Konten Utama dan Footer */
+body.layout-4 .main-content {
+  padding-top: 170px;
+  padding-left: 30px;
+  padding-right: 0;
+  width: calc(100% - 250px);
+  flex-grow: 1; /* Biarkan konten mengisi sisa ruang */
+}
+body.layout-4 .main-footer {
+  padding-left: 30px;
+  padding-right: 0;
+  margin-left: auto;
+  width: calc(100% - 250px);
+}
+
+@media (max-width: 1024px) {
+
+  /* Hide the secondary navbar on smaller screens to prevent overflow */
+  body.layout-4 .navbar.navbar-secondary {
+    display: none;
+  }
+
+  /* Adjust main content to fill the screen width and add correct top padding */
+  body.layout-4 .main-content {
+    /* Corrected padding-top. 70px for the main navbar + 20px space. */
+    padding-top: 90px;
+    padding-left: 30px;
+    padding-right: 30px;
+    width: 100% !important;
+  }
+
+  /* Adjust the footer to fill the screen width */
+  body.layout-4 .main-footer {
+    width: 100% !important;
+    margin-left: 0;
+    padding-left: 30px;
+    padding-right: 30px;
+  }
+
+  /* Ensure the main wrapper stacks elements correctly */
+  body.layout-4 .main-wrapper {
+    display: block;
+    padding: 0;
+  }
+}
+
 .main-sidebar .sidebar-brand {
   display: inline-block;
   width: 100%;

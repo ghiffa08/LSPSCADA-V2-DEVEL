@@ -9,57 +9,49 @@
                 </button>
             </div>
             <div class="modal-body">
-                <!-- Hidden input for ID (used during edit) -->
-                <input type="hidden" name="id_kuk" id="id_kuk" value="">
+                <input type="hidden" name="id_kuk">
 
                 <div class="form-group">
-                    <label for="id_skema">Skema<span class="text-danger">*</span></label>
-                    <select class="form-control select2" name="id_skema" id="id_skema" required>
-                        <option value="">-- Pilih Skema --</option>
-                        <?php foreach ($listSkema as $skema): ?>
+                    <label>Skema Sertifikasi<span class="text-danger">*</span></label>
+                    <select class="form-control select2" name="id_skema" id="id_skema" style="width: 100%;">
+                        <option value="">Pilih Skema</option>
+                        <?php foreach ($listSkema as $skema) : ?>
                             <option value="<?= $skema['id_skema'] ?>"><?= esc($skema['nama_skema']) ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <div class="invalid-feedback error-id_skema"></div>
+                    <div class="invalid-feedback"></div>
                 </div>
 
                 <div class="form-group">
-                    <label for="id_unit">Unit Kompetensi<span class="text-danger">*</span></label>
-                    <select class="form-control select2" name="id_unit" id="id_unit" required disabled>
-                        <option value="">-- Pilih Unit --</option>
+                    <label>Unit Kompetensi<span class="text-danger">*</span></label>
+                    <select class="form-control select2" name="id_unit" id="id_unit" style="width: 100%;" disabled>
+                        <option value="">Pilih Skema Terlebih Dahulu</option>
                     </select>
-                    <div class="invalid-feedback error-id_unit"></div>
+                    <div class="invalid-feedback"></div>
                 </div>
 
                 <div class="form-group">
-                    <label for="id_elemen">Elemen Kompetensi<span class="text-danger">*</span></label>
-                    <select class="form-control select2" name="id_elemen" id="id_elemen" required disabled>
-                        <option value="">-- Pilih Elemen --</option>
+                    <label>Elemen Kompetensi<span class="text-danger">*</span></label>
+                    <select class="form-control select2" name="id_elemen" id="id_elemen" style="width: 100%;" disabled>
+                        <option value="">Pilih Unit Terlebih Dahulu</option>
                     </select>
-                    <div class="invalid-feedback error-id_elemen"></div>
+                    <div class="invalid-feedback"></div>
                 </div>
 
                 <div class="form-group">
-                    <label for="kode_kuk">Kode KUK<span class="text-danger">*</span></label>
-                    <input type="text" name="kode_kuk" class="form-control" id="kode_kuk" required>
-                    <div class="invalid-feedback error-kode_kuk"></div>
+                    <label>Kode KUK<span class="text-danger">*</span></label>
+                    <input type="text" name="kode_kuk" class="form-control" placeholder="Contoh: 1.1">
+                    <div class="invalid-feedback"></div>
                 </div>
 
                 <div class="form-group">
-                    <label for="nama_kuk">Nama KUK<span class="text-danger">*</span></label>
-                    <input type="text" name="nama_kuk" class="form-control" id="nama_kuk" required>
-                    <div class="invalid-feedback error-nama_kuk"></div>
-                </div>
-
-                <div class="form-group">
-                    <label for="pertanyaan">Pertanyaan<span class="text-danger">*</span></label>
-                    <textarea class="form-control" name="pertanyaan" id="pertanyaan" rows="3" required></textarea>
-                    <div class="invalid-feedback error-pertanyaan"></div>
+                    <label>Pertanyaan KUK<span class="text-danger">*</span></label>
+                    <textarea class="form-control" name="pertanyaan" rows="3"></textarea>
+                    <div class="invalid-feedback"></div>
                 </div>
             </div>
             <div class="modal-footer bg-whitesmoke">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Batal</button>
-                <button type="submit" class="btn btn-primary">Simpan</button>
+                <button type="submit" class="btn btn-primary btn-block">Simpan</button>
             </div>
         </div>
     </div>

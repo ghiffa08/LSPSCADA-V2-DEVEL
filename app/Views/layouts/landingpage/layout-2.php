@@ -5,9 +5,11 @@
 
 <?= $this->include("layouts/landingpage/header"); ?>
 
+<?= $this->renderSection("styles") ?>
+
 <!-- ===== End Header ===== -->
 
-<body class="layout-3">
+<body class="layout-3 bg-secondary">
     <div id="app">
         <div class="main-wrapper container">
 
@@ -19,7 +21,7 @@
 
             <!-- ===== Navbar Secondary ===== -->
 
-            <?= $this->include("layouts/landingpage/navbar-secondary"); ?>
+            <?= $this->include("layouts/asesi/components/navbar-secondary"); ?>
 
             <!-- ===== End Navbar Secondary ===== -->
 
@@ -59,7 +61,7 @@
 
     <!-- ===== Script reCAPTCHA ===== -->
 
-    <?= $this->renderSection("js-reCAPTCHA") ?>
+    <?= $this->renderSection("scripts") ?>
 
     <!-- ===== End Script reCAPTCHA ===== -->
 

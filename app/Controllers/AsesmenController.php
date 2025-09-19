@@ -4,9 +4,24 @@ namespace App\Controllers;
 
 use App\Controllers\BaseController;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Models\AsesiModel;
+use App\Models\PengajuanAsesmenModel;
 
 class AsesmenController extends BaseController
 {
+
+    public function __construct()
+    {
+
+        $this->asesmenModel = model('AsesmenModel');
+        $this->skemaModel = model('SkemaModel');
+        $this->settanggalModel = model('SettanggalModel');
+        $this->tukModel = model('TukModel');
+        $this->unitModel = model('UnitModel');
+
+        helper(['auth']);
+    }
+
     public function index()
     {
         $data = [

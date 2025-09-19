@@ -43,7 +43,7 @@
                                         <td><?= $value['email'] ?></td>
                                         <td><?= $value['username'] ?></td>
                                         <td><?= $value['userfullname'] ?></td>
-                                        <td><?= $value['no_telp'] ?></td>
+                                        <td><?php // $value['no_hp'] ?></td>
                                         <td>
                                             <div class="btn-group mb-3" role="group" aria-label="Basic example">
                                                 <button type="button" class="btn btn-icon btn-info" data-toggle="modal" data-target="#editAsesorModal-<?= $value['userid']; ?>"><i class="fas fa-edit"></i></button>

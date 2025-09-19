@@ -2,222 +2,162 @@
 
 namespace App\Controllers\Api;
 
-use CodeIgniter\RESTful\ResourceController;
+use Config\Database;
+use Config\Services;
 use App\Models\PMOPertanyaanModel;
-use App\Models\UnitModel;
+use App\Models\PMOPilihanJawabanModel;
+use CodeIgniter\HTTP\ResponseInterface;
+use App\Controllers\DataTableController;
+use Exception;
 
-class PMOPertanyaan extends ResourceController
+class PMOPertanyaan extends DataTableController
 {
-    protected $pmopertanyaanModel;
-    protected $unitModel;
+
+    protected $pmoPertanyaanModel;
+    protected $pmoPilihanJawabanModel;
 
     public function __construct()
     {
-        $this->pmopertanyaanModel = new PMOPertanyaanModel();
-        $this->unitModel = new UnitModel();
+        parent::__construct();
+        $this->pmoPertanyaanModel = new PMOPertanyaanModel();
+        $this->pmoPilihanJawabanModel =  new PMOPilihanJawabanModel();
+
+        $this->model = $this->pmoPertanyaanModel;
+
+        // Sesuaikan pemetaan kolom untuk sorting DataTable
+        $this->columnMap = [
+            0 => null, // Kolom indeks tanpa sorting
+            1 => 'pmo_pertanyaan.id_pertanyaan',
+            2 => 'skema.nama_skema',
+            3 => 'pmo_pertanyaan.pertanyaan',
+            4 => 'pmo_pertanyaan.jenis_jawaban',
+            5 => 'pmo_pertanyaan.aktif',
+            6 => null // Kolom aksi tanpa sorting
+        ];
     }
 
-    public function save()
+    /**
+     * Simpan atau perbarui data pertanyaan PMO
+     */
+    public function save(): ResponseInterface
     {
         if (!$this->request->isAJAX()) {
-            return $this->failNotFound('Endpoint not found');
+            return Services::response()->setStatusCode(404);
         }
 
-        $validation = \Config\Services::validation();
+        $modelName = PmoPertanyaanModel::class;
+        $data = $this->request->getPost();
+        $pilihanJawaban = $this->request->getPost('pilihan');
 
-        $rules = [
-            'id_unit' => 'required|integer',
-            'pertanyaan' => 'required|min_length[10]|max_length[1000]',
-            'jenis_jawaban' => 'required|in_list[ya_tidak,pilihan_ganda,essay]',
-            'urutan' => 'permit_empty|integer',
-            'is_active' => 'permit_empty|in_list[0,1]'
+        $formattedData = [
+            'id_pertanyaan' => $data['id_pertanyaan'] ?? null,
+            'id_skema' => $data['id_skema'],
+            'id_unit' => $data['id_unit'],
+            'id_elemen' => $data['id_elemen'],
+            'id_kuk' => $data['id_kuk'],
+            'pertanyaan' => $data['pertanyaan'] ?? null,
+            'jenis_jawaban' => $data['jenis_jawaban'],
+            'urutan' => $data['urutan'] ?? 0,
+            'aktif' => $data['aktif'] ?? 'Y'
         ];
 
-        $validation->setRules($rules);
-
-        if (!$validation->withRequest($this->request)->run()) {
-            return $this->fail($validation->getErrors());
-        }
+        $db = Database::connect();
+        $db->transStart();
 
         try {
-            $data = [
-                'id_unit' => $this->request->getPost('id_unit'),
-                'kuk_reference' => $this->request->getPost('kuk_reference'),
-                'pertanyaan' => $this->request->getPost('pertanyaan'),
-                'jenis_jawaban' => $this->request->getPost('jenis_jawaban'),
-                'urutan' => $this->request->getPost('urutan') ?: 0,
-                'is_active' => $this->request->getPost('is_active') ?? 1,
-                'updated_at' => date('Y-m-d H:i:s')
-            ];
+            $result = $this->dataService->save($modelName, $formattedData, 'id_pertanyaan');
 
-            // Handle pilihan_jawaban for multiple choice
-            if ($data['jenis_jawaban'] === 'pilihan_ganda') {
-                $pilihan = $this->request->getPost('pilihan_jawaban');
-                if (is_array($pilihan)) {
-                    $data['pilihan_jawaban'] = json_encode(array_filter($pilihan));
-                } else {
-                    $data['pilihan_jawaban'] = json_encode(explode(',', $pilihan));
+            if ($result['status']) {
+                $pertanyaanId = $result['id'];
+
+                // Hapus pilihan lama terlebih dahulu untuk memastikan konsistensi
+                $this->pmoPilihanJawabanModel->where('id_pertanyaan', $pertanyaanId)->delete();
+
+                // Jika jenis jawaban adalah Pilihan Ganda dan ada pilihan yang dikirim
+                if ($formattedData['jenis_jawaban'] === 'PILIHAN_GANDA' && !empty($pilihanJawaban)) {
+                    $pilihanToInsert = [];
+                    foreach ($pilihanJawaban as $index => $pilihanText) {
+                        if (!empty(trim($pilihanText))) {
+                            $pilihanToInsert[] = [
+                                'id_pertanyaan' => $pertanyaanId,
+                                'pilihan' => $pilihanText,
+                                'urutan' => $index + 1
+                            ];
+                        }
+                    }
+
+                    if (!empty($pilihanToInsert)) {
+                        $this->pmoPilihanJawabanModel->insertBatch($pilihanToInsert);
+                    }
                 }
+            }
+
+            $db->transComplete();
+
+            if ($db->transStatus() === false) {
+                return $this->dataService->response(['status' => false, 'message' => 'Gagal menyimpan data.'], 500);
+            }
+
+            return $this->dataService->response($result, $result['code']);
+        } catch (Exception $e) {
+            $db->transRollback();
+            return $this->dataService->response(['status' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+
+    /**
+     * Hapus pertanyaan PMO
+     */
+    public function delete($id = null): ResponseInterface
+    {
+        if (!$this->request->isAJAX()) {
+            return Services::response()->setStatusCode(404);
+        }
+
+        $pmoPertanyaanModel = $this->pmoPertanyaanModel;
+
+        $db = Database::connect();
+        $db->transStart();
+
+        try {
+            $deleted = $pmoPertanyaanModel->delete($id);
+            $db->transComplete();
+
+            if ($deleted) {
+                return $this->dataService->response(['status' => true, 'message' => 'Pertanyaan PMO berhasil dihapus']);
             } else {
-                $data['pilihan_jawaban'] = null;
+                return $this->dataService->response(['status' => false, 'message' => 'Gagal menghapus Pertanyaan PMO'], 400);
             }
-
-            // Check if editing or creating new
-            $id = $this->request->getPost('id');
-
-            if ($id) {
-                // Check if exists
-                $existing = $this->pmopertanyaanModel->find($id);
-                if (!$existing) {
-                    return $this->failNotFound('Data tidak ditemukan');
-                }
-
-                // Check for duplicates (excluding current record)
-                $duplicate = $this->pmopertanyaanModel
-                    ->where('id_unit', $data['id_unit'])
-                    ->where('pertanyaan', $data['pertanyaan'])
-                    ->where('id !=', $id)
-                    ->first();
-
-                if ($duplicate) {
-                    return $this->fail(['pertanyaan' => 'Pertanyaan sudah ada untuk unit ini']);
-                }
-
-                $this->pmopertanyaanModel->update($id, $data);
-                $message = 'Data pertanyaan PMO berhasil diperbarui';
-            } else {
-                // Check for duplicates
-                $duplicate = $this->pmopertanyaanModel
-                    ->where('id_unit', $data['id_unit'])
-                    ->where('pertanyaan', $data['pertanyaan'])
-                    ->first();
-
-                if ($duplicate) {
-                    return $this->fail(['pertanyaan' => 'Pertanyaan sudah ada untuk unit ini']);
-                }
-
-                $data['created_at'] = date('Y-m-d H:i:s');
-                $this->pmopertanyaanModel->insert($data);
-                $message = 'Data pertanyaan PMO berhasil ditambahkan';
-            }
-
-            return $this->respondCreated([
-                'status' => 'success',
-                'message' => $message
-            ]);
-        } catch (\Exception $e) {
-            return $this->fail('Gagal menyimpan data: ' . $e->getMessage());
+        } catch (Exception $e) {
+            $db->transRollback();
+            return $this->dataService->response(['status' => false, 'message' => 'Terjadi kesalahan: ' . $e->getMessage()], 500);
         }
     }
 
-    public function getById($id)
+    /**
+     * Ambil data pertanyaan PMO berdasarkan ID (untuk modal edit)
+     */
+    public function getById($id = null): ResponseInterface
     {
         if (!$this->request->isAJAX()) {
-            return $this->failNotFound('Endpoint not found');
+            return Services::response()->setStatusCode(404);
         }
 
-        try {
-            $data = $this->pmopertanyaanModel->getPertanyaanWithUnit($id);
+        $pertanyaan = $this->pmoPertanyaanModel->find($id);
 
-            if (!$data) {
-                return $this->failNotFound('Data tidak ditemukan');
-            }
-
-            // Decode pilihan_jawaban if exists
-            if ($data['pilihan_jawaban']) {
-                $data['pilihan_jawaban'] = json_decode($data['pilihan_jawaban'], true);
-            }
-
-            return $this->respond([
-                'status' => 'success',
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            return $this->fail('Gagal mengambil data: ' . $e->getMessage());
-        }
-    }
-
-    public function delete($id)
-    {
-        if (!$this->request->isAJAX()) {
-            return $this->failNotFound('Endpoint not found');
+        if (!$pertanyaan) {
+            return $this->dataService->response(['status' => false, 'message' => 'Pertanyaan PMO tidak ditemukan'], 404);
         }
 
-        try {
-            $pertanyaan = $this->pmopertanyaanModel->find($id);
-
-            if (!$pertanyaan) {
-                return $this->failNotFound('Data tidak ditemukan');
-            }
-
-            // Check if pertanyaan is used in any PMO jawaban
-            $db = \Config\Database::connect();
-            $usageCount = $db->table('pmo_jawaban')
-                ->where('id_template_pertanyaan', $id)
-                ->countAllResults();
-
-            if ($usageCount > 0) {
-                return $this->fail('Pertanyaan tidak dapat dihapus karena sudah digunakan dalam PMO');
-            }
-
-            $this->pmopertanyaanModel->delete($id);
-
-            return $this->respondDeleted([
-                'status' => 'success',
-                'message' => 'Data pertanyaan PMO berhasil dihapus'
-            ]);
-        } catch (\Exception $e) {
-            return $this->fail('Gagal menghapus data: ' . $e->getMessage());
-        }
-    }
-
-    public function getDataTable()
-    {
-        if (!$this->request->isAJAX()) {
-            return $this->failNotFound('Endpoint not found');
+        // Jika jenisnya pilihan ganda, ambil juga pilihan jawabannya
+        if ($pertanyaan['jenis_jawaban'] === 'PILIHAN_GANDA') {
+            $pertanyaan['pilihan'] = $this->pmoPilihanJawabanModel
+                ->where('id_pertanyaan', $id)
+                ->orderBy('urutan', 'ASC')
+                ->findAll();
         }
 
-        try {
-            $request = service('request');
-
-            // DataTables parameters
-            $draw = $request->getPost('draw');
-            $start = $request->getPost('start') ?: 0;
-            $length = $request->getPost('length') ?: 10;
-            $searchValue = $request->getPost('search')['value'] ?? '';
-            $orderColumn = $request->getPost('order')[0]['column'] ?? 0;
-            $orderDir = $request->getPost('order')[0]['dir'] ?? 'asc';
-
-            // Column mapping
-            $columns = ['id', 'kode_unit', 'nama_unit', 'pertanyaan', 'jenis_jawaban', 'is_active', 'created_at'];
-            $orderBy = $columns[$orderColumn] ?? 'id';
-
-            // Get data
-            $result = $this->pmopertanyaanModel->getDataTable($start, $length, $searchValue, $orderBy, $orderDir);
-
-            $data = [];
-            foreach ($result['data'] as $row) {
-                $data[] = [
-                    'id' => $row['id'],
-                    'kode_unit' => $row['kode_unit'],
-                    'nama_unit' => $row['nama_unit'],
-                    'kuk_reference' => $row['kuk_reference'],
-                    'pertanyaan' => $row['pertanyaan'],
-                    'jenis_jawaban' => ucfirst(str_replace('_', ' ', $row['jenis_jawaban'])),
-                    'urutan' => $row['urutan'],
-                    'is_active' => $row['is_active'],
-                    'created_at' => $row['created_at']
-                ];
-            }
-
-            return $this->respond([
-                'draw' => intval($draw),
-                'recordsTotal' => $result['total'],
-                'recordsFiltered' => $result['filtered'],
-                'data' => $data
-            ]);
-        } catch (\Exception $e) {
-            return $this->fail('Gagal mengambil data: ' . $e->getMessage());
-        }
+        return $this->dataService->response(['status' => true, 'data' => $pertanyaan]);
     }
 }

@@ -69,7 +69,7 @@ class DetailObservasiModel extends Model
         return $this->select([
             'detail_observasi.*',
             'kuk.kode_kuk',
-            'kuk.nama_kuk',
+            'kuk.pertanyaan',
             'unit.kode_unit',
             'unit.nama_unit',
             'elemen.kode_elemen',

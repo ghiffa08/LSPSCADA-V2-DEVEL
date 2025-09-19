@@ -42,16 +42,6 @@ class HomeController extends BaseController
         return view('asesi/home', $data);
     }
 
-    public function skema()
-    {
-        $data = [
-            'siteTitle' => 'Skema Sertifikasi',
-            'listSkema' => $this->skemaModel->AllSkema()
-        ];
-
-        return view('asesi/skema', $data);
-    }
-
     public function ujikom()
     {
 
@@ -71,24 +61,231 @@ class HomeController extends BaseController
         // dd($data);
     }
 
-    public function asesmen($id_apl1)
+    /**
+     * [SEMPURNAKAN] Pengecekan awal, manajemen session lebih baik.
+     */
+    public function asesmen($id_pengajuan)
     {
-        $dataAPL1 = $this->apl1Model->getAPL1($id_apl1);
-        $dataAPL2 = $this->apl2Model->getbyId($dataAPL1['id_apl1']);
+        $dataPengajuan = $this->pengajuanAsesmenModel->getCompletePengajuanData($id_pengajuan);
+        if (!$dataPengajuan) {
+            throw new \CodeIgniter\Exceptions\PageNotFoundException('Data pengajuan tidak ditemukan.');
+        }
+
+        // Pengecekan awal: Jika APL.02 sudah ada, langsung arahkan ke mode read-only
+        $dataAPL2 = $this->apl2Model->getByPengajuanId($id_pengajuan);
+        if ($dataAPL2) {
+            // Langsung tampilkan view read-only tanpa perlu proses lebih lanjut
+            $data = [
+                'siteTitle' => 'Asesmen Mandiri - ' . $dataPengajuan['asesi']['nama_lengkap'],
+                'dataPengajuan' => $dataPengajuan,
+                'dataAPL2' => $dataAPL2
+            ];
+            return view('asesi/asesmen-mandiri', $data);
+        }
+
+        $listKukNav = $this->kukModel->getNavigationList($dataPengajuan['asesmen']['id_skema']);
+        $sessionKey = 'asesmen_answers_' . $id_pengajuan;
+
+        // Cek jika pengguna datang dari halaman lain (bukan refresh), kita reset session.
+        // Ini adalah cara sederhana untuk mendeteksi sesi baru.
+        $referer = previous_url() ?? '';
+        if (strpos($referer, 'asesmen-mandiri/' . $id_pengajuan) === false) {
+            session()->remove($sessionKey);
+        }
+
+        $savedAnswers = session($sessionKey) ?? [];
+
         $data = [
-            'siteTitle' => 'Asesmen Mandiri - ' . $dataAPL1['nama_siswa'] . '',
-            'siteSubtitle' => 'Pada bagian ini, masukan data pribadi, data pendidikan formal, data pekerjaan Anda pada saat ini, serta dokumen pendukung.',
-            'dataAPL1' => $dataAPL1,
-            'listUnit' => $this->unitModel->getUnit($dataAPL1['skema_id']),
-            'listElemen' => $this->elemenModel->AllElemen(),
-            'listSubelemen' => $this->kukModel->getbySkema($dataAPL1['skema_id']),
-            'dataAPL2' => $dataAPL2,
+            'siteTitle' => 'Asesmen Mandiri - ' . $dataPengajuan['asesi']['nama_lengkap'],
+            'dataPengajuan' => $dataPengajuan,
+            'listKukNav' => $listKukNav,
+            'totalKuk' => count($listKukNav),
+            'dataAPL2' => null, // Pastikan null karena ini mode pengisian
+            'savedAnswers' => json_encode($savedAnswers)
         ];
 
-
-        // dd($data);
         return view('asesi/asesmen-mandiri', $data);
     }
+
+    /**
+     * [SEMPURNAKAN] Mengembalikan state session terbaru setelah validasi.
+     */
+    public function validateStep()
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(403, 'Forbidden');
+        }
+
+        $id_pengajuan = $this->request->getPost('id_pengajuan');
+        $id_kuk = $this->request->getPost('id_kuk');
+        $jawaban = $this->request->getPost('bk_' . $id_kuk);
+        $bukti = $this->request->getPost('bukti_pendukung_' . $id_kuk);
+
+        $rules = ['bk_' . $id_kuk => 'required'];
+        if ($jawaban === 'K') {
+            $rules['bukti_pendukung_' . $id_kuk] = 'required';
+        }
+
+        if (!$this->validate($rules)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Jawaban tidak valid, harap lengkapi pilihan Anda.',
+                'errors' => $this->validator->getErrors()
+            ]);
+        }
+
+        $sessionKey = 'asesmen_answers_' . $id_pengajuan;
+        $answers = session($sessionKey) ?? [];
+        $answers[$id_kuk] = [
+            'tk' => $jawaban,
+            'bukti_pendukung' => $bukti ?? '',
+        ];
+        session()->set($sessionKey, $answers);
+
+        // [UBAH] Kembalikan semua jawaban yang tersimpan sebagai konfirmasi
+        return $this->response->setJSON([
+            'success' => true,
+            'savedAnswers' => $answers // Kirim balik state terbaru
+        ]);
+    }
+
+    /**
+     * [BARU] Endpoint AJAX untuk mengambil data detail satu pertanyaan (KUK).
+     */
+    public function getAsesmenStep($id_kuk)
+    {
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(403, 'Forbidden');
+        }
+
+        // Query yang sangat spesifik dan cepat
+        $kukData = $this->kukModel->getDetailKuk($id_kuk);
+
+        if ($kukData) {
+            return $this->response->setJSON(['success' => true, 'data' => $kukData]);
+        }
+
+        return $this->response->setJSON(['success' => false, 'message' => 'Data tidak ditemukan.']);
+    }
+
+    /**
+     * [MODIFIKASI] Menyimpan hasil dari session via AJAX.
+     */
+    public function store_asesmen()
+    {
+        // Pastikan ini adalah request AJAX
+        if (!$this->request->isAJAX()) {
+            return $this->response->setStatusCode(403, 'Forbidden action');
+        }
+
+        $id_pengajuan = $this->request->getPost('id_pengajuan');
+        $sessionKey = 'asesmen_answers_' . $id_pengajuan;
+        $savedAnswers = session($sessionKey);
+
+        $dataPengajuan = $this->pengajuanAsesmenModel->getCompletePengajuanData($id_pengajuan);
+        $listKuk = $this->kukModel->getNavigationList($dataPengajuan['asesmen']['id_skema']);
+
+        // Final validation
+        if (empty($savedAnswers) || count($savedAnswers) !== count($listKuk)) {
+            return $this->response->setJSON([
+                'success' => false,
+                'message' => 'Gagal! Harap lengkapi semua pertanyaan sebelum submit.'
+            ]);
+        }
+
+        // --- Proses Penyimpanan Data (Tetap sama) ---
+        $id_apl2 = "FR-APL-02-" . substr(Uuid::uuid4()->toString(), 0, 8);
+        $kode_jawaban_apl2 = "ANS-APL-02-" . substr(Uuid::uuid4()->toString(), 0, 6);
+
+        $this->apl2Model->insert([
+            'id_apl2' => $id_apl2,
+            'id_pengajuan' => $id_pengajuan,
+            'kode_jawaban_apl2' => $kode_jawaban_apl2,
+            'validasi_apl2' => 'pending'
+        ]);
+
+        $fullListKuk = $this->kukModel->getBySkema($dataPengajuan['asesmen']['id_skema']);
+        $insertDataJawaban = [];
+        foreach ($fullListKuk as $kuk) {
+            if (isset($savedAnswers[$kuk['id_kuk']])) {
+                $answer = $savedAnswers[$kuk['id_kuk']];
+                $insertDataJawaban[] = [
+                    'kode_jawaban_apl2' => $kode_jawaban_apl2,
+                    'id_apl2' => $id_apl2,
+                    'tk' => $answer['tk'],
+                    'id_skema' => $kuk['id_skema'],
+                    'id_unit' => $kuk['id_unit'],
+                    'id_elemen' => $kuk['id_elemen'],
+                    'id_kuk' => $kuk['id_kuk'],
+                    'bukti_pendukung' => $answer['bukti_pendukung'],
+                ];
+            }
+        }
+
+        if (!empty($insertDataJawaban)) {
+            $this->apl2JawabanModel->insertBatch($insertDataJawaban);
+        }
+
+        session()->remove($sessionKey); // Hapus data dari session setelah berhasil disimpan
+
+        // Panggil helper untuk kirim email
+        // $this->sendAsesmenNotification($dataPengajuan['asesi'], $id_apl2);
+
+        session()->setFlashdata('pesan', 'Asesmen Mandiri berhasil disubmit!');
+
+        // Kirim URL redirect ke JavaScript
+        return $this->response->setJSON([
+            'success' => true,
+            'redirectUrl' => site_url('asesmen-mandiri/' . $id_pengajuan)
+        ]);
+    }
+
+    /**
+     * Helper function untuk mengirim email notifikasi.
+     *
+     * @param array $pengajuanData
+     * @param string $id_apl2
+     */
+    private function sendAsesmenNotification($pengajuanData, $id_apl2)
+    {
+        $email = \Config\Services::email();
+        $email->setTo($pengajuanData['email']);
+        $email->setFrom('lspp1smkn2kuningan@gmail.com', 'LSP - P1 SMK NEGERI 2 KUNINGAN');
+        $email->setSubject('Asesmen Mandiri Telah Disubmit');
+        $email->setMailType('html');
+
+        $message = view('email/email_send_apl2', [
+            'name'       => $pengajuanData['nama_lengkap'],
+            // 'id_pengajuan' => $pengajuanData['id_pengajuan'],
+            'id_asesmen' => $id_apl2,
+            // 'skema'      => $pengajuanData['nama_skema'],
+        ]);
+
+        $email->setMessage($message);
+
+        if (!$email->send()) {
+            log_message('error', '[sendAsesmenNotification] Gagal mengirim email: ' . $email->printDebugger(['headers']));
+        }
+    }
+
+    // public function asesmen($id_apl1)
+    // {
+    //     $dataAPL1 = $this->apl1Model->getAPL1($id_apl1);
+    //     $dataAPL2 = $this->apl2Model->getbyId($dataAPL1['id_apl1']);
+    //     $data = [
+    //         'siteTitle' => 'Asesmen Mandiri - ' . $dataAPL1['nama_siswa'] . '',
+    //         'siteSubtitle' => 'Pada bagian ini, masukan data pribadi, data pendidikan formal, data pekerjaan Anda pada saat ini, serta dokumen pendukung.',
+    //         'dataAPL1' => $dataAPL1,
+    //         'listUnit' => $this->unitModel->getUnit($dataAPL1['skema_id']),
+    //         'listElemen' => $this->elemenModel->AllElemen(),
+    //         'listSubelemen' => $this->kukModel->getbySkema($dataAPL1['skema_id']),
+    //         'dataAPL2' => $dataAPL2,
+    //     ];
+
+
+    //     // dd($data);
+    //     return view('asesi/asesmen-mandiri', $data);
+    // }
 
     public function store_pengajuan()
     {
@@ -429,108 +626,108 @@ class HomeController extends BaseController
         return redirect()->to('/asesi');
     }
 
-    public function store_asesmen()
-    {
-        $dataAPL1 = $this->apl1Model->getAPL1($this->request->getPost('id'));
-        $listSubelemen = $this->kukModel->getbySkema($dataAPL1['skema_id']);
+    // public function store_asesmen()
+    // {
+    //     $dataAPL1 = $this->apl1Model->getAPL1($this->request->getPost('id'));
+    //     $listSubelemen = $this->kukModel->getbySkema($dataAPL1['skema_id']);
 
-        $rules = [];
-        $insertData = [];
+    //     $rules = [];
+    //     $insertData = [];
 
-        foreach ($listSubelemen as $subelemen) {
-            $rules['bk_' . $subelemen['id_subelemen']] = [
-                'label' => $subelemen['pertanyaan'],
-                'rules' => 'required',
-                'errors' => [
-                    'required' => 'Kolom {field} harus dipilih.',
-                ],
-            ];
+    //     foreach ($listSubelemen as $subelemen) {
+    //         $rules['bk_' . $subelemen['id_subelemen']] = [
+    //             'label' => $subelemen['pertanyaan'],
+    //             'rules' => 'required',
+    //             'errors' => [
+    //                 'required' => 'Kolom {field} harus dipilih.',
+    //             ],
+    //         ];
 
-            if ($this->request->getPost('bk_' . $subelemen['id_subelemen']) == "K") {
-                $rules['bukti_pendukung_' . $subelemen['id_subelemen']] = [
-                    'label' => 'Bukti Pendukung',
-                    'rules' => 'required',
-                    'errors' => [
-                        'required' => 'Kolom {field} harus dipilih.',
-                    ],
-                ];
-            }
-        }
+    //         if ($this->request->getPost('bk_' . $subelemen['id_subelemen']) == "K") {
+    //             $rules['bukti_pendukung_' . $subelemen['id_subelemen']] = [
+    //                 'label' => 'Bukti Pendukung',
+    //                 'rules' => 'required',
+    //                 'errors' => [
+    //                     'required' => 'Kolom {field} harus dipilih.',
+    //                 ],
+    //             ];
+    //         }
+    //     }
 
-        if (!$this->validate($rules)) {
-            session()->setFlashdata('warning', 'Periksa kembali, terdapat beberapa kesalahan yang perlu diperbaiki.');
-            return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
-        }
+    //     if (!$this->validate($rules)) {
+    //         session()->setFlashdata('warning', 'Periksa kembali, terdapat beberapa kesalahan yang perlu diperbaiki.');
+    //         return redirect()->back()->withInput()->with('errors', $this->validator->getErrors());
+    //     }
 
-        $id_apl2 = "FR-APL-02-" . substr(Uuid::uuid4()->toString(), 0, 8);
-        $kode_jawaban_apl2 = "ANS-APL-02-" . substr(Uuid::uuid4()->toString(), 0, 6);
+    //     $id_apl2 = "FR-APL-02-" . substr(Uuid::uuid4()->toString(), 0, 8);
+    //     $kode_jawaban_apl2 = "ANS-APL-02-" . substr(Uuid::uuid4()->toString(), 0, 6);
 
-        $insertAPL2 = [
-            'id_apl2' => $id_apl2,
-            'id_apl1' => $dataAPL1['id_apl1'],
-            'kode_jawaban_apl2' => $kode_jawaban_apl2,
-            'validasi_apl2' => 'pending'
-        ];
+    //     $insertAPL2 = [
+    //         'id_apl2' => $id_apl2,
+    //         'id_apl1' => $dataAPL1['id_apl1'],
+    //         'kode_jawaban_apl2' => $kode_jawaban_apl2,
+    //         'validasi_apl2' => 'pending'
+    //     ];
 
-        $this->apl2Model->insert($insertAPL2);
+    //     $this->apl2Model->insert($insertAPL2);
 
-        foreach ($listSubelemen as $subelemen) {
+    //     foreach ($listSubelemen as $subelemen) {
 
-            // Prepare data to insert
-            $insertData[] = [
-                'kode_jawaban_apl2' => $kode_jawaban_apl2,
-                'id_apl2' => $id_apl2,
-                'tk' => $this->request->getPost('bk_' . $subelemen['id_subelemen']),
-                'id_skema' => $this->request->getPost('id_skema_' . $subelemen['id_subelemen']),
-                'id_unit' => $this->request->getPost('id_unit_' . $subelemen['id_subelemen']),
-                'id_elemen' => $this->request->getPost('id_elemen_' . $subelemen['id_subelemen']),
-                'id_subelemen' => $this->request->getPost('id_subelemen_' . $subelemen['id_subelemen']),
-                'bukti_pendukung' => $this->request->getPost('bukti_pendukung_' . $subelemen['id_subelemen']),
-            ];
-        }
+    //         // Prepare data to insert
+    //         $insertData[] = [
+    //             'kode_jawaban_apl2' => $kode_jawaban_apl2,
+    //             'id_apl2' => $id_apl2,
+    //             'tk' => $this->request->getPost('bk_' . $subelemen['id_subelemen']),
+    //             'id_skema' => $this->request->getPost('id_skema_' . $subelemen['id_subelemen']),
+    //             'id_unit' => $this->request->getPost('id_unit_' . $subelemen['id_subelemen']),
+    //             'id_elemen' => $this->request->getPost('id_elemen_' . $subelemen['id_subelemen']),
+    //             'id_subelemen' => $this->request->getPost('id_subelemen_' . $subelemen['id_subelemen']),
+    //             'bukti_pendukung' => $this->request->getPost('bukti_pendukung_' . $subelemen['id_subelemen']),
+    //         ];
+    //     }
 
-        if (!empty($insertData)) {
+    //     if (!empty($insertData)) {
 
-            if ($this->apl2JawabanModel->insertBatch($insertData)) {
+    //         if ($this->apl2JawabanModel->insertBatch($insertData)) {
 
-                $to = $dataAPL1['email'];
-                $subject = 'Asesmen Mandiri';
+    //             $to = $dataAPL1['email'];
+    //             $subject = 'Asesmen Mandiri';
 
-                $id_apl1 = $dataAPL1['id_apl1'];
-                $nama_asesi = $dataAPL1['nama_siswa'];
-                $skema = $dataAPL1['nama_skema'];
+    //             $id_apl1 = $dataAPL1['id_apl1'];
+    //             $nama_asesi = $dataAPL1['nama_siswa'];
+    //             $skema = $dataAPL1['nama_skema'];
 
-                $message = view('email/email_send_apl2', [
-                    'name' => $nama_asesi,
-                    'id' => $id_apl1,
-                    'id_asesmen' => $id_apl2,
-                    'skema' => $skema
-                ]);
-
-
-                $email = \Config\Services::email();
-                $email->setTo($to);
-                $email->setFrom('lspp1smkn2kuningan@gmail.com', 'LSP - P1 SMK NEGERI 2 KUNINGAN');
-
-                $email->setSubject($subject);
-                $email->setMessage($message);
-
-                // Set mail type to HTML
-                $email->setMailType('html');
-
-                if (!$email->send()) {
-                    $data = $email->printDebugger(['headers']);
-                    print_r($data);
-                }
-            }
-        }
+    //             $message = view('email/email_send_apl2', [
+    //                 'name' => $nama_asesi,
+    //                 'id' => $id_apl1,
+    //                 'id_asesmen' => $id_apl2,
+    //                 'skema' => $skema
+    //             ]);
 
 
-        // dd($insertData);
+    //             $email = \Config\Services::email();
+    //             $email->setTo($to);
+    //             $email->setFrom('lspp1smkn2kuningan@gmail.com', 'LSP - P1 SMK NEGERI 2 KUNINGAN');
 
-        session()->setFlashdata('pesan', 'Subelemen berhasil ditambahkan!');
-        return redirect()->to('/asesmen-mandiri/' . $id_apl1);
-    }
+    //             $email->setSubject($subject);
+    //             $email->setMessage($message);
+
+    //             // Set mail type to HTML
+    //             $email->setMailType('html');
+
+    //             if (!$email->send()) {
+    //                 $data = $email->printDebugger(['headers']);
+    //                 print_r($data);
+    //             }
+    //         }
+    //     }
+
+
+    //     // dd($insertData);
+
+    //     session()->setFlashdata('pesan', 'Subelemen berhasil ditambahkan!');
+    //     return redirect()->to('/asesmen-mandiri/' . $id_apl1);
+    // }
 
     public function send_feedback()
     {

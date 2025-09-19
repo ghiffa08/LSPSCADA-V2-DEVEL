@@ -40,17 +40,24 @@ class KelolaUsersController extends BaseController
         }
     }
 
-    /**
-     * Display users management page
-     */
-    public function index()
+ public function index()
     {
+        // // Security check - Hanya Admin yang bisa akses
+        // if (!in_groups('Admin')) {
+        //     throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound();
+        // }
+
+        $skemaModel = new \App\Models\SkemaModel();
+
         $data = [
-            'siteTitle' => 'Kelola Users'
+            'siteTitle' => 'Kelola Pengguna',
+            // Data ini dibutuhkan untuk mengisi dropdown 'Skema' di modal Tambah dan Edit Asesor
+            'listSkema' => $skemaModel->where('status', 'Y')->findAll(),
         ];
 
         return view('admin/kelola_users', $data);
     }
+    
     /**
      * Get users data for DataTables (AJAX) - Optimized for production
      */

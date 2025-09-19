@@ -9,7 +9,7 @@
     <ul class="navbar-nav navbar-right">
 
         <li class="dropdown"><a href="#" data-toggle="dropdown" class="nav-link dropdown-toggle nav-link-lg nav-link-user">
-                <figure class="avatar avatar-sm mr-2 bg-info text-white" data-initial="<?= getInitials(user()->fullname); ?>"></figure>
+                <figure class="avatar avatar-sm mr-2 bg-info text-white" data-initial="<?= getInitials(user()->nama_lengkap); ?>"></figure>
                 <div class="d-sm-none d-lg-inline-block">Hallo, <?= user()->nama_lengkap; ?></div>
             </a>
             <div class="dropdown-menu dropdown-menu-right">

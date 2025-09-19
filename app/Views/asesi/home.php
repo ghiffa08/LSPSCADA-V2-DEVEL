@@ -37,7 +37,7 @@
     <meta property="twitter:image" content="https://uideck.com/wp-content/uploads/2021/09/play-meta-bs.jpg">
 
     <!--====== Favicon Icon ======-->
-    <link rel="shortcut icon" href="<?= base_url('asset_img/logolsp.png') ?>" type="image/x-icon">
+    <link rel="shortcut icon" href="<?= base_url('assets/images/logolsp.png') ?>" type="image/x-icon">
 
     <!-- ===== All CSS files ===== -->
     <link rel="stylesheet" href="<?= base_url() ?>/play-bootstrap-main/assets/css/bootstrap.min.css" />
@@ -57,7 +57,7 @@
                 <div class="col-lg-12">
                     <nav class="navbar navbar-expand-lg">
                         <a class="navbar-brand" href="index.html">
-                            <img src="<?= base_url('asset_img/logolsp-trans.png') ?>" alt="Logo" />
+                            <img src="<?= base_url() ?>/assets/images/logolsp-trans.png" alt="Logo" />
                         </a>
                         <button class="navbar-toggler">
                             <span class="toggler-icon"> </span>
@@ -76,9 +76,6 @@
                                 </li>
                                 <li class="nav-item">
                                     <a class="ud-menu-scroll" href="#contact">Kontak</a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="ud-menu-scroll" href="<?= site_url('/pendaftaran-uji-kompetensi') ?>">Pendaftaran Uji Kompetensi</a>
                                 </li>
                             </ul>
                         </div>
@@ -108,11 +105,6 @@
                             Layanan Digital Untuk Melakukan Pendaftaran Sertifikasi Uji Kompetensi LSP - P1 SMK Negeri 2 Kuningan Secara Daring.
                         </p>
                         <ul class="ud-hero-buttons">
-                            <li>
-                                <a href="<?= site_url('/pendaftaran-uji-kompetensi') ?>" rel="nofollow noopener" class="ud-main-btn ud-white-btn">
-                                    Daftar Sekarang
-                                </a>
-                            </li>
                             <li>
                                 <a href="#about" rel="nofollow noopener" class="ud-main-btn ud-link-btn">
                                     Pelajari Lebih Lanjut <i class="lni lni-arrow-right"></i>
@@ -381,7 +373,7 @@
                     <div class="col-xl-8 col-lg-4 col-md-6">
                         <div class="ud-widget">
                             <a href="index.html" class="ud-footer-logo">
-                                <img src="<?= base_url('asset_img/logolsp-trans.png') ?>" alt="logo" />
+                                <img src="<?= base_url() ?>/assets/images/logolsp-trans.png" alt="Logo" />
                             </a>
                             <p class="ud-widget-desc">
                                 Kami menciptakan pengalaman digital untuk melakukan pendaftaran sertifikasi dengan menggunakan teknologi.

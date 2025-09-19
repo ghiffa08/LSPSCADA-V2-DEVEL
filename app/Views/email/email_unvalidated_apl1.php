@@ -3,61 +3,68 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Validasi Data Pendaftaran Uji Kompetensi Keahlian</title>
+    <title>Informasi Validasi Pengajuan Asesmen</title>
     <style>
+        /* Menggunakan CSS yang sama persis dengan email 'validated' untuk konsistensi */
         body {
             font-family: Arial, sans-serif;
             line-height: 1.6;
-            color: #000000;
+            color: #333;
             margin: 0;
             padding: 0;
-            background-color: #f9f9f9;
+            background-color: #f4f4f4;
         }
 
         .container {
             max-width: 600px;
-            margin: 0 auto;
+            margin: 20px auto;
             padding: 20px;
-            background-color: #fff;
+            background-color: #ffffff;
             border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
 
         .header {
-            margin-bottom: 30px;
+            text-align: center;
+            border-bottom: 1px solid #eeeeee;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
         }
 
-        .content {
-            margin-bottom: 30px;
+        .header h2 {
+            /* Warna diubah untuk menandakan status ditolak/butuh perhatian */
+            color: #dc3545;
+        }
+
+        .content table {
+            width: 100%;
+            margin: 20px 0;
+            border-collapse: collapse;
+        }
+
+        .content th,
+        .content td {
+            padding: 8px;
+            text-align: left;
+        }
+
+        .content th {
+            width: 150px;
+            color: #555;
+        }
+
+        .alasan {
+            background-color: #fff3f3;
+            border-left: 4px solid #dc3545;
+            padding: 15px;
+            margin-top: 20px;
         }
 
         .footer {
             text-align: center;
-            font-size: 14px;
-            color: #666;
-        }
-
-        /* Tombol Responsif */
-        .button {
-            display: inline-block;
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: #000000;
-            text-decoration: none;
-            border-radius: 5px;
-            transition: background-color 0.3s ease;
-        }
-
-        .button:hover {
-            background-color: #0056b3;
-        }
-
-        /* Responsif */
-        @media screen and (max-width: 600px) {
-            .container {
-                max-width: 100%;
-                border-radius: 0;
-            }
+            font-size: 12px;
+            color: #888;
+            margin-top: 30px;
         }
     </style>
 </head>
@@ -65,52 +72,46 @@
 <body>
     <div class="container">
         <div class="header">
-            <h2>Informasi Pendaftaran Sertifikasi Uji Kompetensi</h2>
+            <h2>Pengajuan Asesmen Perlu Diperbaiki</h2>
         </div>
         <div class="content">
-            <p>Hai <?= $name ?>,</p>
+            <p>Halo <strong><?= esc($nama_asesi) ?></strong>,</p>
+            <p>Setelah melakukan pemeriksaan, kami informasikan bahwa pengajuan asesmen Anda untuk skema sertifikasi terkait <strong>memerlukan perhatian lebih lanjut</strong> atau <strong>ditolak</strong>.</p>
 
-            <p>Dengan hormat,</p>
-
-            <p>Bersama email ini, kami ingin menyampaikan bahwa data pendaftaran Sertifikasi Uji Kompetensi atas nama <?= $name ?> dengan ID Pendaftaran <?= $id ?> tidak dapat diterima.</p>
-
-            <p>Berikut detail data pendaftarannya:</p>
             <table>
                 <tr>
-                    <td>Nama Lengkap</td>
-                    <td>:</td>
-                    <td><?= $name ?></td>
+                    <th>Nama Asesi</th>
+                    <td>: <?= esc($nama_asesi) ?></td>
                 </tr>
                 <tr>
-                    <td>ID Pendaftaran</td>
-                    <td>:</td>
-                    <td><?= $id ?></td>
+                    <th>Skema Sertifikasi</th>
+                    <td>: <?= esc($skema) ?></td>
                 </tr>
                 <tr>
-                    <td>Skema Sertifikasi</td>
-                    <td>:</td>
-                    <td><?= $skema ?></td>
+                    <th>Status Validasi</th>
+                    <td>: <strong style="color: #dc3545;"><?= esc(ucfirst($status_validasi)) ?></strong></td>
                 </tr>
                 <tr>
-                    <td>Alasan Penolakan</td>
-                    <td>:</td>
-                    <td><?= $alasan_penolakan ?></td>
+                    <th>Divalidasi Oleh</th>
+                    <td>: Admin (<?= esc($validator) ?>)</td>
+                </tr>
+                <tr>
+                    <th>Tanggal Validasi</th>
+                    <td>: <?= esc($tanggal_validasi) ?></td>
                 </tr>
             </table>
 
-            <p>Untuk informasi lebih lanjut terkait alasan penolakan, silakan hubungi kami melalui email atau nomor telepon yang tercantum di bawah ini.</p>
+            <div class="alasan">
+                <p><strong>Alasan Penolakan:</strong></p>
+                <p><?= esc($alasan_penolakan) ?></p>
+            </div>
 
-            <p>Email: <?= $email_kontak ?></p>
-            <p>Telepon: <?= $telepon_kontak ?></p>
+            <p>Silakan perbaiki data atau dokumen Anda sesuai dengan catatan di atas dan lakukan pengajuan ulang, atau hubungi kami jika memerlukan bantuan lebih lanjut.</p>
 
-            <p>Hormat kami,</p>
-
-            <p>Tim LSP - P1 SMK Negeri 2 Kuningan</p>
+            <p>Terima kasih atas perhatian Anda,<br>Tim LSP - P1 SMK Negeri 2 Kuningan</p>
         </div>
-
         <div class="footer">
-            <p>Email ini dikirimkan secara otomatis. Jangan membalas email ini.</p>
-            <p>&copy; <?= date('Y') ?> Sertifikasi LSP - P1 SMKN 2 Kuningan. Hak cipta dilindungi undang-undang.</p>
+            <p>&copy; <?= date('Y') ?> LSP - P1 SMKN 2 Kuningan. Email ini dikirim secara otomatis.</p>
         </div>
     </div>
 </body>

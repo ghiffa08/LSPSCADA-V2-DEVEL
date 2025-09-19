@@ -1,203 +1,110 @@
 <?= $this->extend("layouts/admin/layout-admin"); ?>
+
 <?= $this->section("content"); ?>
+<h2 class="section-title">Monitoring Ceklis Observasi</h2>
+<p class="section-lead">Halaman ini menampilkan semua data observasi yang telah dilaksanakan.</p>
+
 <div class="row">
     <div class="col-12">
         <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h4>Tabel <?= $siteTitle ?></h4>
-                <div class="card-header-action">
-                    <div class="btn-group">
-                        <!-- Primary action button -->
-                        <button class="btn btn-primary" data-toggle="modal" data-target="#addKukModal">
-                            <i class="fas fa-plus mr-1"></i> Tambah KUK
-                        </button>
-
-                        <!-- Import button -->
-                        <button class="btn btn-primary" data-toggle="modal" data-target="#importExcelModal">
-                            <i class="fas fa-upload"></i> Import Excel
-                        </button>
-
-                        <!-- Export button -->
-                        <a href="<?= site_url('/export-kuk') ?>" class="btn btn-primary">
-                            <i class="fas fa-download mr-1"></i> Export Excel
-                        </a>
-                    </div>
-                </div>
+            <div class="card-header">
+                <h4>Data Observasi</h4>
             </div>
             <div class="card-body">
-                <table id="table-observasi" class="table table-bordered table-striped">
-                    <thead>
-                        <tr>
-                            <th style="width: 5%">No</th>
-                            <th>Nama Asesi</th>
-                            <th>Nama Asesor</th>
-                            <th>Skema Sertifikasi</th>
-                            <th>TUK</th>
-                            <th>Tanggal Observasi</th>
-                            <th style="width: 10%">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Table data will be loaded dynamically -->
-                    </tbody>
-                </table>
+                <div class="table-responsive">
+                    <table id="table-observasi" class="table table-bordered table-striped" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th>No</th>
+                                <th>Nama Asesi</th>
+                                <th>Nama Asesor</th>
+                                <th>Skema Sertifikasi</th>
+                                <th>TUK</th>
+                                <th>Tanggal Observasi</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 </div>
-<?= $this->endSection(); ?>
+<?= $this->endSection() ?>
 
+<?php // Section "modals" tidak diperlukan karena halaman ini read-only 
+?>
 
 <?= $this->section('js') ?>
-<?= $this->include('admin/scripts/DataEntityManager') ?>
 <script>
-    /**
-     * Implementation example for Observasi Management
-     */
     $(document).ready(function() {
-        // Initialize Observasi Manager using the reusable DataEntityManager
-        const ObservasiManager = DataEntityManager;
+        // Konfigurasi dasar
+        const baseUrl = '<?= base_url() ?>';
 
-        ObservasiManager.init({
-            // Entity information
-            entityName: 'Observasi',
-            primaryKey: 'id_observasi',
-
-            // Selectors
-            selectors: {
-                modal: '#saveObservasiModal',
-                form: '#add-observasi-form',
-                table: '#table-observasi',
-                importForm: '#import-excel-form',
-                importModal: '#importExcelModal',
-                importBtn: '#import-btn',
-                filterInput: '#filter-input',
-                select2Elements: '.select2',
-                modalTitle: '.modal-title'
+        // Inisialisasi DataTable
+        $('#table-observasi').DataTable({
+            "processing": true,
+            "serverSide": true,
+            "responsive": true,
+            "order": [],
+            "ajax": {
+                // Pastikan URL ini sesuai dengan API Controller Anda
+                "url": `${baseUrl}/admin/observasi/get-data-table`,
+                "type": "POST"
             },
-
-            // API endpoints
-            endpoints: {
-                save: 'admin/observasi/save',
-                getById: 'admin/observasi/getById/',
-                delete: 'admin/observasi/delete/',
-                dataTable: 'admin/observasi/get-data-table',
-                import: 'admin/observasi/import'
-            },
-
-            // Form field selectors for edit handling
-            formFields: {
-                kode: '[name="kode_skema"]',
-                nama: '[name="nama_skema"]',
-                jenis: '[name="jenis_skema"]',
-                status: '[name="status"]'
-            },
-
-            // Column definitions
-            columns: [{
-                    data: 'nama_asesi',
-                    render: function(data) {
-                        return `<span>${data.toUpperCase()}</span>`;
-                    }
+            "columns": [{
+                    "data": null,
+                    "orderable": false
                 },
                 {
-                    data: 'nama_asesor',
-                    render: function(data) {
-                        return `<span>${data.toUpperCase()}</span>`;
-                    }
+                    "data": "nama_asesi"
                 },
                 {
-                    data: 'nama_skema'
+                    "data": "nama_asesor"
                 },
                 {
-                    data: null,
-                    render: function(data) {
-                        const text = `TUK ${data.jenis_tuk} ${data.nama_tuk}`;
-                        return `<span>${text.toUpperCase()}</span>`;
-                    }
+                    "data": "nama_skema"
                 },
                 {
-                    data: 'tanggal_observasi',
-                    render: function(data) {
-                        // Format tanggal jika perlu
-                        const date = new Date(data);
-                        return date.toLocaleDateString('id-ID', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                        });
-                    }
+                    "data": "nama_tuk"
+                },
+                {
+                    "data": "tanggal_observasi"
+                },
+                {
+                    "data": null,
+                    "orderable": false
                 }
             ],
-
-            // Column formatters
-            renderFormatters: {},
-
-            // Default order
-            defaultOrder: [1, 'asc'],
-
-            // Additional options for DataTable
-            additionalOptions: {
-                responsive: true
-            },
-
-            // Configure action buttons
-            actions: {
-                edit: {
-                    enabled: true,
-                    title: 'Edit',
-                    icon: 'fa fa-edit',
-                    btnClass: 'btn-info btn-sm mr-1'
-                },
-                delete: {
-                    enabled: true,
-                    title: 'Hapus',
-                    icon: 'fa fa-trash',
-                    btnClass: 'btn-danger btn-sm mr-1'
-                },
-                // Add custom print button
-                print: {
-                    enabled: true,
-                    title: 'Print',
-                    icon: 'fa fa-print',
-                    btnClass: 'btn-primary btn-sm',
-                    callback: function(id, rowData) {
-                        // Print action implementation
-                        printObservasi(id, rowData);
-                    }
-                }
-            },
-
-            // Custom callbacks
-            callbacks: {
-                // Optional: Use this if you want to completely customize the action buttons rendering
-                // renderActionButtons: function(data, type, row) {
-                //     const id = row.id_observasi;
-                //     return `
-                //         <button type="button" class="btn btn-info btn-sm mr-1" data-id="${id}" data-action="edit" title="Edit">
-                //             <i class="fa fa-edit"></i> Edit
-                //         </button>
-                //         <button type="button" class="btn btn-danger btn-sm mr-1" data-id="${id}" data-action="delete" title="Hapus">
-                //             <i class="fa fa-trash"></i> Hapus
-                //         </button>
-                //         <button type="button" class="btn btn-primary btn-sm" data-id="${id}" data-action="print" title="Print">
-                //             <i class="fa fa-print"></i> Print
-                //         </button>
-                //     `;
-                // }
-            }
+            "columnDefs": [{
+                // Kolom nomor urut
+                "targets": 0,
+                "render": (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1
+            }, {
+                // Format tanggal menjadi format Indonesia
+                "targets": 5,
+                "render": (data) => new Date(data).toLocaleDateString('id-ID', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                })
+            }, {
+                // Kolom Aksi hanya berisi tombol PDF/Print
+                "targets": -1,
+                "render": (data, type, row) => `
+                    <button class="btn btn-sm btn-primary btn-print" data-id="${row.id_observasi}" title="Cetak PDF">
+                        <i class="fas fa-print"></i> PDF
+                    </button>`
+            }],
         });
 
-        // Make updateFileLabel globally accessible
-        window.updateFileLabel = ObservasiManager.updateFileLabel;
-
         /**
-         * Handle Print Observasi
-         * @param {number} id - ID of the observasi to print
-         * @param {object} rowData - The data of the selected row
+         * Menangani aksi cetak PDF.
+         * @param {string|number} id - ID observasi yang akan dicetak.
          */
-        function printObservasi(id, rowData) {
-            // Show loading notification
+        function printObservasi(id) {
             Swal.fire({
                 title: 'Mempersiapkan Dokumen',
                 text: 'Mohon tunggu...',
@@ -208,32 +115,22 @@
                 }
             });
 
-            // Generate print URL
-            const printUrl = `${window.location.origin}/pdf/observasi/${id}`;
-
-            // Open print URL in new window
+            // Pastikan URL ini sesuai dengan route untuk generate PDF Anda
+            const printUrl = `${baseUrl}/pdf/observasi/${id}`;
             const printWindow = window.open(printUrl, '_blank');
 
             if (printWindow) {
-                // Close loading notification once window is opened
                 Swal.close();
-
-                // Optional: Add event listener to detect if print window is closed
-                const checkWindowClosed = setInterval(function() {
-                    if (printWindow.closed) {
-                        clearInterval(checkWindowClosed);
-                        // Optional: Do something after print window is closed
-                    }
-                }, 1000);
             } else {
-                // If popup was blocked
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Popup Diblokir',
-                    text: 'Mohon izinkan popup untuk mencetak dokumen observasi.'
-                });
+                Swal.fire('Popup Diblokir', 'Mohon izinkan popup untuk mencetak dokumen.', 'error');
             }
         }
+
+        // Event listener untuk tombol print di dalam tabel
+        $('#table-observasi tbody').on('click', '.btn-print', function() {
+            const id = $(this).data('id');
+            printObservasi(id);
+        });
     });
 </script>
-<?= $this->endSection(); ?>
+<?= $this->endSection() ?>

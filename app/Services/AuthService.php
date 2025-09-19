@@ -41,7 +41,7 @@ class AuthService
                 $userData = $session->get('user_data');
 
                 if (!$userData) {
-                    throw new Exception('No user session found');
+                    throw new \Exception('No user session found');
                 }
 
                 return is_array($userData) ? $userData : ['id' => $userData->id ?? null];
@@ -52,7 +52,7 @@ class AuthService
                 'username' => $user->username ?? null,
                 'email' => $user->email ?? null
             ];
-        } catch (Exception $e) {
+        } catch (\Exception $e) {
             log_message('error', 'Error getting current user: ' . $e->getMessage());
             return [];
         }

@@ -1,30 +1,30 @@
 <nav class="navbar navbar-secondary navbar-expand-lg">
     <div class="container">
         <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#secondaryNavbar"
-                aria-controls="secondaryNavbar" aria-expanded="false" aria-label="Toggle navigation">
+            aria-controls="secondaryNavbar" aria-expanded="false" aria-label="Toggle navigation">
             <i class="fas fa-bars"></i>
         </button>
 
         <div class="collapse navbar-collapse" id="secondaryNavbar">
             <ul class="navbar-nav">
                 <li class="nav-item">
-                    <a href="<?= site_url('/asesi') ?>" class="nav-link <?= current_url() == site_url('/asesi') ? 'active' : '' ?>">
+                    <a href="<?= site_url('/asesi/dashboard') ?>" class="nav-link <?= current_url() == site_url('/asesi/dashboard') ? 'active' : '' ?>">
                         <i class="fas fa-home mr-2"></i><span>Beranda</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="<?= site_url('/asesi/pengajuan') ?>" class="nav-link <?= strpos(current_url(), '/asesi/pengajuan') !== false ? 'active' : '' ?>">
-                        <i class="fas fa-file-signature mr-2"></i><span>Pengajuan Sertifikasi</span>
+                    <a href="<?= site_url('/asesmen') ?>" class="nav-link <?= strpos(current_url(), '/asesmen') !== false ? 'active' : '' ?>">
+                        <i class="fas fa-file-signature mr-2"></i><span>Asesmen</span>
                     </a>
                 </li>
-                <li class="nav-item">
+                <!-- <li class="nav-item">
                     <a href="<?= site_url('/asesi/asesmen-mandiri') ?>" class="nav-link <?= strpos(current_url(), '/asesi/asesmen-mandiri') !== false ? 'active' : '' ?>">
                         <i class="fas fa-tasks mr-2"></i><span>Asesmen Mandiri</span>
                     </a>
                 </li>
                 <li class="nav-item dropdown">
                     <a href="#" data-toggle="dropdown" class="nav-link dropdown-toggle <?= strpos(current_url(), '/asesi/dokumen') !== false ? 'active' : '' ?>"
-                       aria-expanded="false">
+                        aria-expanded="false">
                         <i class="fas fa-folder-open mr-2"></i><span>Dokumen</span>
                     </a>
                     <ul class="dropdown-menu">
@@ -54,7 +54,7 @@
                     <a href="<?= site_url('/logout') ?>" class="nav-link">
                         <i class="fas fa-sign-out-alt mr-2"></i><span>Keluar</span>
                     </a>
-                </li>
+                </li> -->
             </ul>
         </div>
     </div>

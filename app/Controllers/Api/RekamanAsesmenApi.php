@@ -1,138 +1,168 @@
 <?php
 
-namespace App\Controllers\Api;
+namespace App\Services;
 
-use CodeIgniter\RESTful\ResourceController;
-use CodeIgniter\HTTP\ResponseInterface;
 use App\Models\RekamanAsesmenModel;
-use App\Models\RekamanAsesmenKompetensiModel;
+use CodeIgniter\Database\BaseConnection;
 
-/**
- * API Controller for Rekaman Asesmen (AJAX)
- *
- * Menyediakan endpoint AJAX untuk kebutuhan frontend rekaman asesmen,
- * dengan pola dan best practices seperti ObservasiService.
- */
-class RekamanAsesmenApi extends ResourceController
+class RekamanAsesmenService
 {
     protected RekamanAsesmenModel $rekamanModel;
-    protected RekamanAsesmenKompetensiModel $kompetensiModel;
+    protected BaseConnection $db;
 
     public function __construct()
     {
         $this->rekamanModel = new RekamanAsesmenModel();
-        $this->kompetensiModel = new RekamanAsesmenKompetensiModel();
+        $this->db = \Config\Database::connect();
     }
 
     /**
-     * Get rekaman + kompetensi (detail) untuk form edit/view
-     * GET /api/rekaman/{id}
+     * Mengambil daftar APL1 (asesi) yang sudah divalidasi per asesmen.
      */
-    public function show($id = null)
+    public function getApl1ByAsesmen(int $id_asesmen): array
     {
-        if (!$this->request->isAJAX()) {
-            return $this->fail('Unauthorized', 401);
+        try {
+            $apl1List = $this->db->table('apl1')
+                ->select('apl1.id_apl1, apl1.nama_siswa as nama_asesi, apl1.nik, apl1.email, apl1.validasi_apl1 as status_pengajuan')
+                ->where('apl1.id_asesmen', $id_asesmen)
+                ->where('apl1.validasi_apl1', 'validated')
+                ->orderBy('apl1.nama_siswa', 'ASC')
+                ->get()->getResultArray();
+
+            return ['success' => true, 'data' => $apl1List];
+        } catch (\Exception $e) {
+            log_message('error', '[Service::getApl1ByAsesmen] ' . $e->getMessage());
+            return ['success' => false, 'message' => 'Gagal memuat daftar asesi.'];
         }
-        if (!$id || !is_numeric($id)) {
-            return $this->fail('ID rekaman tidak valid');
-        }
-        $data = $this->rekamanModel->getRekamanWithDetails((int)$id);
-        if (!$data) {
-            return $this->fail('Data rekaman tidak ditemukan');
-        }
-        return $this->respond([
-            'success' => true,
-            'data' => $data,
-            'csrf_hash' => csrf_hash()
-        ]);
     }
 
     /**
-     * Get progress statistik untuk dashboard
-     * GET /api/rekaman/{id}/progress
+     * Memuat semua data yang dibutuhkan untuk menampilkan form rekaman asesmen.
      */
-    public function progress($id = null)
+    public function getRekamanWithDetailsByApl1(string $id_apl1, int $id_asesor): array
     {
-        if (!$this->request->isAJAX()) {
-            return $this->fail('Unauthorized', 401);
-        }
-        if (!$id || !is_numeric($id)) {
-            return $this->fail('ID rekaman tidak valid');
-        }
-        $stats = $this->rekamanModel->getProgressStats((int)$id);
-        return $this->respond([
-            'success' => true,
-            'data' => $stats,
-            'csrf_hash' => csrf_hash()
-        ]);
-    }
+        try {
+            $rekaman = $this->getOrCreateRekaman($id_apl1, $id_asesor);
+            if (!$rekaman) {
+                throw new \Exception('Gagal mendapatkan atau membuat record rekaman.');
+            }
 
-    /**
-     * Batch update kompetensi (import/save)
-     * POST /api/rekaman/{id}/kompetensi
-     * Body: array kompetensiRows
-     */
-    public function batchKompetensi($id = null)
-    {
-        if (!$this->request->isAJAX()) {
-            return $this->fail('Unauthorized', 401);
-        }
-        $kompetensiRows = $this->request->getJSON(true);
-        if (!$id || !is_numeric($id) || empty($kompetensiRows) || !is_array($kompetensiRows)) {
-            return $this->fail('Data tidak valid');
-        }
-        $result = $this->rekamanModel->importKompetensiBatch((int)$id, $kompetensiRows);
-        if ($result) {
-            return $this->respond([
+            $apl1Data = $this->rekamanModel->getApl1Data($id_apl1);
+            if (!$apl1Data) {
+                throw new \Exception('Data APL-01 tidak ditemukan.');
+            }
+
+            $units = $this->rekamanModel->getUnitsBySkema($apl1Data['id_skema']);
+            $existingData = $this->rekamanModel->getExistingById($rekaman['id']);
+
+            return [
                 'success' => true,
-                'message' => 'Batch kompetensi berhasil disimpan',
-                'csrf_hash' => csrf_hash()
-            ]);
+                'data' => [
+                    'rekaman'             => $rekaman,
+                    'units'               => $units,
+                    'existing_data'       => $existingData,
+                    'existing_rekaman_id' => $rekaman['id'],
+                    'rekaman_data'        => $rekaman
+                ]
+            ];
+        } catch (\Exception $e) {
+            log_message('error', '[Service::getRekamanWithDetailsByApl1] ' . $e->getMessage());
+            return ['success' => false, 'message' => $e->getMessage()];
         }
-        return $this->fail('Gagal menyimpan batch kompetensi');
     }
 
     /**
-     * Export rekaman + kompetensi (CSV/Excel-ready array)
-     * GET /api/rekaman/{id}/export
+     * Menangani auto-save untuk satu checkbox metode.
      */
-    public function export($id = null)
+    public function autoSaveUnit(array $data): array
     {
-        if (!$this->request->isAJAX()) {
-            return $this->fail('Unauthorized', 401);
+        try {
+            $rekaman = $this->getOrCreateRekaman($data['id_apl1'], $data['id_asesor']);
+            $methodData = [$data['method_key'] => $data['method_value']];
+            $this->saveUnitKompetensi($rekaman['id'], $data['id_unit'], $methodData);
+
+            return ['success' => true, 'message' => 'Perubahan disimpan.', 'data' => ['id_rekaman' => $rekaman['id']]];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
         }
-        if (!$id || !is_numeric($id)) {
-            return $this->fail('ID rekaman tidak valid');
-        }
-        $rows = $this->rekamanModel->exportRekamanWithKompetensi((int)$id);
-        if (!$rows) {
-            return $this->fail('Data tidak ditemukan');
-        }
-        return $this->respond([
-            'success' => true,
-            'data' => $rows,
-            'csrf_hash' => csrf_hash()
-        ]);
     }
 
     /**
-     * Get list rekaman (filter, pagination)
-     * GET /api/rekaman/list
+     * Menangani penyimpanan massal (batch) dari bulk check.
      */
-    public function list()
+    public function saveBatchUnits(array $data): array
     {
-        if (!$this->request->isAJAX()) {
-            return $this->fail('Unauthorized', 401);
+        try {
+            $rekaman = $this->getOrCreateRekaman($data['id_apl1'], $data['id_asesor']);
+            $this->rekamanModel->saveBulkKompetensiDetails($rekaman['id'], $data['kompetensi']);
+            return ['success' => true, 'message' => 'Semua perubahan berhasil disimpan.', 'data' => ['id_rekaman' => $rekaman['id']]];
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
         }
-        $filters = $this->request->getGet();
-        $page = (int)($filters['page'] ?? 1);
-        $perPage = (int)($filters['perPage'] ?? 10);
-        unset($filters['page'], $filters['perPage']);
-        $data = $this->rekamanModel->getRekamanList($filters, $page, $perPage);
-        return $this->respond([
-            'success' => true,
-            'data' => $data,
-            'csrf_hash' => csrf_hash()
+    }
+
+    /**
+     * Menangani penyimpanan final (rekomendasi & catatan).
+     * PERBAIKAN FINAL: Logika get-or-create dipindahkan ke sini.
+     */
+    public function saveRekaman(array $data): array
+    {
+        try {
+            // Langkah 1: Selalu dapatkan atau buat record master yang benar
+            $rekaman = $this->getOrCreateRekaman($data['id_apl1'], $data['id_asesor']);
+            if (!$rekaman) {
+                throw new \Exception('Gagal memproses record utama rekaman.');
+            }
+            $id_rekaman = $rekaman['id'];
+
+            // Langkah 2: Siapkan data yang akan diupdate
+            $updateData = [
+                'rekomendasi'   => $data['rekomendasi'] ?? 'belum_kompeten',
+                'tindak_lanjut' => $data['tindak_lanjut'] ?? null,
+                'komentar'      => $data['komentar'] ?? null,
+            ];
+
+            // Langkah 3: Gunakan Query Builder langsung untuk memastikan UPDATE terjadi
+            $this->db->table('rekaman_asesmen')->where('id', $id_rekaman)->update($updateData);
+
+            return ['success' => true, 'message' => 'Catatan berhasil disimpan.', 'data' => ['id_rekaman' => $id_rekaman]];
+        } catch (\Exception $e) {
+            log_message('error', '[Service::saveRekaman] ' . $e->getMessage());
+            return ['success' => false, 'message' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Helper: Mengecek rekaman yang ada atau membuat yang baru.
+     */
+    private function getOrCreateRekaman(string $id_apl1, int $id_asesor): ?array
+    {
+        $existing = $this->rekamanModel->where(['id_apl1' => $id_apl1, 'id_asesor' => $id_asesor])->first();
+        if ($existing) {
+            return $existing;
+        }
+        $newId = $this->rekamanModel->insert([
+            'id_apl1' => $id_apl1,
+            'id_asesor' => $id_asesor,
+            'tanggal_rekaman' => date('Y-m-d'),
+            'rekomendasi' => 'belum_kompeten'
         ]);
+        return $newId ? $this->rekamanModel->find($newId) : null;
+    }
+
+    /**
+     * Helper: Menyimpan detail kompetensi untuk satu unit (upsert).
+     */
+    private function saveUnitKompetensi(int $id_rekaman, int $id_unit, array $methodData): bool
+    {
+        $table = 'rekaman_asesmen_kompetensi';
+        $existing = $this->db->table($table)->where(['id_rekaman' => $id_rekaman, 'id_unit' => $id_unit])->get()->getRowArray();
+        if ($existing) {
+            return $this->db->table($table)->where('id', $existing['id'])->update($methodData);
+        } else {
+            $methodData['id_rekaman'] = $id_rekaman;
+            $methodData['id_unit'] = $id_unit;
+            return $this->db->table($table)->insert($methodData);
+        }
     }
 }

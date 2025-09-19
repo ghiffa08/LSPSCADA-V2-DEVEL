@@ -5,8 +5,6 @@
          <a href="#" class="nav-link sidebar-gone-show" data-toggle="sidebar"><i class="fas fa-bars"></i></a>
      </div>
      <ul class="ml-auto navbar-nav navbar-right">
-         <!-- <li><a id="startButton" class="nav-link text-light" data-toggle="tooltip" data-placement="bottom" title="Help?"><i class="fas fa-question"></i></a></li> -->
-         <!-- <a href="#" class="introJs().start(); " data-intro='Hello step one!'><i class="fas fa-question"></i></a> -->
          <li class="dropdown"><a href="#" data-toggle="dropdown" class="nav-link dropdown-toggle nav-link-lg nav-link-user">
                  <figure class="avatar avatar-sm mr-2 bg-info text-white" data-initial="<?= getInitials(user()->fullname); ?>"></figure>
                  <div class="d-sm-none d-lg-inline-block">Hi, <?= user()->nama_lengkap ?></div>

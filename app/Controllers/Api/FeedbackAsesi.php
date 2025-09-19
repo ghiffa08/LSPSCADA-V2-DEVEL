@@ -2,314 +2,247 @@
 
 namespace App\Controllers\Api;
 
-use Config\Services;
+use Config\Database;
+use App\Models\ObservasiModel; // Digunakan untuk mengambil daftar asesi
+use App\Models\FeedbackAsesiModel;
 use CodeIgniter\HTTP\ResponseInterface;
-use App\Services\FeedbackService;
+use App\Controllers\Api\DataTableController;
 
+/**
+ * Feedback Asesi API Controller
+ * Diadaptasi dari Observasi API Controller untuk mengelola feedback dari asesi.
+ */
 class FeedbackAsesi extends DataTableController
 {
-    private int $id_user;
-    protected $feedbackService;
+    private $id_asesor;
+    protected $db;
 
     public function __construct()
     {
         parent::__construct();
 
-        $this->model = $this->feedbackAsesiModel;
-        $this->id_user = user()->id ?? 0;
-        $this->feedbackService = service('feedback');
+        helper('auth');
 
-        // Define custom column mapping for complex ordering
+        // Inisialisasi model yang akan digunakan
+        $this->model = new FeedbackAsesiModel(); // Model utama untuk DataTable
+        $this->db = Database::connect();
+
+        // Mengambil id_asesor dari user yang sedang login
+        $user_id = user()->id;
+        $asesorModel = new \App\Models\AsesorModel();
+        $asesor = $asesorModel->where('id_user', $user_id)->first();
+
+        // if (!$asesor) {
+        //     // Sebaiknya ditangani dengan exception atau redirect di production
+        //     throw new \RuntimeException('User tidak terdaftar sebagai asesor.');
+        // }
+
+        $this->id_asesor = $asesor['id_asesor'] ?? '';
+
+        // Mapping kolom untuk server-side ordering DataTable
         $this->columnMap = [
-            0 => null, // No ordering for index column
-            1 => 'asesi_user.fullname',
-            2 => 'asesor.fullname',
+            0 => null, // Kolom nomor
+            1 => 'apl1.nama_siswa',
+            2 => 'asesor_user.nama_lengkap',
             3 => 'skema.nama_skema',
-            4 => 'feedback_asesi.tanggal_mulai',
-            5 => 'feedback_asesi.tanggal_selesai',
-            6 => null // No ordering for action column
+            4 => 'feedback_asesi.tanggal_selesai',
+            5 => null // Kolom aksi
         ];
     }
 
     /**
-     * Get all komponen umpan balik
+     * Mengambil detail Skema dan daftar Asesi (APL1) yang sudah divalidasi.
+     * Logikanya sama dengan di Observasi.
      */
-    public function getKomponen(): ResponseInterface
+    public function getSkemaDetails(): ResponseInterface
     {
         if (!$this->request->isAJAX()) {
-            return $this->response->setJSON([
-                'status' => 401,
-                'error' => 'Unauthorized: Direct access not allowed'
-            ])->setStatusCode(401);
-        }
-
-        try {
-            // Use feedback service to get komponen data
-            $komponen = $this->feedbackService->getAllKomponen();
-
-            return $this->respond([
-                'success' => true,
-                'komponen' => $komponen
-            ]);
-        } catch (\Exception $e) {
-            log_message('error', 'Error getting komponen umpan balik: ' . $e->getMessage());
-            return $this->fail('Gagal memuat komponen umpan balik: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Check if feedback already exists for the given parameters
-     */
-    public function checkExisting()
-    {
-        if (!$this->request->isAJAX()) {
-            return $this->response->setJSON([
-                'status' => 401,
-                'error' => 'Unauthorized: Direct access not allowed'
-            ])->setStatusCode(401);
-        }
-
-        try {
-            $id_asesi = $this->request->getGet('id_asesi');
-            $id_skema = $this->request->getGet('id_skema');
-
-            if (empty($id_asesi) || empty($id_skema)) {
-                return $this->fail('ID Asesi dan ID Skema diperlukan', 400);
-            }
-
-            // Use feedback service to check for existing feedback
-            $result = $this->feedbackService->checkExistingFeedback($id_asesi, $id_skema);
-
-            return $this->respond($result);
-        } catch (\Exception $e) {
-            log_message('error', 'Error checking existing feedback: ' . $e->getMessage());
-            return $this->fail('Gagal memeriksa data: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Get skema details and available asesi
-     */
-    public function getSkemaDetails()
-    {
-        if (!$this->request->isAJAX()) {
-            return $this->response->setJSON([
-                'status' => 401,
-                'error' => 'Unauthorized: Direct access not allowed'
-            ])->setStatusCode(401);
+            return $this->failUnauthorized('Akses langsung tidak diizinkan.');
         }
 
         $id_skema = $this->request->getGet('id_skema');
 
-        if (!$id_skema) {
-            return $this->fail('ID Skema diperlukan', 400);
+        if (!$id_skema || !filter_var($id_skema, FILTER_VALIDATE_INT)) {
+            return $this->fail('ID Skema diperlukan dan harus berupa angka.', 400);
         }
 
         try {
-            // Get skema details
-            $skema = $this->skemaModel->find($id_skema);
-
+            $skemaModel = new \App\Models\SkemaModel();
+            $skema = $skemaModel->find($id_skema);
             if (!$skema) {
-                return $this->fail('Skema tidak ditemukan', 404);
+                return $this->failNotFound('Skema tidak ditemukan.');
             }
 
-            // Get asesi list for this skema
-            $asesi = $this->observasiModel->getAsesiBySkema($id_skema);
+            // Menggunakan ObservasiModel untuk mengambil daftar APL1 yang valid, karena fungsinya sudah ada
+            $observasiModel = new ObservasiModel();
+            $apl1List = $observasiModel->getValidatedApl1BySkema($id_skema);
 
             return $this->respond([
                 'success' => true,
                 'skema' => $skema,
-                'asesi' => $asesi
+                'apl1_list' => $apl1List,
             ]);
         } catch (\Exception $e) {
-            log_message('error', 'Error getting skema details: ' . $e->getMessage());
+            log_message('error', '[FeedbackAsesi] ' . $e->getMessage());
             return $this->fail('Gagal memuat detail skema: ' . $e->getMessage());
         }
     }
 
     /**
-     * Load feedback data via AJAX
+     * Memuat data untuk form feedback via AJAX.
+     * Mengambil komponen pertanyaan dan jawaban yang sudah ada (jika ada).
      */
-    public function loadFeedback()
+    public function loadFeedback(): ResponseInterface
     {
         if (!$this->request->isAJAX()) {
-            return $this->response->setJSON([
-                'status' => 401,
-                'error' => 'Unauthorized: Direct access not allowed'
-            ])->setStatusCode(401);
+            return $this->failUnauthorized('Akses langsung tidak diizinkan.');
         }
 
-        $id_feedback = $this->request->getGet('id_feedback');
+        $id_skema = $this->request->getGet('id_skema');
+        $id_apl1 = $this->request->getGet('id_apl1'); // id_asesi di tabel feedback = id_apl1
 
-        if (!$id_feedback) {
-            return $this->fail('ID Feedback diperlukan', 400);
+        if (!$id_skema || !$id_apl1) {
+            return $this->fail('ID Skema dan ID APL1 diperlukan.', 400);
         }
 
         try {
-            // Use feedback service to get feedback data
-            $data = $this->feedbackService->getFeedbackData($id_feedback);
+            // Cek apakah feedback sudah ada
+            $existingFeedback = $this->model
+                ->where('id_asesor', $this->id_asesor)
+                ->where('id_skema', $id_skema)
+                ->where('id_asesi', $id_apl1)
+                ->first();
+
+            $id_feedback = $existingFeedback['id_feedback'] ?? null;
+            $existing_data = [];
+
+            if ($id_feedback) {
+                $existing_data = $this->model->getExistingFeedback($id_feedback);
+            }
+
+            // Ambil daftar komponen/pertanyaan feedback
+            $komponen = $this->model->getKomponenFeedback();
+
             return $this->respond([
                 'success' => true,
-                'feedback' => $data['feedback'],
-                'komponen' => $this->feedbackService->getAllKomponen(),
-                'existing_data' => $data['existing_data']
+                'komponen' => $komponen,
+                'feedback' => $existingFeedback,
+                'existing_data' => $existing_data,
+                'id_feedback' => $id_feedback,
             ]);
         } catch (\Exception $e) {
-            log_message('error', 'Error loading feedback data: ' . $e->getMessage());
-            return $this->fail('Gagal memuat data: ' . $e->getMessage());
+            log_message('error', '[FeedbackAsesi] ' . $e->getMessage());
+            return $this->fail('Gagal memuat data feedback: ' . $e->getMessage());
         }
     }
 
     /**
-     * Save feedback data
+     * Menyimpan data feedback dari asesi.
+     * Menangani create dan update (UPSERT) secara transaksional.
      */
     public function save()
     {
-        // Determine request type
-        $isAjax = $this->request->isAJAX();
+        if (! $this->request->isAJAX()) {
+            return $this->failUnauthorized('Akses langsung tidak diizinkan.');
+        }
 
-        // Get data from request
-        $id_feedback = $this->request->getPost('id_feedback');
-        $id_asesi = $this->request->getPost('id_asesi');
-        $id_skema = $this->request->getPost('id_skema');
-        $id_asesmen = $this->request->getPost('id_asesmen');
-        $id_asesor = $this->request->getPost('id_asesor');
-        $tanggal_mulai = $this->request->getPost('tanggal_mulai');
-        $tanggal_selesai = $this->request->getPost('tanggal_selesai');
-        $catatan_lain = $this->request->getPost('catatan_lain');
-        $komponen = $this->request->getPost('komponen');
-        $komentar = $this->request->getPost('komentar');
+        $postData = $this->request->getPost();
 
-        // Validate required fields
-        if (empty($id_asesi) || empty($id_skema)) {
-            return $this->handleErrorResponse('ID Asesi dan ID Skema diperlukan', $isAjax);
+        // Validasi
+        $validation = \Config\Services::validation();
+        $validation->setRules([
+            'id_pengajuan' => 'required|string|max_length[36]',
+            // 'id_asesi'     => 'required|integer',
+            // 'id_asesor'    => 'required|integer',
+            'id_skema'     => 'required|integer',
+            'tanggal_mulai' => 'required|valid_date',
+            'tanggal_selesai' => 'required|valid_date',
+        ]);
+
+        if (!$validation->withRequest($this->request)->run()) {
+            return $this->fail($validation->getErrors(), 400);
         }
 
         try {
-            // Prepare master data
+            $model = new FeedbackAsesiModel();
+
+            // Data untuk tabel master 'feedback_asesi'
             $masterData = [
-                'id_feedback' => $id_feedback,
-                'id_asesor' => $id_asesor,
-                'id_asesi' => $id_asesi,
-                'id_skema' => $id_skema,
-                'tanggal_mulai' => $tanggal_mulai,
-                'tanggal_selesai' => $tanggal_selesai,
-                'catatan_lain' => $catatan_lain
+                'id_pengajuan'    => $postData['id_pengajuan'],
+                // 'id_asesi'        => $postData['id_asesi'],
+                // 'id_asesor'       => $postData['id_asesor'],
+                'id_skema'        => $postData['id_skema'],
+                'tanggal_mulai'   => $postData['tanggal_mulai'],
+                'tanggal_selesai' => $postData['tanggal_selesai'],
+                'catatan_lain'    => $postData['catatan_lain'] ?? null,
             ];
 
-            // Prepare detail data
+            // Data untuk tabel detail 'detail_feedback_asesi'
             $detailData = [
-                'komponen' => $komponen,
-                'komentar' => $komentar
+                'jawaban'  => $postData['jawaban'] ?? [],
+                'komentar' => $postData['komentar'] ?? [],
             ];
 
-            // Process the data using the feedback service
-            $result = $this->feedbackService->saveFeedbackData($masterData, $detailData);
+            // Panggil metode di model yang sudah transaksional
+            $id_feedback = $model->saveFeedbackData($masterData, $detailData);
 
-            // Handle success response
-            return $this->handleSuccessResponse('Data umpan balik berhasil disimpan', $isAjax, $result);
-        } catch (\Exception $e) {
-            log_message('error', 'Error saving feedback: ' . $e->getMessage());
-            return $this->handleErrorResponse('Gagal menyimpan data: ' . $e->getMessage(), $isAjax);
-        }
-    }
-
-    /**
-     * Delete feedback
-     */
-    public function delete($id = null): ResponseInterface
-    {
-        if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
-        }
-
-        // Start transaction
-        $db = \Config\Database::connect();
-        $db->transStart();
-
-        try {
-            // Delete detail records first
-            $db->table('detail_feedback_asesi')->where('id_feedback', $id)->delete();
-
-            // Then delete master record
-            $deleted = $this->feedbackAsesiModel->delete($id);
-
-            $db->transComplete();
-
-            if ($deleted) {
-                return $this->dataService->response([
-                    'status' => true,
-                    'message' => 'Feedback berhasil dihapus'
+            if ($id_feedback) {
+                return $this->respondCreated([
+                    'success'     => true,
+                    'message'     => 'Data feedback berhasil disimpan.',
+                    'id_feedback' => $id_feedback,
+                    'token'       => csrf_hash()
                 ]);
             } else {
-                return $this->dataService->response([
-                    'status' => false,
-                    'message' => 'Gagal menghapus feedback'
-                ], 400);
+                return $this->fail('Gagal menyimpan data feedback karena kesalahan transaksi.');
             }
         } catch (\Exception $e) {
-            $db->transRollback();
-
-            return $this->dataService->response([
-                'status' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage()
-            ], 500);
+            log_message('error', '[API/FeedbackController] ' . $e->getMessage());
+            return $this->failServerError('Terjadi kesalahan pada sistem: ' . $e->getMessage());
         }
     }
 
     /**
-     * Get feedback by ID (for edit modal)
+     * Menghapus data feedback beserta detailnya.
      */
-    public function getById($id = null): ResponseInterface
+    public function deleteFeedback($id = null): ResponseInterface
     {
         if (!$this->request->isAJAX()) {
-            return Services::response()->setStatusCode(404);
+            return $this->failUnauthorized('Akses langsung tidak diizinkan.');
         }
 
-        $feedback = $this->feedbackAsesiModel->getById($id);
-
-        if (!$feedback) {
-            return $this->dataService->response([
-                'status' => false,
-                'message' => 'Feedback tidak ditemukan'
-            ], 404);
+        if (!$id || !filter_var($id, FILTER_VALIDATE_INT)) {
+            return $this->fail('ID Feedback tidak valid', 400);
         }
 
-        return $this->dataService->response([
-            'status' => true,
-            'data' => $feedback
-        ]);
-    }
+        try {
+            // Verifikasi kepemilikan feedback oleh asesor yang login
+            $feedback = $this->model
+                ->where('id_feedback', $id)
+                ->where('id_asesor', $this->id_asesor)
+                ->first();
 
-    /**
-     * Helper method to handle error responses
-     */
-    private function handleErrorResponse($message, $isAjax)
-    {
-        if ($isAjax) {
-            return $this->fail($message, 400);
-        }
+            if (!$feedback) {
+                return $this->failNotFound('Data feedback tidak ditemukan atau Anda tidak memiliki akses.');
+            }
 
-        return redirect()->back()
-            ->with('error', $message)
-            ->withInput();
-    }
+            // Hapus data dalam transaksi
+            $this->db->transStart();
+            $this->db->table('detail_feedback_asesi')->where('id_feedback', $id)->delete();
+            $this->model->delete($id);
+            $this->db->transComplete();
 
-    /**
-     * Helper method to handle success responses
-     */
-    private function handleSuccessResponse($message, $isAjax, $result = null)
-    {
-        if ($isAjax) {
-            return $this->respond([
+            if ($this->db->transStatus() === false) {
+                return $this->fail('Gagal menghapus data feedback.');
+            }
+
+            return $this->respondDeleted([
                 'success' => true,
-                'message' => $message,
-                'result' => $result,
-                'token' => csrf_hash() // Return new CSRF token
+                'message' => 'Data feedback berhasil dihapus.'
             ]);
+        } catch (\Exception $e) {
+            log_message('error', '[FeedbackAsesi] ' . $e->getMessage());
+            return $this->fail('Gagal menghapus data: ' . $e->getMessage());
         }
-
-        return redirect()->to('dashboard')
-            ->with('success', $message);
     }
 }

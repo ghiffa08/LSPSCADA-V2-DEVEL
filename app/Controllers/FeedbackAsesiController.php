@@ -60,41 +60,71 @@ class FeedbackAsesiController extends ResourceController
 
         return view('admin/feedback_asesi', $data);
     }
-
     /**
-     * Asesi view for filling feedback form
+     * Menampilkan halaman pengisian feedback untuk asesi yang sedang login.
+     * Mengoptimalkan pengambilan data untuk menghindari N+1 query.
      */
     public function asesiIndex()
     {
-        // Check asesi role
-        if (!in_groups('asesi')) {
-            return redirect()->to('dashboard')->with('error', 'Anda tidak memiliki akses');
-        }
+        // if (!in_groups('asesi')) {
+        //     return redirect()->to('dashboard')->with('error', 'Anda tidak memiliki akses.');
+        // }
 
-        // Get current user (asesi) details using the feedback service
-        $asesiData = $this->feedbackService->getAsesiDataByUserId($this->id_user);
-        if (!$asesiData) {
-            return redirect()->to('dashboard')->with('error', 'Data asesi tidak ditemukan');
-        }
+        // Pastikan helper 'auth' sudah di-load
+        helper('auth');
+        $id_user = user()->id;
 
-        // Get active assessment information
-        $pengajuanAsesmen = $this->feedbackService->getActiveAssessment($asesiData['id_asesi']);
-        if (!$pengajuanAsesmen) {
-            return redirect()->to('dashboard')->with('error', 'Tidak ada asesmen aktif yang ditemukan');
-        }
-
-        // Check if feedback already exists
-        $feedback = $this->feedbackAsesiModel
-            ->where('id_asesi', $asesiData['id_asesi'])
-            ->where('id_skema', $pengajuanAsesmen['id_skema'])
+        $pengajuanModel = new \App\Models\PengajuanAsesmenModel();
+        $pengajuan = $pengajuanModel
+            ->select('
+                pengajuan_asesmen.id_pengajuan, 
+                pengajuan_asesmen.id_asesi, 
+                pengajuan_asesmen.id_asesor,
+                skema.id_skema,
+                skema.nama_skema, 
+                skema.kode_skema,
+                asesor_user.nama_lengkap as nama_asesor,
+                asesi_user.nama_lengkap as nama_asesi 
+            ')
+            ->join('asesi', 'asesi.id_asesi = pengajuan_asesmen.id_asesi')
+            // PERBAIKAN 1: Tambahkan JOIN ke tabel users dengan alias 'asesi_user' untuk mendapatkan nama asesi
+            ->join('users as asesi_user', 'asesi_user.id = asesi.id_user')
+            ->join('asesmen', 'asesmen.id_asesmen = pengajuan_asesmen.id_asesmen')
+            ->join('skema', 'skema.id_skema = asesmen.id_skema')
+            ->join('asesor', 'asesor.id_asesor = pengajuan_asesmen.id_asesor', 'left')
+            ->join('users as asesor_user', 'asesor_user.id = asesor.id_user', 'left')
+            ->where('asesi.id_user', $id_user)
+            ->whereIn('pengajuan_asesmen.status_pengajuan', ['diterima', 'selesai'])
+            ->orderBy('pengajuan_asesmen.created_at', 'DESC')
             ->first();
 
+        // if (!$pengajuan) {
+        //     return redirect()->to('dashboard')->with('error', 'Tidak ada jadwal asesmen aktif yang ditemukan untuk Anda.');
+        // }
+
+        $feedbackModel = new \App\Models\FeedbackAsesiModel();
+
+        $feedback = $feedbackModel->where('id_pengajuan', $pengajuan['id_pengajuan'])->first();
+
+        $existingAnswers = [];
+        if ($feedback) {
+            $existingAnswers = $feedbackModel->getExistingFeedback($feedback['id_feedback']);
+        }
+
+        $komponen = $feedbackModel->getKomponenFeedback();
+
         $data = [
-            'siteTitle' => 'Umpan Balik Asesi',
-            'asesi' => $asesiData,
-            'pengajuanAsesmen' => $pengajuanAsesmen,
-            'feedback' => $feedback,
+            'siteTitle'       => 'Umpan Balik Asesi',
+            'pengajuan'       => $pengajuan,
+            'feedback'        => $feedback,
+            'komponen'        => $komponen,
+            'existingAnswers' => $existingAnswers
         ];
-        return view('asesi/feedback', $data);
+
+        // Hapus atau beri komentar pada dd() setelah selesai debugging
+        // dd($data); 
+
+        // Ganti nama view jika berbeda
+        return view('asesi/feedback_asesi', $data);
     }
 }

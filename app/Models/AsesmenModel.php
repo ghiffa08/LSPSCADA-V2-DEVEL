@@ -116,8 +116,106 @@ class AsesmenModel extends Model
             ->join('skema', 'skema.id_skema=asesmen.id_skema', 'left')
             ->join('tuk', 'tuk.id_tuk=asesmen.id_tuk', 'left')
             ->join('set_tanggal', 'set_tanggal.id_tanggal=asesmen.id_tanggal', 'left')
-            ->select('asesmen.id_asesmen, asesmen.id_skema, asesmen.id_tuk, asesmen.id_tanggal, asesmen.tujuan, skema.nama_skema, skema.kode_skema, skema.jenis_skema, tuk.nama_tuk, DATE_FORMAT(set_tanggal.tanggal, "%d/%m/%Y") AS tanggal')
+            ->select('asesmen.id_asesmen, asesmen.id_skema, asesmen.id_tuk, asesmen.id_tanggal, asesmen.tujuan, skema.nama_skema, skema.kode_skema, skema.jenis_skema, tuk.nama_tuk, tuk.jenis_tuk, DATE_FORMAT(set_tanggal.tanggal, "%d/%m/%Y") AS tanggal')
             ->get()->getResultArray();
+    }
+
+    /**
+     * Get asesmen by ID with complete related data
+     *
+     * @param int $id
+     * @param bool $useCache Whether to use internal request cache
+     * @return array|null
+     */
+    public function getAsesmenById(int $id, bool $useCache = false)
+    {
+        // Check cache first if enabled
+        $cacheKey = "asesmen_{$id}";
+        if ($useCache && isset($this->tempCache[$cacheKey])) {
+            return $this->tempCache[$cacheKey];
+        }
+
+        try {
+            $result = $this->db->table('asesmen')
+                ->join('skema', 'skema.id_skema=asesmen.id_skema', 'left')
+                ->join('tuk', 'tuk.id_tuk=asesmen.id_tuk', 'left')
+                ->join('set_tanggal', 'set_tanggal.id_tanggal=asesmen.id_tanggal', 'left')
+                ->select('
+                asesmen.id_asesmen, 
+                asesmen.id_skema, 
+                asesmen.id_tuk, 
+                asesmen.id_tanggal, 
+                asesmen.tujuan, 
+                skema.nama_skema, 
+                skema.kode_skema, 
+                skema.jenis_skema, 
+                tuk.nama_tuk, 
+                tuk.jenis_tuk, 
+                DATE_FORMAT(set_tanggal.tanggal, "%d/%m/%Y") AS tanggal,
+                set_tanggal.tanggal AS tanggal_raw
+            ')
+                ->where('asesmen.id_asesmen', $id)
+                ->get()
+                ->getRowArray();
+
+            // Store in cache if enabled and result found
+            if ($useCache && $result) {
+                $this->tempCache[$cacheKey] = $result;
+            }
+
+            return $result;
+        } catch (\Exception $e) {
+            log_message('error', 'Error in getAsesmenById: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Get filtered and paginated asesmen data with total count.
+     *
+     * @param string $searchTerm
+     * @param int    $limit
+     * @param int    $offset
+     * @return array
+     */
+    public function getFilteredPaginatedAsesmen(string $searchTerm = '', int $limit = 10, int $offset = 0)
+    {
+        $builder = $this->db->table('asesmen')
+            ->join('skema', 'skema.id_skema=asesmen.id_skema', 'left')
+            ->join('tuk', 'tuk.id_tuk=asesmen.id_tuk', 'left')
+            ->join('set_tanggal', 'set_tanggal.id_tanggal=asesmen.id_tanggal', 'left')
+            ->select('
+                asesmen.id_asesmen, 
+                skema.nama_skema, 
+                skema.jenis_skema, 
+                tuk.nama_tuk, 
+                tuk.jenis_tuk, 
+                set_tanggal.tanggal
+            ');
+
+        // Apply search filter if a search term is provided
+        if (!empty($searchTerm)) {
+            $builder->groupStart();
+            $builder->like('skema.nama_skema', $searchTerm);
+            $builder->orLike('skema.jenis_skema', $searchTerm);
+            $builder->orLike('tuk.nama_tuk', $searchTerm);
+            $builder->groupEnd();
+        }
+
+        // To get the total count of filtered rows, we clone the builder *before* applying limit and offset
+        $totalRows = $builder->countAllResults(false); // `false` prevents the query from resetting
+
+        // Now apply limit and offset for pagination
+        $builder->limit($limit, $offset);
+
+        // Get the paginated results
+        $data = $builder->get()->getResultArray();
+
+        // Return both data and total count
+        return [
+            'data'      => $data,
+            'totalRows' => $totalRows
+        ];
     }
 
     public function getJadwal($id_skema)

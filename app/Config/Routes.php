@@ -6,103 +6,107 @@ use CodeIgniter\Router\RouteCollection;
  * @var RouteCollection $routes
  */
 
-// =====================================================
-// KONFIGURASI DASAR
-// =====================================================
+// ===================================================================
+// #1. KONFIGURASI DASAR
+// ===================================================================
 $routes->setDefaultNamespace('App\Controllers');
 $routes->setDefaultController('Dashboard');
 $routes->setDefaultMethod('index');
 $routes->setTranslateURIDashes(false);
 $routes->set404Override();
 
-// =====================================================
-// ROUTES PUBLIK (TANPA AUTENTIKASI)
-// =====================================================
 
-// Halaman Utama dan Publik
+// ===================================================================
+// #2. ROUTES PUBLIK (Tidak Memerlukan Autentikasi)
+// ===================================================================
+
+// --- Halaman Utama & Landing Page ---
 $routes->get('/', 'HomeController::index');
-$routes->get('skema-sertifikasi', 'HomeController::skema');
+$routes->get('landingpage', 'LandingpageController::index');
+$routes->get('skema-sertifikasi', 'LandingpageController::skema');
+$routes->get('pendaftaran-uji-kompetensi', 'LandingpageController::ujikom');
+$routes->get('monitoring-asesi', 'MonitoringController::index');
 
-// AJAX
-$routes->post('/get-jadwal', 'AsesmenController::getJadwal');
-$routes->post('/get-tuk', 'AsesmenController::getTuk');
-$routes->post('/getUnit', 'UnitController::getUnit');
-$routes->post('/getElemen', 'ElemenController::getElemen');
-$routes->post('/kabupaten', 'APL1Controller::kabupaten');
-$routes->post('/kecamatan', 'APL1Controller::kecamatan');
-$routes->post('/desa', 'APL1Controller::desa');
-$routes->post('/get-jadwal', 'AsesmenController::getJadwal');
+// --- Proses Pendaftaran & Asesmen Publik ---
+$routes->get('asesmen', 'PengajuanAsesmenController::skema');
+$routes->get('asesmen-detail/(:any)', 'PengajuanAsesmenController::skema_detail/$1');
+$routes->get('asesmen-daftar/(:any)', 'PengajuanAsesmenController::skema_daftar/$1');
+$routes->post('store-pengajuan', 'LandingpageController::store_pengajuan');
+$routes->get('asesmen/get-step/(:num)', 'HomeController::getAsesmenStep/$1');
+$routes->post('asesmen/validate-step', 'HomeController::validateStep');
 
-// Pendaftaran dan Pengajuan
-// $routes->get('pendaftaran-uji-kompetensi', 'PengajuanAsesmenController::index');
-// $routes->post('store-pengajuan', 'PengajuanAsesmenController::store');
+// --- Asesmen Mandiri Publik ---
+$routes->get('list-asesmen-mandiri', 'AsesmenMandiriController::index');
+$routes->get('asesmen-mandiri/filter', 'AsesmenMandiriController::filterAsesmen');
+$routes->get('asesmen-mandiri/(:any)', 'AsesmenMandiriController::asesmen/$1');
+$routes->post('asesmen-mandiri/store', 'AsesmenMandiriController::store_asesmen');
+$routes->post('send-feedback', 'AsesmenMandiriController::send_feedback');
 
-$routes->get('/pendaftaran-uji-kompetensi', 'LandingpageController::ujikom');
-
-$routes->post('/store-pengajuan', 'LandingpageController::store_pengajuan');
-
-// Asesmen Mandiri
-$routes->get('asesmen-mandiri/(:any)', 'HomeController::asesmen/$1');
-$routes->post('store-asesmen', 'HomeController::store_asesmen');
-$routes->post('send-feedback', 'HomeController::send_feedback');
-
-// Pemindaian Tanda Tangan
-$routes->group('scan', function ($routes) {
+// --- Pemindaian Tanda Tangan (QR Code) ---
+$routes->group('scan', static function ($routes) {
     $routes->get('tanda-tangan-asesi/(:segment)', 'APL1Controller::scan_ttd_asesi/$1');
     $routes->get('tanda-tangan-admin/(:segment)', 'APL1Controller::scan_ttd_admin/$1');
     $routes->get('tanda-tangan-asesor/(:segment)', 'APL2Controller::scan_ttd_asesor/$1');
 });
 
+// --- API Publik (AJAX Endpoints) ---
+$routes->post('pengajuan-submit', 'Api\PengajuanAsesmen::submit_pengajuan_ajax');
+$routes->post('get-jadwal', 'AsesmenController::getJadwal');
+$routes->post('get-tuk', 'AsesmenController::getTuk');
+$routes->post('getUnit', 'UnitController::getUnit');
+$routes->post('getElemen', 'ElemenController::getElemen');
+$routes->post('kabupaten', 'AsesiController::getKabupaten');
+$routes->post('kecamatan', 'AsesiController::getKecamatan');
+$routes->post('kelurahan', 'AsesiController::getKelurahan');
+$routes->post('getSekolah', 'Sekolah::getSekolah');
+$routes->get('signature-show/(:segment)', 'DocumentController::signatureShow/$1');
 
-// Google OAuth 
+
+// ===================================================================
+// #3. ROUTES AUTENTIKASI (Login, OAuth, etc.)
+// ===================================================================
 $routes->get('auth/google', 'OAuthController::google');
 $routes->get('OAuth/proses', 'OAuthController::proses');
 
-// =====================================================
-// ROUTES TERAUTENTIKASI
-// =====================================================
-$routes->group('', ['filter' => 'login'], function ($routes) {
-    // Dashboard router: redirect ke dashboard sesuai role
+
+// ===================================================================
+// #4. ROUTES TERPROTEKSI (Memerlukan Login - Filter 'login')
+// ===================================================================
+$routes->group('', ['filter' => 'login'], static function ($routes) {
+
+    // --------------------------------------------------------------------
+    // Rute Umum & Profil Pengguna
+    // --------------------------------------------------------------------
     $routes->get('dashboard', 'DashboardRouterController::index');
-
-    // Dashboard dan Profil Pengguna
     $routes->get('settings', 'Settings::index');
-    $routes->get('profile', 'AsesiController::profile');
 
-    // Pembuatan PDF
-    $routes->group('pdf', function ($routes) {
-        $routes->get('pmo', 'PMOController::pdf');
+    // Grup profil umum
+    $routes->group('profile', static function ($routes) {
+        $routes->get('/', 'ProfileController::index');
+        $routes->post('update', 'ProfileController::update');
+        $routes->post('change-password', 'ProfileController::changePassword');
+        $routes->post('upload-avatar', 'ProfileController::uploadAvatar');
+    });
+
+    // --------------------------------------------------------------------
+    // Generasi PDF
+    // --------------------------------------------------------------------
+    $routes->group('pdf', static function ($routes) {
+        $routes->get('pmo/(:num)', 'CeklistPMOController::pdf/$1');
         $routes->get('feedback', 'FeedbackController::pdf');
-        $routes->get('observasi/(:num)', 'CeklistObservasiController::pdf/$1');
         $routes->get('feedback/(:num)', 'FeedbackAsesiController::pdf/$1');
-        $routes->get('apl1/(:num)', 'APL1Controller::pdf/$1');
-        $routes->get('rekaman/(:num)', 'RekamanAsesmenController::pdf/$1');
+        $routes->get('observasi/(:num)', 'CeklistObservasiController::pdf/$1');
+        $routes->get('apl1/(:any)', 'PengajuanAsesmenController::generateAPL1/$1');
+        $routes->get('rekaman-asesmen/(:num)', 'RekamanAsesmenController::pdf/$1');
         $routes->get('rekaman', 'RekamanAsesmenController::pdf');
         $routes->get('laporan', 'LaporanAsesmenController::pdf');
+        $routes->get('pertanyaan-tertulis', 'PertanyaanTertulisController::pdf');
     });
 
-    // Manajemen Asesmen
-    $routes->group('asesmen', function ($routes) {
-        $routes->get('/', 'AsesmenController::index');
-        $routes->post('save', 'Api\Asesmen::save');
-        $routes->post('import', 'AsesmenController::import');
-        $routes->get('delete/(:num)', 'Api\Asesmen::delete/$1');
-        $routes->get('getById/(:num)', 'Api\Asesmen::getById/$1');
-        $routes->post('get-data-table', 'Api\Asesmen::getDataTable');
-
-        // Persetujuan Asesmen
-        $routes->group('persetujuan', function ($routes) {
-            $routes->get('/', 'AKController::index');
-            $routes->post('store', 'AKController::store');
-            $routes->get('pdf/(:any)', 'AKController::pdf/$1');
-            $routes->post('import', 'AKController::import');
-            $routes->post('update', 'AKController::update');
-            $routes->post('delete', 'AKController::delete');
-        });
-    });
-
+    // --------------------------------------------------------------------
     // Manajemen Admin
-    $routes->group('admin', function ($routes) {
+    // --------------------------------------------------------------------
+    $routes->group('admin', static function ($routes) {
         $routes->get('/', 'AdminController::index');
         $routes->get('dashboard', 'AdminController::dashboard');
         $routes->post('store', 'AdminController::store');
@@ -111,25 +115,28 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
         $routes->post('delete', 'AdminController::delete');
         $routes->get('profile/(:any)', 'UserController::profile/$1');
 
-        // Kelola Users Routes       
-        $routes->get('kelola-users', 'KelolaUsersController::index');
-        $routes->get('deleted-users', 'KelolaUsersController::deletedUsers');
-        $routes->post('kelola-users/data', 'KelolaUsersController::getUsersData');
-        $routes->post('deleted-users/data-table', 'KelolaUsersController::getDeletedUsersData');
-        $routes->get('kelola-users/stats', 'KelolaUsersController::getStats');
-        $routes->get('deleted-users/get-statistics', 'KelolaUsersController::getDeletedStats');
-        $routes->get('kelola-users/details/(:num)', 'KelolaUsersController::getUserDetails/$1');
-        $routes->get('deleted-users/details/(:num)', 'KelolaUsersController::getUserArchivedDetails/$1');
-        $routes->post('kelola-users/update', 'KelolaUsersController::updateUser');
-        $routes->post('kelola-users/toggle-status/(:num)', 'KelolaUsersController::toggleStatus/$1');
-        $routes->post('kelola-users/delete/(:num)', 'KelolaUsersController::deleteUser/$1');
-        $routes->post('kelola-users/restore/(:num)', 'KelolaUsersController::restoreUser/$1');
-        $routes->post('deleted-users/restore/(:num)', 'KelolaUsersController::restoreUser/$1');
-        $routes->post('deleted-users/permanent-delete/(:num)', 'KelolaUsersController::permanentlyDeleteUser/$1');
-        $routes->post('deleted-users/batch-action', 'KelolaUsersController::batchAction');
+        $routes->group('kelola-users', static function ($routes) {
+            $routes->get('/', 'KelolaUsersController::index');
+            $routes->post('data', 'Api\UserManagement::getDataTable');
+            $routes->get('stats', 'Api\UserManagement::getStatistics');
+            $routes->get('details/(:num)', 'KelolaUsersController::getUserDetails/$1');
+            $routes->post('update', 'KelolaUsersController::updateUser');
+            $routes->post('toggle-status/(:num)', 'KelolaUsersController::toggleStatus/$1');
+            $routes->post('delete/(:num)', 'KelolaUsersController::deleteUser/$1');
+            $routes->post('restore/(:num)', 'KelolaUsersController::restoreUser/$1');
+        });
 
-        // User Management Routes
-        $routes->group('users', function ($routes) {
+        $routes->group('deleted-users', static function ($routes) {
+            $routes->get('/', 'KelolaUsersController::deletedUsers');
+            $routes->post('data-table', 'KelolaUsersController::getDeletedUsersData');
+            $routes->get('get-statistics', 'KelolaUsersController::getDeletedStats');
+            $routes->get('details/(:num)', 'KelolaUsersController::getUserArchivedDetails/$1');
+            $routes->post('restore/(:num)', 'KelolaUsersController::restoreUser/$1');
+            $routes->post('permanent-delete/(:num)', 'KelolaUsersController::permanentlyDeleteUser/$1');
+            $routes->post('batch-action', 'KelolaUsersController::batchAction');
+        });
+
+        $routes->group('users', static function ($routes) {
             $routes->get('/', 'UserManagementController::index');
             $routes->get('create', 'UserManagementController::create');
             $routes->post('store', 'UserManagementController::store');
@@ -140,8 +147,7 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->get('stats', 'UserManagementController::stats');
         });
 
-        // Observasi Admin
-        $routes->group('observasi', function ($routes) {
+        $routes->group('observasi', static function ($routes) {
             $routes->get('/', 'CeklistObservasiController::index');
             $routes->get('delete/(:num)', 'Api\Observasi::delete/$1');
             $routes->get('getById/(:num)', 'Api\Observasi::getById/$1');
@@ -149,8 +155,7 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->get('loadObservasi', 'Api\Observasi::loadObservasi');
         });
 
-        // Feedback Asesi Admin
-        $routes->group('feedback-asesi', function ($routes) {
+        $routes->group('feedback-asesi', static function ($routes) {
             $routes->get('/', 'FeedbackAsesiController::index');
             $routes->get('getById/(:num)', 'Api\FeedbackAsesi::getById/$1');
             $routes->get('delete/(:num)', 'Api\FeedbackAsesi::delete/$1');
@@ -158,8 +163,7 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->post('get-data-table', 'Api\FeedbackAsesi::getDataTable');
         });
 
-        // Komponen Feedback
-        $routes->group('komponen-feedback', function ($routes) {
+        $routes->group('komponen-feedback', static function ($routes) {
             $routes->get('/', 'KomponenFeedbackController::index');
             $routes->post('save', 'Api\KomponenFeedback::save');
             $routes->post('import', 'KomponenFeedbackController::import');
@@ -169,90 +173,119 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->post('update-order', 'Api\KomponenFeedback::updateOrder');
             $routes->post('get-data-table', 'Api\KomponenFeedback::getDataTable');
             $routes->get('getMaxOrder', 'Api\KomponenFeedback::getMaxOrder');
-            $routes->post('updateOrder', 'Api\KomponenFeedback::updateOrder');
-            $routes->get('getAll', 'Api\KomponenFeedback::getAll'); // New route for getting all komponen
+            $routes->get('getAll', 'Api\KomponenFeedback::getAll');
         });
+
+        $routes->group('rekaman-asesmen', static function ($routes) {
+            $routes->get('/', 'RekamanAsesmenController::index');
+            $routes->get('view/(:num)', 'RekamanAsesmenController::view/$1');
+            $routes->get('pdf/(:num)', 'RekamanAsesmenController::pdf/$1');
+            $routes->post('batch-pdf', 'RekamanAsesmenController::batchPdf');
+            $routes->post('approve/(:num)', 'RekamanAsesmenController::approve/$1');
+            $routes->post('reject/(:num)', 'RekamanAsesmenController::reject/$1');
+            $routes->post('bulk-approve', 'RekamanAsesmenController::bulkApprove');
+            $routes->delete('bulk-delete', 'RekamanAsesmenController::bulkDelete');
+        });
+
+        $routes->get('pertanyaan-tertulis', 'PertanyaanTertulisController::index');
     });
 
+    // --------------------------------------------------------------------
+    // Manajemen Asesor
+    // --------------------------------------------------------------------
+    $routes->group('asesor', static function ($routes) {
+        $routes->get('/', 'AsesorController::index');
+        $routes->get('dashboard', 'AsesorController::dashboard');
+        $routes->post('store', 'AsesorController::store');
+        $routes->post('update', 'AsesorController::update');
+        $routes->post('delete', 'AsesorController::delete');
+
+        $routes->group('observasi', static function ($routes) {
+            $routes->get('/', 'CeklistObservasiController::index');
+            $routes->get('ceklist', 'CeklistObservasiController::create');
+            $routes->get('loadObservasi', 'Api\Observasi::loadObservasi');
+            $routes->get('getSkemaDetails', 'Api\Observasi::getSkemaDetails');
+            $routes->get('getValidatedApl1ByAsesmen', 'CeklistObservasiController::getValidatedApl1ByAsesmen');
+            $routes->get('getApl1Details', 'Api\Observasi::getApl1Details');
+            $routes->get('checkExistingObservation', 'Api\Observasi::checkExistingObservation');
+            $routes->post('save', 'Api\Observasi::save');
+            $routes->post('saveSettings', 'Api\Observasi::saveSettings');
+            $routes->post('saveSingleKUK', 'Api\Observasi::saveSingleKUK');
+            $routes->post('saveBatchKUK', 'Api\Observasi::saveBatchKUK');
+            $routes->get('getStatistics', 'Api\Observasi::getStatistics');
+            $routes->get('getProgressReport', 'Api\Observasi::getProgressReport');
+            $routes->delete('delete/(:num)', 'Api\Observasi::deleteObservasi/$1');
+            $routes->get('view/(:num)', 'CeklistObservasiController::view/$1');
+            $routes->get('print/(:num)', 'CeklistObservasiController::printObservasi/$1');
+            $routes->get('export/(:num)', 'CeklistObservasiController::exportObservasi/$1');
+        });
+
+        $routes->group('feedback', static function ($routes) {
+            $routes->get('/', 'CeklistFeedbackController::index', ['as' => 'feedback-index']);
+            $routes->get('form', 'CeklistFeedbackController::create', ['as' => 'feedback-form']);
+            $routes->get('pdf/(:num)', 'CeklistFeedbackController::pdf/$1', ['as' => 'feedback-pdf']);
+            $routes->group('api', static function ($routes) {
+                $routes->get('get-skema-details', 'Api\FeedbackAsesi::getSkemaDetails');
+                $routes->get('load-feedback', 'Api\FeedbackAsesi::loadFeedback');
+                $routes->post('save', 'Api\FeedbackAsesi::save');
+                $routes->delete('delete/(:num)', 'Api\FeedbackAsesi::deleteFeedback/$1');
+            });
+        });
+
+        $routes->group('rekaman-asesmen', static function ($routes) {
+            $routes->get('/', 'RekamanAsesmenController::ceklist');
+            $routes->get('getAsesiByAsesmen', 'RekamanAsesmenController::getAsesiByAsesmen');
+            $routes->get('loadRekamanAsesmen', 'RekamanAsesmenController::loadRekamanAsesmen');
+            $routes->post('store', 'RekamanAsesmenController::store');
+            $routes->post('/', 'Api\RekamanAsesmenApi::saveUnit');
+        });
+
+        $routes->group('pmo', static function ($routes) {
+            $routes->get('/', 'CeklistPMOController::index');
+            $routes->get('create', 'CeklistPMOController::show');
+            $routes->get('getAsesiByAsesmen', 'PMOController::getAsesiByAsesmen');
+            $routes->get('loadPMO', 'Api\PMO::loadPmo');
+            $routes->post('store', 'PMOController::store');
+            $routes->get('pdf/(:num)', 'PMOController::pdf/$1');
+            $routes->post('batch-pdf', 'CeklistPMOController::batchPdf');
+        });
+
+        $routes->get('header-konfigurasi', 'HeaderKonfigurasiController::index');
+    });
+
+    // --------------------------------------------------------------------
     // Manajemen Asesi
-    $routes->group('asesi', function ($routes) {
+    // --------------------------------------------------------------------
+    $routes->group('asesi', static function ($routes) {
         $routes->get('/', 'AsesiController::index');
         $routes->get('dashboard', 'AsesiController::index');
+        $routes->get('dashboard/data', 'AsesiController::getDashboardData');
         $routes->get('profile', 'AsesiController::profile');
+        $routes->post('validateField', 'AsesiController::validateField');
+        $routes->post('getSekolah', 'AsesiController::getSekolah');
+        $routes->post('upload-documents', 'AsesiController::uploadDocuments');
         $routes->post('store', 'AsesiController::store');
         $routes->post('import', 'AsesiController::import');
         $routes->post('save', 'AsesiController::save');
         $routes->post('update-user-info', 'AsesiController::updateUserInfo');
         $routes->post('delete', 'AsesiController::delete');
 
-        // Fitur Umpan Balik Asesi
-        $routes->group('feedback', function ($routes) {
+        $routes->group('feedback', static function ($routes) {
             $routes->get('/', 'FeedbackAsesiController::asesiIndex');
             $routes->post('save', 'FeedbackAsesiController::asesiSave');
         });
+
+        $routes->get('pmo', 'CeklistPMOController::index');
+        $routes->get('pmo-ceklist/(:any)', 'CeklistPMOController::show/$1');
+
+        $routes->get('pertanyaan-tertulis/cbt/(:any)', 'PertanyaanTertulisController::show/$1');
     });
 
-    // Manajemen Asesor
-    $routes->group('asesor', function ($routes) {
-        $routes->get('/', 'AsesorController::index');
-        $routes->get('dashboard', 'AsesorController::dashboard');
-        $routes->post('store', 'AsesorController::store');
-        $routes->post('update', 'AsesorController::update');
-        $routes->post('delete', 'AsesorController::delete');        // Observasi Asesor
-        $routes->group('observasi', function ($routes) {
-            $routes->get('/', 'CeklistObservasiController::index');
-            $routes->get('ceklist', 'CeklistObservasiController::create');
-            $routes->get('loadObservasi', 'Api\Observasi::loadObservasi');
-            $routes->get('getSkemaDetails', 'Api\Observasi::getSkemaDetails');
-            $routes->get('getAsesiByAsesmen', 'CeklistObservasiController::getAsesiByAsesmen');
-            $routes->post('save', 'Api\Observasi::save');
-        });
-
-        // New REST API for Observasi (Production-ready)
-        $routes->group('api/observasi', function ($routes) {
-            $routes->get('/', 'Api\ObservasiV2Controller::index');
-            $routes->get('(:num)', 'Api\ObservasiV2Controller::show/$1');
-            $routes->post('/', 'Api\ObservasiV2Controller::create');
-            $routes->put('(:num)', 'Api\ObservasiV2Controller::update/$1');
-            $routes->get('kuk-structure/(:num)', 'Api\ObservasiV2Controller::getKukStructure/$1');
-            $routes->post('batch', 'Api\ObservasiV2Controller::batchSave');
-            $routes->get('(:num)/summary', 'Api\ObservasiV2Controller::getSummary/$1');
-            $routes->post('validate', 'Api\ObservasiV2Controller::validateObservationData');
-        });
-
-        // Feedback Asesi Asesor
-        $routes->group('feedback', function ($routes) {
-            $routes->get('/', 'FeedbackAsesiController::create');
-            $routes->get('getSkemaDetails', 'Api\FeedbackAsesi::getSkemaDetails');
-            $routes->get('loadFeedback', 'Api\FeedbackAsesi::loadFeedback');
-            $routes->post('save', 'Api\FeedbackAsesi::save');
-        });
-
-        // PERBAIKAN: Rekaman Asesmen routes
-        $routes->group('rekaman-asesmen', function ($routes) {
-            $routes->get('/', 'RekamanAsesmenController::index');
-            $routes->get('create', 'RekamanAsesmenController::create');
-            $routes->get('getAsesiByAsesmen', 'RekamanAsesmenController::getAsesiByAsesmen');
-            $routes->get('loadRekamanAsesmen', 'RekamanAsesmenController::loadRekamanAsesmen');
-            $routes->post('store', 'RekamanAsesmenController::store'); // PERBAIKAN: Tambahkan ini
-            $routes->get('pdf/(:num)', 'RekamanAsesmenController::pdf/$1');
-        });
-
-        // PMO routes
-        $routes->group('pmo', function ($routes) {
-            $routes->get('/', 'PMOController::index');
-            $routes->get('create', 'PMOController::index'); // Alias untuk create
-            $routes->get('getAsesiByAsesmen', 'PMOController::getAsesiByAsesmen'); // SAMA SEPERTI OBSERVASI
-            $routes->get('loadPMO', 'PMOController::loadPMO');
-            $routes->post('store', 'PMOController::store');
-            $routes->get('pdf/(:num)', 'PMOController::pdf/$1');
-        });
-    });
-
+    // --------------------------------------------------------------------
     // Manajemen Data Master
-    $routes->group('master', function ($routes) {
-        // Skema
-        $routes->group('skema', function ($routes) {
+    // --------------------------------------------------------------------
+    $routes->group('master', static function ($routes) {
+        $routes->group('skema', static function ($routes) {
             $routes->get('/', 'SkemaController::index');
             $routes->post('save', 'Api\Skema::save');
             $routes->get('get/(:num)', 'Api\Skema::get/$1');
@@ -263,8 +296,7 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->post('get-data-table', 'Api\Skema::getDataTable');
         });
 
-        // Unit Kompetensi
-        $routes->group('unit', function ($routes) {
+        $routes->group('unit', static function ($routes) {
             $routes->get('/', 'UnitController::index');
             $routes->post('save', 'Api\Unit::save');
             $routes->post('import', 'UnitController::import');
@@ -274,8 +306,7 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->post('get-data-table', 'Api\Unit::getDataTable');
         });
 
-        // Elemen
-        $routes->group('elemen', function ($routes) {
+        $routes->group('elemen', static function ($routes) {
             $routes->get('/', 'ElemenController::index');
             $routes->post('save', 'Api\Elemen::save');
             $routes->post('import', 'ElemenController::import');
@@ -286,8 +317,7 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->post('get-data-table', 'Api\Elemen::getDataTable');
         });
 
-        // KUK (Kriteria Unjuk Kerja)
-        $routes->group('kuk', function ($routes) {
+        $routes->group('kuk', static function ($routes) {
             $routes->get('/', 'KUKController::index');
             $routes->post('save', 'Api\KUK::save');
             $routes->post('import', 'KUKController::import');
@@ -299,19 +329,26 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->post('get-data-table', 'Api\KUK::getDataTable');
         });
 
-        // Kelompok Kerja
-        $routes->group('kelompok-kerja', function ($routes) {
+        $routes->group('asesmen', static function ($routes) {
+            $routes->get('/', 'AsesmenController::index');
+            $routes->post('save', 'Api\Asesmen::save');
+            $routes->post('import', 'AsesmenController::import');
+            $routes->delete('delete/(:num)', 'Api\Asesmen::delete/$1');
+            $routes->get('getById/(:num)', 'Api\Asesmen::getById/$1');
+            $routes->post('get-data-table', 'Api\Asesmen::getDataTable');
+        });
+
+        $routes->group('kelompok-kerja', static function ($routes) {
             $routes->get('/', 'KelompokKerjaController::index');
             $routes->get('detail/(:num)', 'KelompokKerjaController::detail/$1');
             $routes->post('save', 'KelompokKerjaController::save');
             $routes->post('import', 'KelompokKerjaController::import');
             $routes->post('update', 'KelompokKerjaController::update');
-            $routes->delete('delete/(:num)', 'Api\KelompokKerja::delete/$1');
+            $routes->get('delete/(:num)', 'Api\KelompokKerja::delete/$1');
             $routes->post('get-data-table', 'Api\KelompokKerja::getDataTable');
         });
 
-        // TUK (Tempat Uji Kompetensi)
-        $routes->group('tuk', function ($routes) {
+        $routes->group('tuk', static function ($routes) {
             $routes->get('/', 'TUKController::index');
             $routes->post('save', 'Api\TUK::save');
             $routes->get('delete/(:num)', 'Api\TUK::delete/$1');
@@ -319,16 +356,14 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->post('get-data-table', 'Api\TUK::getDataTable');
         });
 
-        // Persyaratan
-        $routes->group('persyaratan', function ($routes) {
+        $routes->group('persyaratan', static function ($routes) {
             $routes->get('/', 'PersyaratanController::index');
             $routes->post('store', 'PersyaratanController::store');
             $routes->post('update', 'PersyaratanController::update');
             $routes->post('delete', 'PersyaratanController::delete');
         });
 
-        // Pengaturan Tanggal
-        $routes->group('tanggal', function ($routes) {
+        $routes->group('tanggal', static function ($routes) {
             $routes->get('/', 'SettanggalController::index');
             $routes->post('save', 'Api\SetTanggal::save');
             $routes->get('delete/(:num)', 'Api\SetTanggal::delete/$1');
@@ -336,8 +371,7 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->post('get-data-table', 'Api\SetTanggal::getDataTable');
         });
 
-        // Pertanyaan PMO
-        $routes->group('pertanyaan-pmo', function ($routes) {
+        $routes->group('pmo-pertanyaan', static function ($routes) {
             $routes->get('/', 'PMOPertanyaanController::index');
             $routes->post('save', 'Api\PMOPertanyaan::save');
             $routes->post('import', 'PMOPertanyaanController::import');
@@ -346,12 +380,41 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->get('getById/(:num)', 'Api\PMOPertanyaan::getById/$1');
             $routes->post('get-data-table', 'Api\PMOPertanyaan::getDataTable');
         });
+
+        $routes->group('pertanyaan-tertulis-soal', static function ($routes) {
+            $routes->get('/', 'PertanyaanTertulisSoalController::index');
+            $routes->post('save', 'Api\PertanyaanTertulisSoal::save');
+            $routes->post('import', 'PertanyaanTertulisSoalController::import');
+            $routes->get('download-template', 'PertanyaanTertulisSoalController::downloadTemplate');
+            $routes->get('delete/(:num)', 'Api\PertanyaanTertulisSoal::delete/$1');
+            $routes->get('getById/(:num)', 'Api\PertanyaanTertulisSoal::getById/$1');
+            $routes->post('get-data-table', 'Api\PertanyaanTertulisSoal::getDataTable');
+        });
     });
 
-    // Manajemen Formulir APL
-    $routes->group('apl', function ($routes) {
-        // Formulir APL01
-        $routes->group('1', function ($routes) {
+    // --------------------------------------------------------------------
+    // Manajemen Formulir & Proses Inti Asesmen
+    // --------------------------------------------------------------------
+    $routes->group('asesmen', static function ($routes) {
+        $routes->get('/', 'AsesmenController::index');
+        $routes->post('save', 'Api\Asesmen::save');
+        $routes->post('import', 'AsesmenController::import');
+        $routes->delete('delete/(:num)', 'Api\Asesmen::delete/$1');
+        $routes->get('getById/(:num)', 'Api\Asesmen::getById/$1');
+        $routes->post('get-data-table', 'Api\Asesmen::getDataTable');
+
+        $routes->group('persetujuan', static function ($routes) {
+            $routes->get('/', 'AKController::index');
+            $routes->post('store', 'AKController::store');
+            $routes->get('pdf/(:any)', 'AKController::pdf/$1');
+            $routes->post('import', 'AKController::import');
+            $routes->post('update', 'AKController::update');
+            $routes->post('delete', 'AKController::delete');
+        });
+    });
+
+    $routes->group('apl', static function ($routes) {
+        $routes->group('1', static function ($routes) {
             $routes->get('/', 'APL1Controller::index');
             $routes->post('store', 'APL1Controller::store');
             $routes->get('validasi', 'APL1Controller::validasi');
@@ -359,13 +422,12 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
             $routes->post('store-validasi', 'APL1Controller::store_validasi');
             $routes->post('store-email-validasi', 'APL1Controller::send_email_validasi');
             $routes->post('store-email-validasi-by-date', 'APL1Controller::send_email_validasi_by_date');
-            $routes->post('getDateValidated', 'APL1Controller::getDateValidated'); // Tambah route ini
+            $routes->post('getDateValidated', 'APL1Controller::getDateValidated');
             $routes->post('delete', 'APL1Controller::delete');
             $routes->get('pdf/(:any)', 'APL1Controller::pdf/$1');
         });
 
-        // Formulir APL02
-        $routes->group('2', function ($routes) {
+        $routes->group('2', static function ($routes) {
             $routes->get('/', 'APL2Controller::index');
             $routes->post('store', 'APL2Controller::store');
             $routes->get('validasi', 'APL2Controller::validasi');
@@ -378,85 +440,109 @@ $routes->group('', ['filter' => 'login'], function ($routes) {
         });
     });
 
-    // Monitoring dan Feedback
+    // --------------------------------------------------------------------
+    // Monitoring, Laporan & Feedback
+    // --------------------------------------------------------------------
     $routes->get('monitoring', 'MonitoringController::index');
-    $routes->group('feedback', function ($routes) {
+
+    $routes->group('feedback', static function ($routes) {
         $routes->get('/', 'FeedbackController::index');
         $routes->post('delete', 'FeedbackController::delete');
     });
 
-    // Umpan Balik Asesi
-    $routes->group('asesor/feedback', function ($routes) {
-        $routes->get('/', 'FeedbackAsesiController::index');
-        $routes->get('create', 'FeedbackAsesiController::create');
-        $routes->get('edit/(:num)', 'FeedbackAsesiController::edit/$1');
-        $routes->post('save', 'FeedbackAsesiController::save');
-    });
-
-    $routes->group('asesi/feedback', function ($routes) {
-        $routes->get('/', 'FeedbackAsesiController::asesiIndex');
-        $routes->post('save', 'FeedbackAsesiController::asesiSave');
-    });
-
-    // Rekaman Asesmen
-    $routes->group('rekaman-asesmen', function ($routes) {
-        $routes->get('/', 'RekamanAsesmenController::index'); // untuk admin
-        $routes->get('create', 'RekamanAsesmenController::create'); // untuk asesor
+    $routes->group('rekaman-asesmen', static function ($routes) {
+        $routes->get('/', 'RekamanAsesmenController::index');
+        $routes->get('create', 'RekamanAsesmenController::create');
         $routes->post('store', 'RekamanAsesmenController::store');
         $routes->post('load', 'RekamanAsesmenController::loadRekamanAsesmen');
         $routes->get('pdf/(:num)', 'RekamanAsesmenController::pdf/$1');
         $routes->get('delete/(:num)', 'RekamanAsesmenController::delete/$1');
     });
 
-    // Komponen Umpan Balik
-    $routes->group('komponen-feedback', function ($routes) {
-        $routes->get('/', 'KomponenFeedbackController::index');
-        $routes->post('import', 'KomponenFeedbackController::import');
-        $routes->get('download-template', 'KomponenFeedbackController::downloadTemplate');
+    $routes->group('laporan', function ($routes) {
+        $routes->get('/', 'LaporanAsesmenController::index');
+        $routes->post('asesmen/batch-pdf', 'LaporanAsesmenController::batchPdf');
+        $routes->get('asesmen/pdf/(:num)', 'LaporanAsesmenController::generateLaporan/$1');
+        $routes->get('view/(:num)', 'LaporanAsesmenController::view/$1');
+        $routes->get('download/(:num)', 'LaporanAsesmenController::download/$1');
     });
 
-    // PDF Routes for Feedback Asesi
-    $routes->get('pdf/feedback/(:num)', 'FeedbackAsesiController::pdf/$1');
+    $routes->group('reports', static function ($routes) {
+        $routes->get('rekaman-asesmen/statistics', 'ReportsController::rekamanStatistics');
+        $routes->get('rekaman-asesmen/by-skema', 'ReportsController::rekamanBySkema');
+        $routes->get('rekaman-asesmen/by-asesor', 'ReportsController::rekamanByAsesor');
+        $routes->get('rekaman-asesmen/export/excel', 'ReportsController::exportRekamanExcel');
+        $routes->get('rekaman-asesmen/export/pdf-summary', 'ReportsController::exportRekamanPdfSummary');
+    });
 
-    // Manajemen Menu (dengan filter auth)
-    $routes->group('menu', ['filter' => 'auth'], function ($routes) {
+    // --------------------------------------------------------------------
+    // Fitur Lainnya
+    // --------------------------------------------------------------------
+    $routes->group('menu', ['filter' => 'auth'], static function ($routes) {
         $routes->get('/', 'Menu::index');
-        $routes->get('items/(:num)', 'Menu::items/$1');        // Group CRUD
+        $routes->get('items/(:num)', 'Menu::items/$1');
         $routes->match(['GET', 'POST'], 'create-group', 'Menu::createGroup');
         $routes->match(['GET', 'POST'], 'edit-group/(:num)', 'Menu::editGroup/$1');
         $routes->get('delete-group/(:num)', 'Menu::deleteGroup/$1');
-
-        // Item CRUD
         $routes->match(['GET', 'POST'], 'create-item/(:num)', 'Menu::createItem/$1');
         $routes->match(['GET', 'POST'], 'edit-item/(:num)', 'Menu::editItem/$1');
         $routes->get('delete-item/(:num)', 'Menu::deleteItem/$1');
         $routes->post('reorder-items', 'Menu::reorderItems');
     });
 
-    // Profile Routes
-    $routes->group('profile', ['filter' => 'login'], function ($routes) {
-        $routes->get('/', 'ProfileController::index');
-        $routes->post('update', 'ProfileController::update');
-        $routes->post('change-password', 'ProfileController::changePassword');
-        $routes->post('upload-avatar', 'ProfileController::uploadAvatar');
+    $routes->group('dashboard', static function ($routes) {
+        $routes->get('rekaman/widget/latest', 'DashboardController::latestRekaman');
+        $routes->get('rekaman/widget/statistics', 'DashboardController::rekamanStatistics');
+        $routes->get('rekaman/widget/pending', 'DashboardController::pendingRekaman');
     });
 });
 
-// =====================================================
-// ROUTES API
-// =====================================================
-$routes->group('api', function ($routes) {
-    // Data Asesmen
-    $routes->post('get-jadwal', 'AsesmenController::getJadwal');
-    $routes->post('get-tuk', 'AsesmenController::getTuk');
+
+// ===================================================================
+// #5. ROUTES API TERPROTEKSI (Filter 'login', Prefix 'api/')
+// ===================================================================
+$routes->group('api', ['filter' => 'login'], static function ($routes) {
+
+    // --- Data Master & Dependensi ---
     $routes->post('get-unit', 'Api\Unit::getUnit');
     $routes->post('get-unit-json', 'Api\Unit::getUnitJSON');
-    $routes->post('get-elemen', 'Api\ELemen::getElemen');
+    $routes->post('get-elemen', 'Api\Elemen::getElemen');
+    $routes->post('get-elemen-json', 'Api\Elemen::getElemenJSON');
+    $routes->post('get-kuk', 'Api\KUK::getKuk');
+    $routes->get('get-skema-asesor', 'Api\AsesorSkema::getSkemaAsesor');
+
+    // --- Pengajuan Asesmen ---
+    $routes->get('getAsesmenJson', 'Api\PengajuanAsesmen::getAsesmenJson');
+    $routes->get('getSkemaDetailJson', 'Api\PengajuanAsesmen::getSkemaDetailJson');
+    $routes->get('check-registration-status', 'Api\PengajuanAsesmen::check_registration_status');
+    $routes->group('pengajuan-asesmen', static function ($routes) {
+        $routes->post('get-data-table', 'Api\PengajuanAsesmen::getDataTable');
+        $routes->get('getById/(:any)', 'Api\PengajuanAsesmen::getById/$1');
+        $routes->post('save', 'Api\PengajuanAsesmen::save');
+        $routes->delete('delete/(:any)', 'Api\PengajuanAsesmen::delete/$1');
+        $routes->post('validate/(:any)', 'Api\PengajuanAsesmen::validatePengajuan/$1');
+    });
+
+    // --- Observasi ---
     $routes->get('get-observasi', 'CeklistObservasiController::getObservasiData');
     $routes->get('get-asesi', 'CeklistObservasiController::getAsesiList');
+    $routes->group('observasi', static function ($routes) {
+        $routes->get('getValidatedApl1List', 'Api\Observasi::getValidatedApl1List');
+        $routes->get('getValidatedApl1BySkema', 'Api\Observasi::getValidatedApl1BySkema');
+        $routes->get('getApl1Details', 'Api\Observasi::getApl1Details');
+        $routes->get('checkExistingObservation', 'Api\Observasi::checkExistingObservation');
+        $routes->get('loadObservasi', 'Api\Observasi::loadObservasi');
+        $routes->get('getSkemaDetails', 'Api\Observasi::getSkemaDetails');
+        $routes->post('save', 'Api\Observasi::save');
+        $routes->post('saveSingleKUK', 'Api\Observasi::saveSingleKUK');
+        $routes->post('saveBatchKUK', 'Api\Observasi::saveBatchKUK');
+        $routes->get('getStatistics', 'Api\Observasi::getStatistics');
+        $routes->get('getProgressReport', 'Api\Observasi::getProgressReport');
+        $routes->delete('deleteObservasi/(:num)', 'Api\Observasi::deleteObservasi/$1');
+    });
 
-    // Feedback Asesi API
-    $routes->group('feedback-asesi', function ($routes) {
+    // --- Feedback Asesi ---
+    $routes->group('feedback-asesi', static function ($routes) {
         $routes->get('get-skema-details', 'Api\FeedbackAsesi::getSkemaDetails');
         $routes->get('get-komponen', 'Api\FeedbackAsesi::getKomponen');
         $routes->get('load-feedback', 'Api\FeedbackAsesi::loadFeedback');
@@ -467,36 +553,74 @@ $routes->group('api', function ($routes) {
         $routes->post('get-data-table', 'Api\FeedbackAsesi::getDataTable');
     });
 
-    // Data Lokasi
-    $routes->post('kabupaten', 'APL1Controller::kabupaten');
-    $routes->post('kecamatan', 'APL1Controller::kecamatan');
-    $routes->post('desa', 'APL1Controller::desa');
-
-    // Rekaman Asesmen API
-    $routes->group('rekaman-asesmen', function ($routes) {
-        $routes->post('load', 'RekamanAsesmenController::loadRekamanAsesmen');
-        $routes->get('get-data-table', 'Api\RekamanAsesmen::getDataTable');
+    // --- PMO (Portofolio) ---
+    $routes->group('pmo', static function ($routes) {
+        $routes->post('list', 'Api\PMO::list');
+        $routes->get('loadPmo', 'Api\PMO::loadPMO');
+        $routes->post('save', 'Api\PMO::save');
+        $routes->post('get-data-table', 'Api\PMO::getDataTable');
+        $routes->get('delete/(:num)', 'Api\PMO::delete/$1');
     });
 
-    // Tanggal Validasi
-    $routes->post('get-date-validated-apl1', 'APL1Controller::getDateValidated');
-    $routes->post('get-date-validated-apl2', 'APL2Controller::getDateValidated');
+    // --- Rekaman Asesmen ---
+    $routes->group('rekaman-asesmen', static function ($routes) {
+        $routes->post('load', 'RekamanAsesmenController::loadRekamanAsesmen');
+        $routes->get('get-data-table', 'Api\RekamanAsesmen::getDataTable');
+        $routes->group('admin', function ($routes) {
+            $routes->post('list', 'Api\RekamanAsesmenAdmin::list');
+            $routes->post('get-data-table', 'Api\RekamanAsesmenAdmin::getDataTable');
+            $routes->post('delete/(:num)', 'Api\RekamanAsesmenAdmin::delete/$1');
+            $routes->delete('delete/(:num)', 'Api\RekamanAsesmenAdmin::delete/$1');
+        });
+    });
 
-    // Tanda Tangan
-    $routes->get('signature-show/(:segment)', 'DocumentController::signatureShow/$1');
-});
+    $routes->group('rekaman', static function ($routes) {
+        $routes->post('auto-save', 'Api\RekamanAsesmenApi::autoSave');
+        $routes->post('create', 'Api\RekamanAsesmenApi::create');
+        $routes->post('update', 'Api\RekamanAsesmenApi::update');
+        $routes->post('save-bulk', 'Api\RekamanAsesmenApi::saveBulk');
+        $routes->post('batch-save', 'Api\RekamanAsesmenApi::batchSave');
+        $routes->post('(:num)/batch-kompetensi', 'Api\RekamanAsesmenApi::batchKompetensi/$1');
+        $routes->get('list', 'Api\RekamanAsesmenApi::list');
+        $routes->get('struktur/(:num)', 'Api\RekamanAsesmenApi::struktur/$1');
+        $routes->get('(:num)/work-groups', 'Api\RekamanAsesmenApi::workGroups/$1');
+        $routes->get('(:num)/existing-kompetensi', 'Api\RekamanAsesmenApi::existingKompetensi/$1');
+        $routes->get('(:num)/progress', 'Api\RekamanAsesmenApi::progress/$1');
+        $routes->get('apl1-list/(:num)', 'Api\RekamanAsesmenApi::apl1List/$1');
+        $routes->get('apl1-detail/(:segment)', 'Api\RekamanAsesmenApi::apl1Detail/$1');
+        $routes->get('check-existing/(:segment)', 'Api\RekamanAsesmenApi::checkExisting/$1');
+        $routes->get('(:num)/export', 'Api\RekamanAsesmenApi::export/$1');
+        $routes->get('(:num)/pdf-data', 'Api\RekamanAsesmenApi::pdfData/$1');
+        $routes->get('(:num)', 'Api\RekamanAsesmenApi::show/$1');
+        $routes->delete('(:num)', 'Api\RekamanAsesmenApi::delete/$1');
+    });
 
-// =====================================================
-// ROUTE TESTING (SEMENTARA)
-// =====================================================
-$routes->get('tes', 'TesController::index');
+    // --- Asesor ---
+    $routes->group('asesor', static function ($routes) {
+        $routes->group('rekaman', static function ($routes) {
+            $routes->get('apl1/(:num)', 'RekamanAsesmenController::getApl1ByAsesmen/$1');
+            $routes->get('load', 'RekamanAsesmenController::loadRekamanAsesmen');
+            $routes->post('save/settings', 'RekamanAsesmenController::store');
+            $routes->post('save/method', 'RekamanAsesmenController::store');
+            $routes->post('save/batch', 'RekamanAsesmenController::store');
+            $routes->post('save/recommendation', 'RekamanAsesmenController::store');
+            $routes->post('save', 'RekamanAsesmenController::store');
+            $routes->post('finalize', 'RekamanAsesmenController::finalize');
+            $routes->get('history/(:segment)', 'RekamanAsesmenController::getRekamanHistory/$1');
+            $routes->delete('(:num)', 'RekamanAsesmenController::delete/$1');
+        });
+    });
 
-// =====================================================
-// API ROUTTES
-// =====================================================
-$routes->group('api', function ($routes) {
-    // User Management API
-    $routes->group('user-management', function ($routes) {
+    // --- Pertanyaan Tertulis (CBT) ---
+    $routes->group('pertanyaan-tertulis', static function ($routes) {
+        $routes->get('loadUjian', 'Api\PertanyaanTertulis::loadUjian');
+        $routes->post('save', 'Api\PertanyaanTertulis::save');
+        $routes->post('get-data-table', 'Api\PertanyaanTertulis::getDataTable');
+        $routes->get('delete/(:num)', 'Api\PertanyaanTertulis::delete/$1');
+    });
+
+    // --- Manajemen User ---
+    $routes->group('user-management', static function ($routes) {
         $routes->post('get-data-table', 'Api\UserManagement::getDataTable');
         $routes->get('get-user-statistics-with-deleted', 'Api\UserManagement::getUserStatisticsWithDeleted');
         $routes->post('get-user-by-id', 'Api\UserManagement::getUserByIdPost');
@@ -506,53 +630,99 @@ $routes->group('api', function ($routes) {
         $routes->post('update-user', 'Api\UserManagement::updateUser');
         $routes->post('update-status', 'Api\UserManagement::updateStatus');
         $routes->post('soft-delete-user', 'Api\UserManagement::softDeleteUser');
-
-        // Asesor management routes
         $routes->get('get-asesor-by-user-id', 'Api\UserManagement::getAsesorByUserId');
         $routes->get('get-all-asesor', 'Api\UserManagement::getAllAsesor');
         $routes->post('update-asesor', 'Api\UserManagement::updateAsesor');
         $routes->get('get-asesor-statistics', 'Api\UserManagement::getAsesorStatistics');
-
-        // Skema routes
         $routes->get('get-active-skemas', 'Api\UserManagement::getActiveSkemas');
     });
 
-    // Add this new route for asesor skema
-    $routes->get('get-skema-asesor', 'Api\AsesorSkema::getSkemaAsesor');
+    $routes->group('user', function ($routes) {
+        $routes->post('getDataTable', 'Api\UserManagement::getDataTable');
+        $routes->get('statistics', 'Api\UserManagement::getStatistics');
+        $routes->get('getById/(:num)', 'Api\UserManagement::getById/$1');
+        $routes->post('create', 'Api\UserManagement::create');
+        $routes->post('update', 'Api\UserManagement::update');
+        $routes->post('delete/(:num)', 'Api\UserManagement::delete/$1');
+        $routes->post('toggle-status/(:num)', 'Api\UserManagement::toggleStatus/$1');
+    });
+
+    // --- Lain-lain ---
+    $routes->group('headerkonfigurasi', function ($routes) {
+        $routes->post('getDataTable', 'HeaderKonfigurasiController::getDataTable');
+        $routes->post('save', 'HeaderKonfigurasiController::save');
+        $routes->get('getById/(:num)', 'HeaderKonfigurasiController::getById/$1');
+        $routes->get('delete/(:num)', 'HeaderKonfigurasiController::delete/$1');
+    });
+    $routes->post('get-date-validated-apl1', 'APL1Controller::getDateValidated');
+    $routes->post('get-date-validated-apl2', 'APL2Controller::getDateValidated');
 });
 
 
-$routes->group('kelola_apl1', ['filter' => 'login'], function ($routes) {
-    $routes->get('/', 'APL1Controller::index');
-    $routes->post('store', 'APL1Controller::store');
-    $routes->get('validasi', 'APL1Controller::validasi');
-    $routes->get('send-email-validasi', 'APL1Controller::email_validasi');
-    $routes->post('store-validasi', 'APL1Controller::store_validasi');
-    $routes->post('store-email-validasi', 'APL1Controller::send_email_validasi');
-    $routes->post('store-email-validasi-by-date', 'APL1Controller::send_email_validasi_by_date');
-    $routes->post('getDateValidated', 'APL1Controller::getDateValidated'); // Tambah route ini
-    $routes->post('delete', 'APL1Controller::delete');
-    $routes->get('pdf-(:any)', 'APL1Controller::pdf/$1');
+// ===================================================================
+// #6. ROUTES LEGACY / KOMPATIBILITAS
+// ===================================================================
+$routes->group('', ['filter' => 'login'], static function ($routes) {
+    $routes->group('kelola_apl1', static function ($routes) {
+        $routes->get('/', 'PengajuanAsesmenController::index');
+        $routes->post('store', 'APL1Controller::store');
+        $routes->get('validasi', 'APL1Controller::validasi');
+        $routes->get('send-email-validasi', 'APL1Controller::email_validasi');
+        $routes->post('store-validasi', 'APL1Controller::store_validasi');
+        $routes->post('store-email-validasi', 'APL1Controller::send_email_validasi');
+        $routes->post('store-email-validasi-by-date', 'APL1Controller::send_email_validasi_by_date');
+        $routes->post('getDateValidated', 'APL1Controller::getDateValidated');
+        $routes->post('delete', 'APL1Controller::delete');
+        $routes->get('pdf-(:any)', 'APL1Controller::pdf/$1');
+    });
+
+    $routes->group('kelola_apl2', static function ($routes) {
+        $routes->get('/', 'APL2Controller::index');
+        $routes->post('store', 'APL2Controller::store');
+        $routes->get('validasi', 'APL2Controller::validasi');
+        $routes->post('validasi-store', 'APL2Controller::store_validasi');
+        $routes->get('send-email-validasi', 'APL2Controller::email_validasi');
+        $routes->post('store-email-validasi', 'APL2Controller::send_email_validasi');
+        $routes->post('store-email-validasi-by-date', 'APL2Controller::send_email_validasi_by_date');
+        $routes->post('delete', 'APL2Controller::delete');
+        $routes->get('pdf-(:any)', 'APL2Controller::pdf/$1');
+    });
+
+    $routes->group('persetujuan-asesmen', static function ($routes) {
+        $routes->get('/', 'AKController::index');
+        $routes->post('store', 'AKController::store');
+        $routes->get('pdf-(:any)', 'AKController::pdf/$1');
+        $routes->post('import', 'AKController::import');
+        $routes->post('update', 'AKController::update');
+        $routes->post('delete', 'AKController::delete');
+    });
+
+    $routes->group('asesor/rekaman-asesmen', static function ($routes) {
+        $routes->get('/', 'RekamanAsesmenController::index', ['as' => 'asesor.rekaman']);
+        $routes->get('getApl1ByAsesmen', 'RekamanAsesmenController::getAsesiByAsesmen', ['as' => 'asesor.rekaman.get_apl1']);
+        $routes->get('loadRekamanAsesmen', 'RekamanAsesmenController::loadRekamanAsesmen', ['as' => 'asesor.rekaman.load']);
+        $routes->post('store', 'RekamanAsesmenController::store', ['as' => 'asesor.rekaman.store']);
+        $routes->post('finalize', 'RekamanAsesmenController::finalize', ['as' => 'asesor.rekaman.finalize']);
+        $routes->get('history', 'RekamanAsesmenController::getRekamanHistory', ['as' => 'asesor.rekaman.history']);
+        $routes->delete('delete/(:num)', 'RekamanAsesmenController::delete/$1', ['as' => 'asesor.rekaman.delete']);
+        $routes->get('pdf/(:num)', 'RekamanAsesmenController::pdf/$1', ['as' => 'asesor.rekaman.pdf']);
+    });
+    $routes->get('asesor/rekaman-kompetensi', 'RekamanAsesmenController::index', ['as' => 'asesor.rekaman.kompetensi']);
 });
 
 
-$routes->group('kelola_apl2', ['filter' => 'login'], function ($routes) {
-    $routes->get('/', 'APL2Controller::index');
-    $routes->post('store', 'APL2Controller::store');
-    $routes->get('validasi', 'APL2Controller::validasi');
-    $routes->post('validasi-store', 'APL2Controller::store_validasi');
-    $routes->get('send-email-validasi', 'APL2Controller::email_validasi');
-    $routes->post('store-email-validasi', 'APL2Controller::send_email_validasi');
-    $routes->post('store-email-validasi-by-date', 'APL2Controller::send_email_validasi_by_date');
-    $routes->post('delete', 'APL2Controller::delete');
-    $routes->get('pdf-(:any)', 'APL2Controller::pdf/$1');
+// ===================================================================
+// #7. ROUTES WEBSOCKET (Opsional)
+// ===================================================================
+$routes->group('ws', static function ($routes) {
+    $routes->get('rekaman/updates/(:segment)', 'WebSocketController::rekamanUpdates/$1');
+    $routes->post('rekaman/broadcast', 'WebSocketController::broadcastRekamanUpdate');
 });
 
-$routes->group('persetujuan-asesmen', ['filter' => 'login'], function ($routes) {
-    $routes->get('/', 'AKController::index');
-    $routes->post('store', 'AKController::store');
-    $routes->get('pdf-(:any)', 'AKController::pdf/$1');
-    $routes->post('import', 'AKController::import');
-    $routes->post('update', 'AKController::update');
-    $routes->post('delete', 'AKController::delete');
-});
+
+// ===================================================================
+// #8. ROUTES KHUSUS DEVELOPMENT
+// ===================================================================
+if (ENVIRONMENT === 'development') {
+    $routes->get('tes', 'TesController::index');
+}

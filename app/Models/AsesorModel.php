@@ -45,4 +45,21 @@ class AsesorModel extends Model
             ->where('asesor.id_asesor', $asesorId)
             ->first();
     }
+
+    /**
+     * [FUNGSI BARU] Get all asesors with their full names from the users table.
+     * This is used for populating dropdowns.
+     *
+     * @return array
+     */
+    public function findAllAsesorWithUser(): array
+    {
+        return $this->select('
+                        asesor.id_asesor, 
+                        users.nama_lengkap as nama_asesor
+                    ')
+            ->join('users', 'users.id = asesor.id_user', 'left')
+            ->orderBy('users.nama_lengkap', 'ASC')
+            ->findAll();
+    }
 }

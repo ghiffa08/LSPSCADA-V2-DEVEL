@@ -38,6 +38,7 @@ use App\Models\PersyaratanModel;
 use App\Models\KelompokUnitModel;
 use App\Models\KelompokKerjaModel;
 use App\Models\PengajuanAsesmenModel;
+use App\Models\HeaderKonfigurasiModel;
 use Myth\Auth\Models\UserModel as MythUserModel;
 
 
@@ -87,6 +88,8 @@ trait BaseConfigTrait
     protected $kelompokUnitModel;
     protected $observasiModel;
     protected $dynamicDependentModel;
+
+    protected $headerKonfigurasiModel;
 
     protected $session;
     protected $validation;
@@ -140,6 +143,8 @@ trait BaseConfigTrait
         $this->kelompokUnitModel = new KelompokUnitModel();
         $this->observasiModel = new ObservasiModel();
         $this->dynamicDependentModel = new DynamicDependent();
+
+        $this->headerKonfigurasiModel = new HeaderKonfigurasiModel();
 
 
         $this->dataService = new DataService();
