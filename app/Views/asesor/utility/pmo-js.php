@@ -1,265 +1,189 @@
 <script>
-$(document).ready(function() {
-    'use strict';
+    $(document).ready(function() {
+        const form = $('#formPmo');
+        const loadingIndicator = $('#loadingData');
+        const pmoContainer = $('#pmoContainer');
+        const progressBar = $('#progress-bar');
+        const progressText = $('#progress-text');
+        const dataStatus = $('#data-status');
+        const btnSave = $('#btnSave');
 
-    // Initialize select2 - SAMA SEPERTI OBSERVASI
-    $('.select2').select2({
-        placeholder: "Pilih...",
-        allowClear: true,
-        width: '100%'
-    });
+        // Get IDs from the hidden inputs in the form
+        const idSkema = $('input[name="id_skema"]').val();
+        const idPengajuan = $('input[name="id_pengajuan"]').val();
 
-    // Configuration - SAMA SEPERTI OBSERVASI
-    const config = {
-        baseUrl: '<?= base_url() ?>',
-        endpoints: {
-            getAsesi: 'asesor/pmo/getAsesiByAsesmen', // SAMA URL PATTERN
-            loadPMO: 'asesor/pmo/loadPMO',
-            store: 'asesor/pmo/store'
-        }
-    };
+        let totalQuestions = 0;
 
-    // State management - SAMA SEPERTI OBSERVASI
-    const state = {
-        selectedAsesmen: null,
-        selectedAsesi: null,
-        selectedPengajuan: null,
-        selectedSkema: null,
-        totalQuestions: 0,
-        answeredQuestions: 0,
-        autoSaveTimeout: null,
-        isLoading: false,
-        csrfHash: '<?= csrf_hash() ?>'
-    };
+        /**
+         * Load PMO questions and any existing answers from the server.
+         */
+        function loadPmoData() {
+            loadingIndicator.show();
+            form.hide();
+            dataStatus.html('<i class="fas fa-sync fa-spin text-muted"></i> Memuat...');
 
-    // Event handlers - SAMA SEPERTI OBSERVASI
-    function bindEvents() {
-        // Asesmen selection change - SAMA SEPERTI OBSERVASI
-        $('#id_asesmen').on('change', function() {
-            const selectedOption = $(this).find('option:selected');
-            state.selectedAsesmen = $(this).val();
-            state.selectedSkema = selectedOption.data('id-skema');
-
-            $('#form_id_skema').val(state.selectedSkema);
-            $('#form_id_asesmen').val(state.selectedAsesmen);
-            $('#kode_skema').val(selectedOption.data('kode-skema') || '');
-
-            // Reset asesi dropdown and hide form
-            $('#id_asesi').prop('disabled', true).empty().append('<option value="">-- Memuat Asesi... --</option>');
-            $('#form_id_asesi').val('');
-            resetForm();
-
-            if (!state.selectedAsesmen) {
-                $('#id_asesi').empty().append('<option value="">-- Pilih Asesmen Terlebih Dahulu --</option>');
-                showInitialInstructions();
-                return;
-            }
-
-            // Hide initial instructions when asesmen is selected
-            hideInitialInstructions();
-            loadAsesiOptions(state.selectedAsesmen);
-        });
-
-        // Asesi selection change - SAMA SEPERTI OBSERVASI
-        $('#id_asesi').on('change', function() {
-            const asesiId = $(this).val();
-            state.selectedAsesi = asesiId;
-
-            const selectedOption = $(this).find('option:selected');
-            const pengajuanId = selectedOption.data('id-pengajuan');
-            state.selectedPengajuan = pengajuanId;
-
-            $('#form_id_asesi').val(asesiId);
-            $('#form_id_pengajuan').val(pengajuanId);
-
-            if (asesiId && pengajuanId && state.selectedAsesmen) {
-                $('#btnMuatPMO').prop('disabled', false);
-                saveSessionState();
-            } else {
-                $('#btnMuatPMO').prop('disabled', true);
-                resetForm();
-            }
-        });
-
-        // Tanggal PMO change - AUTO SAVE
-        $('#tanggal_pmo').on('change', function() {
-            $('#form_tanggal_pmo').val($(this).val());
-            saveSettings();
-            saveSessionState();
-        });
-
-        // Load PMO button
-        $('#btnMuatPMO').on('click', function() {
-            if (!state.selectedSkema || !state.selectedPengajuan) {
-                Swal.fire('Error', 'Silakan pilih asesmen dan asesi terlebih dahulu', 'error');
-                return;
-            }
-            loadPMO();
-        });
-    }
-
-    // Load asesi options - SAMA PERSIS SEPERTI OBSERVASI
-    async function loadAsesiOptions(asesmenId) {
-        $('#id_asesi').prop('disabled', true).html('<option value="">Loading...</option>');
-        hideEmptyDataMessage();
-
-        try {
-            const response = await $.ajax({
-                url: `${config.baseUrl}/${config.endpoints.getAsesi}`,
+            $.ajax({
+                url: "<?= site_url('api/pmo/loadPmo') ?>",
                 type: 'GET',
-                data: { id_asesmen: asesmenId },
-                dataType: 'json'
+                dataType: 'json',
+                data: {
+                    id_skema: idSkema,
+                    id_pengajuan: idPengajuan // Send id_pengajuan
+                },
+                success: function(response) {
+                    if (response.success) {
+                        renderPmoStructure(response.struktur);
+                        populateExistingData(response.pmo_data, response.existing_jawaban);
+                        updateProgress();
+                        loadingIndicator.hide();
+                        form.fadeIn(300);
+                        dataStatus.html('<i class="fas fa-check text-success"></i> Data termuat');
+                    } else {
+                        handleAjaxError(null, 'Error: ' + response.message);
+                    }
+                },
+                error: handleAjaxError
             });
-
-            populateAsesiDropdown(response.asesi, response);
-        } catch (error) {
-            console.error('Error loading asesi:', error);
-            handleLoadAsesiError(error);
         }
-    }
 
-    // Populate asesi dropdown - SAMA SEPERTI OBSERVASI
-    function populateAsesiDropdown(asesiList, response = {}) {
-        const $asesiDropdown = $('#id_asesi').empty();
+        /**
+         * Render the entire PMO checklist structure from the server response.
+         */
+        function renderPmoStructure(struktur) {
+            let html = '';
+            totalQuestions = 0;
 
-        if (asesiList && asesiList.length > 0) {
-            $asesiDropdown.append('<option value="">-- Pilih Asesi --</option>');
-            
-            asesiList.forEach(function(asesi) {
-                $asesiDropdown.append(
-                    `<option value="${asesi.id_asesi}" data-id-pengajuan="${asesi.id_pengajuan}">
-                        ${escapeHtml(asesi.nama_asesi)} - ${escapeHtml(asesi.nik)}
-                    </option>`
-                );
+            // Simplified rendering logic (adjust if your structure is more complex)
+            struktur.kelompok_kerja.forEach(kelompok => {
+                kelompok.units.forEach(unit => {
+                    html += `<div class="card mb-3">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0 font-weight-bold text-primary">${unit.kode_unit} - ${unit.nama_unit}</h6>
+                            </div>
+                            <div class="card-body">`;
+                    unit.elemen.forEach(elemen => {
+                        elemen.kuk.forEach(kuk => {
+                            kuk.pertanyaan_list.forEach(pertanyaan => {
+                                totalQuestions++;
+                                html += renderQuestion(pertanyaan, kuk.kriteria_unjuk_kerja);
+                            });
+                        });
+                    });
+                    html += `   </div>
+                         </div>`;
+                });
             });
-            
-            $asesiDropdown.prop('disabled', false);
-            
-            if (response.message) {
-                showInfo('Info', response.message);
+            pmoContainer.html(html);
+        }
+
+        /**
+         * Render a single question block.
+         */
+        function renderQuestion(pertanyaan, kukText) {
+            const qId = pertanyaan.id_pertanyaan;
+            return `
+            <div class="pmo-question mb-4 p-3 border rounded" data-question-id="${qId}">
+                <p class="font-weight-bold mb-1">KUK: <span class="font-weight-normal">${kukText}</span></p>
+                <p class="text-info mb-2">${pertanyaan.pertanyaan}</p>
+                <div class="d-flex align-items-center">
+                    <div class="btn-group btn-group-toggle" data-toggle="buttons">
+                        <label class="btn btn-outline-success btn-sm">
+                            <input type="radio" name="jawaban[${qId}][pencapaian]" value="Ya" autocomplete="off"> Ya
+                        </label>
+                        <label class="btn btn-outline-danger btn-sm">
+                            <input type="radio" name="jawaban[${qId}][pencapaian]" value="Tidak" autocomplete="off"> Tidak
+                        </label>
+                    </div>
+                </div>
+            </div>
+        `;
+        }
+
+        /**
+         * Fill the form with data that has already been saved.
+         */
+        function populateExistingData(pmoData, existingJawaban) {
+            if (pmoData) {
+                $('#id_pmo').val(pmoData.id_pmo);
+                $('#tanggal_observasi').val(pmoData.tanggal_observasi);
+                $('#catatan').val(pmoData.catatan);
             }
-        } else {
-            $asesiDropdown.append('<option value="">-- Tidak ada asesi tersedia --</option>');
-            showEmptyDataMessage();
-            
-            if (response.message) {
-                showInfo('Tidak Ada Data', response.message);
+
+            for (const qId in existingJawaban) {
+                const jawaban = existingJawaban[qId];
+                const questionDiv = $(`.pmo-question[data-question-id="${qId}"]`);
+                if (questionDiv.length) {
+                    const radio = questionDiv.find(`input[name="jawaban[${qId}][pencapaian]"][value="${jawaban.pencapaian}"]`);
+                    if (radio.length) {
+                        radio.prop('checked', true).closest('label').addClass('active');
+                    }
+                }
             }
         }
-    }
 
-    // Handle load asesi error - SAMA SEPERTI OBSERVASI
-    function handleLoadAsesiError(error) {
-        console.error('Load asesi error:', error);
-        
-        $('#id_asesi')
-            .empty()
-            .append('<option value="">-- Error memuat asesi --</option>')
-            .prop('disabled', true);
+        /**
+         * Update the progress bar based on answered questions.
+         */
+        function updateProgress() {
+            const answeredCount = pmoContainer.find('input[type="radio"]:checked').length;
+            const percentage = totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
 
-        let errorMessage = 'Terjadi kesalahan saat memuat data asesi';
-        
-        if (error.responseJSON && error.responseJSON.message) {
-            errorMessage = error.responseJSON.message;
-        } else if (error.status === 0) {
-            errorMessage = 'Koneksi terputus. Periksa koneksi internet Anda.';
-        } else if (error.status >= 500) {
-            errorMessage = 'Server mengalami gangguan. Silakan coba lagi nanti.';
+            progressBar.css('width', percentage + '%').attr('aria-valuenow', percentage);
+            progressText.text(percentage + '%');
         }
 
-        showError('Error Database', errorMessage);
-    }
+        /**
+         * Handle form submission via AJAX.
+         */
+        form.on('submit', function(e) {
+            e.preventDefault();
+            btnSave.prop('disabled', true).html('<i class="fas fa-spinner fa-spin mr-1"></i> Menyimpan...');
 
-    // Utility functions
-    function escapeHtml(text) {
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
+            const formData = $(this).serialize();
 
-    function showError(title, message) {
-        Swal.fire({
-            icon: 'error',
-            title: title,
-            text: message,
-            confirmButtonText: 'OK'
+            $.ajax({
+                url: $(this).attr('action'),
+                type: 'POST',
+                data: formData,
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        $('#id_pmo').val(response.id_pmo); // Update PMO ID if it's newly created
+                        Swal.fire('Berhasil!', response.message, 'success');
+                        dataStatus.html('<i class="fas fa-save text-success"></i> Tersimpan');
+                    } else {
+                        Swal.fire('Gagal!', response.message || 'Terjadi kesalahan.', 'error');
+                    }
+                },
+                error: handleAjaxError,
+                complete: function() {
+                    btnSave.prop('disabled', false).html('<i class="fas fa-save mr-1"></i> Simpan Final Ceklis PMO');
+                }
+            });
         });
-    }
 
-    function showInfo(title, message) {
-        Swal.fire({
-            icon: 'info',
-            title: title,
-            text: message,
-            confirmButtonText: 'OK'
+        function handleAjaxError(jqXHR, textStatus) {
+            loadingIndicator.html('<p class="text-danger">Gagal memuat data. Silakan coba lagi.</p>');
+            dataStatus.html('<i class="fas fa-times-circle text-danger"></i> Gagal');
+            const message = jqXHR?.responseJSON?.message || 'Terjadi kesalahan jaringan atau server.';
+            Swal.fire('Error', message, 'error');
+        }
+
+        // Event listeners
+        $('#checkAllPmo').on('click', () => {
+            pmoContainer.find('input[value="Ya"]').prop('checked', true).closest('label').addClass('active');
+            pmoContainer.find('input[value="Tidak"]').prop('checked', false).closest('label').removeClass('active');
+            updateProgress();
         });
-    }
 
-    // UI Helper functions - SAMA SEPERTI OBSERVASI
-    function showInitialInstructions() {
-        $('#initialInstructions').show();
-        $('#emptyDataMessage').hide();
-    }
+        $('#uncheckAllPmo').on('click', () => {
+            pmoContainer.find('input[type="radio"]').prop('checked', false).closest('label').removeClass('active');
+            updateProgress();
+        });
 
-    function hideInitialInstructions() {
-        $('#initialInstructions').hide();
-    }
+        pmoContainer.on('change', 'input[type="radio"]', updateProgress);
 
-    function showEmptyDataMessage() {
-        $('#emptyDataMessage').show();
-        $('#initialInstructions').hide();
-    }
-
-    function hideEmptyDataMessage() {
-        $('#emptyDataMessage').hide();
-    }
-
-    function resetForm() {
-        $('#pmoForm').hide();
-        $('#progressCard').hide();
-        $('#questionContainer').empty();
-        $('#catatan_asesor').val('');
-        $('#btnGeneratePDF').hide();
-    }
-
-    function saveSessionState() {
-        const state_data = {
-            id_asesmen: state.selectedAsesmen,
-            id_asesi: state.selectedAsesi,
-            id_pengajuan: state.selectedPengajuan,
-            tanggal_pmo: $('#tanggal_pmo').val()
-        };
-
-        try {
-            sessionStorage.setItem('pmo_state', JSON.stringify(state_data));
-        } catch (e) {
-            console.warn('Cannot save session state:', e);
-        }
-    }
-
-    // Initialize page state - SAMA SEPERTI OBSERVASI
-    function initializePageState() {
-        $('#loadingOverlay').hide();
-        $('#pmoForm').hide();
-        $('#emptyDataMessage').hide();
-        $('#progressCard').hide();
-        $('#initialInstructions').show();
-
-        if (!$('#id_asesmen').val()) {
-            $('#id_asesi').empty().append('<option value="">-- Pilih Asesmen Terlebih Dahulu --</option>').prop('disabled', true);
-        }
-    }
-
-    // Initialize
-    try {
-        bindEvents();
-        initializePageState();
-
-        console.log('PMO form initialized successfully');
-    } catch (error) {
-        console.error('PMO initialization error:', error);
-        showError('Initialization Error', 'Terjadi kesalahan saat memuat halaman. Silakan refresh halaman.');
-    }
-});
+        // Initial load
+        loadPmoData();
+    });
 </script>

@@ -18,7 +18,6 @@ class FeedbackAsesiModel extends Model
     protected $allowedFields    = [
         'id_asesor',
         'id_skema',
-        'id_asesi',
         'id_pengajuan',
         'tanggal_mulai',
         'tanggal_selesai',
@@ -33,23 +32,24 @@ class FeedbackAsesiModel extends Model
     protected $dataTableSearchFields = ['asesor_user.nama_lengkap', 'asesi_user.nama_lengkap', 'skema.nama_skema'];
 
     /**
-     * Menerapkan join untuk query DataTable dengan struktur tabel baru
+     * PENYESUAIAN: Menerapkan join untuk query DataTable dengan struktur tabel baru.
      */
     protected function applyDataTableJoins($builder)
     {
         return $builder
-            // Join untuk Asesi
-            ->join('asesi', 'asesi.id_asesi = feedback_asesi.id_asesi', 'inner')
+            // Join ke pengajuan_asesmen sebagai pusat relasi
+            ->join('pengajuan_asesmen', 'pengajuan_asesmen.id_pengajuan = feedback_asesi.id_pengajuan', 'inner')
+            // Join untuk mendapatkan data Asesi dari tabel users
+            ->join('asesi', 'asesi.id_asesi = pengajuan_asesmen.id_asesi', 'inner')
             ->join('users as asesi_user', 'asesi_user.id = asesi.id_user', 'inner')
-            // Join untuk Asesor
-            ->join('asesor', 'asesor.id_asesor = feedback_asesi.id_asesor', 'inner')
-            ->join('users as asesor_user', 'asesor_user.id = asesor.id_user', 'inner')
+            // Join untuk mendapatkan data Asesor dari tabel users
+            ->join('users as asesor_user', 'asesor_user.id = pengajuan_asesmen.id_asesor', 'inner')
             // Join untuk Skema
-            ->join('skema', 'skema.id_skema = feedback_asesi.id_skema', 'inner');
+            ->join('skema', 'skema.id_skema = pengajuan_asesmen.id_skema', 'inner');
     }
 
     /**
-     * Menerapkan select field kustom untuk query DataTable
+     * PENYESUAIAN: Menerapkan select field kustom untuk query DataTable.
      */
     protected function applyDataTableSelects($builder)
     {
@@ -59,6 +59,48 @@ class FeedbackAsesiModel extends Model
             asesi_user.nama_lengkap AS nama_asesi,
             skema.nama_skema'
         );
+    }
+
+    /**
+     * [FUNGSI BARU] Mengambil daftar asesmen yang memerlukan feedback untuk user tertentu.
+     *
+     * @param int    $userId ID dari tabel users
+     * @param string $filter Tipe urutan ('terbaru' atau 'terlama')
+     * @return array
+     */
+    public function getListByUserId(int $userId, string $filter = 'terbaru'): array
+    {
+        $builder = $this->db->table('pengajuan_asesmen pa');
+
+        $builder->select('
+            pa.id_pengajuan,
+            skema.nama_skema,
+            asesor_user.nama_lengkap AS nama_asesor,
+            fa.id_feedback,
+            fa.updated_at
+        ');
+
+        $builder->join('asesi', 'asesi.id_asesi = pa.id_asesi');
+        $builder->join('asesmen', 'asesmen.id_asesmen = pa.id_asesmen');
+        $builder->join('skema', 'skema.id_skema = asesmen.id_skema');
+        $builder->join('users as asesor_user', 'asesor_user.id = pa.id_asesor', 'left');
+        // Gunakan LEFT JOIN agar semua pengajuan yang relevan muncul, baik sudah diisi feedback-nya atau belum
+        $builder->join('feedback_asesi fa', 'fa.id_pengajuan = pa.id_pengajuan', 'left');
+
+        // Filter untuk user yang sedang login
+        $builder->where('asesi.id_user', $userId);
+        // Feedback hanya bisa diisi jika asesmen sudah selesai
+        $builder->where('pa.status_pengajuan', 'selesai');
+
+        // Terapkan filter urutan
+        if ($filter === 'terlama') {
+            $builder->orderBy('pa.created_at', 'ASC');
+        } else {
+            // Default adalah 'terbaru'
+            $builder->orderBy('pa.created_at', 'DESC');
+        }
+
+        return $builder->get()->getResultArray();
     }
 
     /**
@@ -142,10 +184,15 @@ class FeedbackAsesiModel extends Model
             $batchData = [];
             if (!empty($detailData['jawaban']) && is_array($detailData['jawaban'])) {
                 foreach ($detailData['jawaban'] as $id_komponen => $jawaban) {
+                    // Konversi jawaban 'Y' ke 1, 'T' ke 0
+                    $jawabanInt = ($jawaban === 'Y') ? 1 : (($jawaban === 'T') ? 0 : null);
+                    if ($jawabanInt === null) {
+                        continue; // Skip jika tidak valid
+                    }
                     $batchData[] = [
                         'id_feedback' => $id_feedback,
                         'id_komponen' => $id_komponen,
-                        'jawaban'     => $jawaban, // Jawaban harus 'Y' atau 'T'
+                        'jawaban'     => $jawabanInt,
                         'komentar'    => $detailData['komentar'][$id_komponen] ?? null,
                     ];
                 }

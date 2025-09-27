@@ -15,7 +15,7 @@ class PertanyaanTertulis extends DataTableController
         parent::__construct();
         $this->model = new PertanyaanTertulisModel();
         $this->columnMap = [
-            1 => 'apl1.nama_siswa',
+            1 => 'users.nama_lengkap', // Diubah dari apl1.nama_siswa
             2 => 'skema.nama_skema',
             3 => 'pertanyaan_tertulis.tanggal_ujian',
         ];
@@ -26,13 +26,14 @@ class PertanyaanTertulis extends DataTableController
         if (!$this->request->isAJAX()) return $this->failForbidden();
 
         $id_skema = $this->request->getGet('id_skema');
-        $id_apl1 = $this->request->getGet('id_apl1');
+        $id_pengajuan = $this->request->getGet('id_pengajuan'); // Diubah dari id_apl1
 
-        if (!$id_skema || !$id_apl1) return $this->fail('ID Skema dan APL1 diperlukan.', 400);
+        if (!$id_skema || !$id_pengajuan) return $this->fail('ID Skema dan ID Pengajuan diperlukan.', 400);
 
         try {
             $strukturUjian = $this->model->getStrukturUjianSkema((int)$id_skema);
-            $ujian = $this->model->where('id_apl1', $id_apl1)->where('id_skema', $id_skema)->first();
+            // Kueri disesuaikan ke id_pengajuan
+            $ujian = $this->model->where('id_pengajuan', $id_pengajuan)->where('id_skema', $id_skema)->first();
             $existingJawaban = $ujian ? $this->model->getExistingJawaban($ujian['id_ujian']) : [];
 
             return $this->respond([

@@ -38,33 +38,51 @@ class PengajuanAsesmen extends DataTableController
     /**
      * Mengambil data pengajuan berdasarkan ID untuk modal edit
      */
-    public function getById($id = null): \CodeIgniter\HTTP\ResponseInterface
+    public function getById($id): \CodeIgniter\HTTP\ResponseInterface
     {
         if (!$this->request->isAJAX()) {
             return $this->failNotFound();
         }
 
-        $pengajuanModel = new PengajuanAsesmenModel();
-        $data = $pengajuanModel->getCompletePengajuanData($id);
+        try {
+            $pengajuan = $this->model->find($id);
+            if (!$pengajuan) {
+                return $this->failNotFound('Pengajuan tidak ditemukan');
+            }
 
-        $asesorModel = new AsesorModel();
-        $asesorList = $asesorModel->findAllAsesorWithUser();
+            $asesi = $this->asesiModel->find($pengajuan['id_asesi']);
+            $asesmen = $this->asesmenModel->find($pengajuan['id_asesmen']);
 
-        if (!$data) {
-            return $this->failNotFound('Data pengajuan tidak ditemukan');
+            // Dokumen sekarang dari tabel asesi
+            $dokumen = [
+                'pas_foto' => $asesi['pas_foto'] ?? null,
+                'ktp' => $asesi['ktp'] ?? null,
+                'bukti_pendidikan' => $asesi['bukti_pendidikan'] ?? null
+            ];
+
+            // Tambahkan query untuk mendapatkan daftar asesor (dari tabel users)
+            $userModel = new \App\Models\UserModel();
+            $asesorList = $userModel->select('id as id_asesor, nama_lengkap as nama_asesor')->findAll();
+
+            return $this->respond([
+                'status' => true,
+                'data' => [
+                    'pengajuan' => $pengajuan,
+                    'asesi' => $asesi,
+                    'asesmen' => $asesmen,
+                    'dokumen' => $dokumen
+                ],
+                'asesorList' => $asesorList
+            ]);
+        } catch (\Exception $e) {
+            return $this->failServerError('Gagal mengambil data: ' . $e->getMessage());
         }
-
-        return $this->respond([
-            'status' => true,
-            'data' => $data,
-            'asesorList' => $asesorList
-        ]);
     }
 
     /**
      * Menyimpan perubahan data pengajuan (update)
      */
-    public function save(): \CodeIgniter\HTTP\ResponseInterface
+    public function save($id = null): \CodeIgniter\HTTP\ResponseInterface
     {
         if (!$this->request->isAJAX()) {
             return $this->failNotFound();
@@ -80,7 +98,8 @@ class PengajuanAsesmen extends DataTableController
             return $this->failValidationErrors($this->validator->getErrors());
         }
 
-        $id = $this->request->getPost('id_pengajuan');
+        // Prioritize URL ID for edits, fall back to POST data for creates
+        $id = $id ?? $this->request->getPost('id_pengajuan');
         $data = $this->validator->getValidated();
 
         try {

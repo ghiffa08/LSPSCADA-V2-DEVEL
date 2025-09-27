@@ -3,7 +3,7 @@
 namespace App\Controllers;
 
 use App\Controllers\BaseController;
-use App\Models\AsesorModel;
+use App\Models\InstansiModel; // Ganti dengan InstansiModel
 
 class HeaderKonfigurasiController extends BaseController
 {
@@ -12,17 +12,14 @@ class HeaderKonfigurasiController extends BaseController
      */
     public function index()
     {
-        $asesorModel = new AsesorModel();
+        $instansiModel = new InstansiModel();
 
         $data = [
             'siteTitle' => 'Manajemen Kop Surat',
-            // Mengambil daftar asesor untuk dropdown di modal
-            'assessors' => $asesorModel
-                ->select('asesor.id_asesor, users.nama_lengkap')
-                ->join('users', 'users.id = asesor.id_user', 'left')
-                ->findAll()
+            // Mengambil daftar instansi untuk dropdown di modal
+            'instansiList' => $instansiModel->orderBy('nama_instansi', 'ASC')->findAll()
         ];
 
-        return view('asesor/ListheaderKonfigurasi', $data);
+        return view('admin/header_konfigurasi', $data);
     }
 }

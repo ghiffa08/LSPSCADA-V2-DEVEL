@@ -18,7 +18,7 @@ class PMOModel extends Model
     protected $allowedFields    = [
         'id_asesor',
         'id_skema',
-        'id_apl1',
+        'id_pengajuan', // Changed from id_apl1
         'tanggal_observasi',
         'catatan'
     ];
@@ -30,7 +30,7 @@ class PMOModel extends Model
     protected $updatedField  = 'updated_at';
 
     // Fields that should be searched when using DataTable
-    protected $dataTableSearchFields = ['apl1.nama_siswa', 'apl1.nik', 'skema.nama_skema'];
+    protected $dataTableSearchFields = ['asesi_user.nama_lengkap', 'asesi.nik', 'skema.nama_skema'];
 
     /**
      * Menerapkan join untuk query DataTable
@@ -38,7 +38,9 @@ class PMOModel extends Model
     protected function applyDataTableJoins($builder)
     {
         return $builder
-            ->join('apl1', 'apl1.id_apl1 = pmo.id_apl1', 'left')
+            ->join('pengajuan_asesmen pa', 'pa.id_pengajuan = pmo.id_pengajuan')
+            ->join('asesi', 'asesi.id_asesi = pa.id_asesi')
+            ->join('users as asesi_user', 'asesi_user.id = asesi.id_user')
             ->join('skema', 'skema.id_skema = pmo.id_skema', 'left')
             ->join('asesor', 'asesor.id_asesor = pmo.id_asesor', 'left')
             ->join('users as asesor_user', 'asesor_user.id = asesor.id_user', 'left');
@@ -50,20 +52,108 @@ class PMOModel extends Model
     protected function applyDataTableSelects($builder)
     {
         return $builder->select(
-            'pmo.id_pmo, pmo.tanggal_observasi, 
-             apl1.nama_siswa, 
-             skema.nama_skema, 
+            'pmo.id_pmo, pmo.tanggal_observasi,
+             asesi_user.nama_lengkap as nama_asesi,
+             skema.nama_skema,
              asesor_user.nama_lengkap as nama_asesor'
         );
     }
 
     /**
-     * Mengambil struktur pertanyaan PMO untuk skema tertentu
+     * Menyimpan data master PMO dan detail jawabannya
      */
+    public function savePmoData(array $masterData, array $jawabanData): ?int
+    {
+        $db = $this->db;
+        $db->transStart();
+
+        try {
+            // Find existing PMO based on id_pengajuan
+            $pmo = $this->where('id_pengajuan', $masterData['id_pengajuan'])->first();
+
+            if ($pmo) {
+                $id_pmo = $pmo['id_pmo'];
+                $this->update($id_pmo, $masterData);
+            } else {
+                $id_pmo = $this->insert($masterData, true);
+            }
+
+            $pmoJawabanModel = new PMOJawabanModel(); // Assuming this model exists
+            $pmoJawabanModel->upsertJawaban($id_pmo, $jawabanData);
+
+            $db->transComplete();
+
+            return $db->transStatus() ? $id_pmo : null;
+        } catch (\Exception $e) {
+            $db->transRollback();
+            log_message('error', 'Error in savePmoData: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Mengambil semua data PMO yang diperlukan untuk generate PDF.
+     */
+    public function getPMOWithDetails(int $id_pmo): array
+    {
+        try {
+            $pmo = $this->db->table('pmo p')
+                ->select([
+                    'p.*',
+                    'pa.id_pengajuan',
+                    'asesi.nik as nik_asesi',
+                    'asesi.tanda_tangan_asesi as ttd_asesi',
+                    'asesi_user.nama_lengkap as nama_asesi',
+                    'asesor_user.nama_lengkap as nama_asesor',
+                    'asesor_user.tanda_tangan as ttd_asesor',
+                    's.nama_skema',
+                    's.jenis_skema',
+                    's.kode_skema',
+                    's.id_skema',
+                    'tuk.nama_tuk',
+                    'tuk.jenis_tuk'
+                ])
+                ->join('pengajuan_asesmen pa', 'pa.id_pengajuan = p.id_pengajuan')
+                ->join('asesi', 'asesi.id_asesi = pa.id_asesi')
+                ->join('users as asesi_user', 'asesi_user.id = asesi.id_user')
+                ->join('asesor', 'asesor.id_asesor = p.id_asesor')
+                ->join('users as asesor_user', 'asesor_user.id = asesor.id_user')
+                ->join('skema s', 's.id_skema = p.id_skema')
+                ->join('asesmen asm', 'asm.id_asesmen = pa.id_asesmen')
+                ->join('tuk', 'tuk.id_tuk = asm.id_tuk', 'left')
+                ->where('p.id_pmo', $id_pmo)
+                ->get()
+                ->getRowArray();
+
+            if (!$pmo) {
+                return ['success' => false, 'message' => 'Data PMO tidak ditemukan.'];
+            }
+
+            $struktur = $this->getStrukturPmoSkema($pmo['id_skema']);
+            $jawaban_list = $this->getExistingJawaban($id_pmo);
+
+            return [
+                'success' => true,
+                'data' => [
+                    'pmo' => $pmo,
+                    'struktur' => $struktur,
+                    'jawaban_list' => $jawaban_list
+                ]
+            ];
+        } catch (\Exception $e) {
+            log_message('error', 'Error getting PMO for PDF: ' . $e->getMessage());
+            return ['success' => false, 'message' => 'Gagal mengambil data PMO: ' . $e->getMessage()];
+        }
+    }
+
+    // --- UNCHANGED METHODS ---
+    // The following methods do not depend on the asesi's identity,
+    // so they remain the same.
     public function getStrukturPmoSkema(int $id_skema): array
     {
+        // This method logic remains unchanged
         $sql = "
-            SELECT 
+            SELECT
                 s.id_skema, s.nama_skema,
                 COALESCE(kk.id_kelompok, 1) as id_kelompok,
                 COALESCE(kk.nama_kelompok, 'Kelompok Utama') as nama_kelompok,
@@ -87,12 +177,9 @@ class PMOModel extends Model
         $rawData = $this->db->query($sql, [$id_skema])->getResultArray();
         return $this->transformToHierarchicalStructure($rawData);
     }
-
-    /**
-     * Mengubah data flat menjadi struktur hierarkis
-     */
     private function transformToHierarchicalStructure(array $rawData): array
     {
+        // This method logic remains unchanged
         $structure = ['skema' => null, 'kelompok_kerja' => []];
         if (empty($rawData)) return $structure;
 
@@ -141,26 +228,9 @@ class PMOModel extends Model
 
         return $structure;
     }
-
-    /**
-     * Mengambil data PMO berdasarkan ID
-     */
-    public function getPmoById(int $id_pmo): ?array
-    {
-        return $this->select('pmo.*, apl1.nama_siswa as nama_asesi, skema.nama_skema')
-            ->join('apl1', 'apl1.id_apl1 = pmo.id_apl1')
-            ->join('skema', 'skema.id_skema = pmo.id_skema')
-            ->find($id_pmo);
-    }
-
-    /**
-     * Mengambil jawaban yang sudah ada untuk sebuah sesi PMO
-     */
     public function getExistingJawaban(int $id_pmo): array
     {
-        // Mengambil jawaban dan meng-alias kolom agar sesuai dengan yang diharapkan view
-        // 'jawaban_ya_tidak' -> 'pencapaian'
-        // 'tanggapan' -> 'jawaban_asesor'
+        // This method logic remains unchanged
         $result = $this->db->table('pmo_jawaban j')
             ->select('j.id_pertanyaan, j.jawaban_ya_tidak as pencapaian, j.tanggapan as jawaban_asesor')
             ->where('id_pmo', $id_pmo)
@@ -171,94 +241,5 @@ class PMOModel extends Model
             $formatted[$row['id_pertanyaan']] = $row;
         }
         return $formatted;
-    }
-
-    /**
-     * Menyimpan data master PMO dan detail jawabannya
-     */
-    public function savePmoData(array $masterData, array $jawabanData): ?int
-    {
-        $db = $this->db;
-        $db->transStart();
-
-        try {
-            $pmo = $this->where('id_apl1', $masterData['id_apl1'])
-                ->where('id_skema', $masterData['id_skema'])
-                ->first();
-
-            if ($pmo) {
-                $id_pmo = $pmo['id_pmo'];
-                $this->update($id_pmo, $masterData);
-            } else {
-                $id_pmo = $this->insert($masterData, true);
-            }
-
-            $pmoJawabanModel = new PMOJawabanModel();
-            $pmoJawabanModel->upsertJawaban($id_pmo, $jawabanData);
-
-            $db->transComplete();
-
-            return $db->transStatus() ? $id_pmo : null;
-        } catch (\Exception $e) {
-            $db->transRollback();
-            log_message('error', 'Error in savePmoData: ' . $e->getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * Mengambil semua data PMO yang diperlukan untuk generate PDF.
-     */
-    public function getPMOWithDetails(int $id_pmo): array
-    {
-        try {
-            // 1. Ambil data master PMO dengan semua join yang diperlukan
-            $pmo = $this->db->table('pmo p')
-                ->select([
-                    'p.*',
-                    'apl1.nik as nik_asesi',
-                    'apl1.tanda_tangan_asesi as ttd_asesi',
-                    'apl1.nama_siswa as nama_asesi',
-                    'asesor_user.nama_lengkap as nama_asesor',
-                    'asesor_user.tanda_tangan as ttd_asesor',
-                    's.nama_skema',
-                    's.jenis_skema',
-                    's.kode_skema',
-                    's.id_skema',
-                    'tuk.nama_tuk',
-                    'tuk.jenis_tuk'
-                ])
-                ->join('apl1', 'apl1.id_apl1 = p.id_apl1')
-                ->join('asesor', 'asesor.id_asesor = p.id_asesor')
-                ->join('users as asesor_user', 'asesor_user.id = asesor.id_user')
-                ->join('skema s', 's.id_skema = p.id_skema')
-                ->join('asesmen asm', 'asm.id_asesmen = apl1.id_asesmen')
-                ->join('tuk', 'tuk.id_tuk = asm.id_tuk', 'left')
-                ->where('p.id_pmo', $id_pmo)
-                ->get()
-                ->getRowArray();
-
-            if (!$pmo) {
-                return ['success' => false, 'message' => 'Data PMO tidak ditemukan.'];
-            }
-
-            // 2. Ambil struktur pertanyaan
-            $struktur = $this->getStrukturPmoSkema($pmo['id_skema']);
-
-            // 3. Ambil jawaban yang sudah ada
-            $jawaban_list = $this->getExistingJawaban($id_pmo);
-
-            return [
-                'success' => true,
-                'data' => [
-                    'pmo' => $pmo,
-                    'struktur' => $struktur,
-                    'jawaban_list' => $jawaban_list
-                ]
-            ];
-        } catch (\Exception $e) {
-            log_message('error', 'Error getting PMO for PDF: ' . $e->getMessage());
-            return ['success' => false, 'message' => 'Gagal mengambil data PMO: ' . $e->getMessage()];
-        }
     }
 }

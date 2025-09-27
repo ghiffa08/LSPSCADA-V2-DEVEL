@@ -1,7 +1,5 @@
 <?php
 
-// File: app/Models/PertanyaanTertulisModel.php
-
 namespace App\Models;
 
 use App\Traits\DataTableTrait;
@@ -18,11 +16,12 @@ class PertanyaanTertulisModel extends Model
     protected $useSoftDeletes   = false;
     protected $protectFields    = true;
     protected $allowedFields    = [
-        'id_asesor',
+        'id_pengajuan',
         'id_skema',
-        'id_apl1',
+        'id_asesor',
         'tanggal_ujian',
-        'catatan'
+        'catatan',
+        'jumlah_benar'
     ];
 
     // Dates
@@ -31,13 +30,18 @@ class PertanyaanTertulisModel extends Model
     protected $createdField  = 'created_at';
     protected $updatedField  = 'updated_at';
 
-    protected $dataTableSearchFields = ['apl1.nama_siswa', 'apl1.nik', 'skema.nama_skema'];
+    // Diubah untuk mencari berdasarkan nama lengkap asesi (dari tabel users) dan nik (dari tabel asesi)
+    protected $dataTableSearchFields = ['user_asesi.nama_lengkap', 'asesi.nik', 'skema.nama_skema'];
 
     protected function applyDataTableJoins($builder)
     {
-        return $builder->join('apl1', 'apl1.id_apl1 = pertanyaan_tertulis.id_apl1', 'inner')
-            ->join('asesor', 'asesor.id_asesor = pertanyaan_tertulis.id_asesor', 'inner')
-            ->join('users as asesor_user', 'asesor_user.id = asesor.id_user', 'inner')
+        return $builder
+            // Join ke pengajuan untuk mendapatkan data asesi
+            ->join('pengajuan_asesmen', 'pengajuan_asesmen.id_pengajuan = pertanyaan_tertulis.id_pengajuan', 'inner')
+            ->join('asesi', 'asesi.id_asesi = pengajuan_asesmen.id_asesi', 'inner')
+            ->join('users as user_asesi', 'user_asesi.id = asesi.id_user', 'inner')
+            // Join ke users untuk mendapatkan nama asesor
+            ->join('users as asesor_user', 'asesor_user.id = pertanyaan_tertulis.id_asesor', 'left')
             ->join('skema', 'skema.id_skema = pertanyaan_tertulis.id_skema', 'inner');
     }
 
@@ -46,8 +50,8 @@ class PertanyaanTertulisModel extends Model
         return $builder->select(
             'pertanyaan_tertulis.*, 
             asesor_user.nama_lengkap AS nama_asesor, 
-            apl1.nama_siswa AS nama_asesi,
-            apl1.nik,
+            user_asesi.nama_lengkap AS nama_asesi,
+            asesi.nik,
             skema.nama_skema'
         );
     }
@@ -91,5 +95,49 @@ class PertanyaanTertulisModel extends Model
         }
         return $formatted;
     }
-}
 
+    /**
+     * [FUNGSI DIPERBARUI] Mengambil daftar ujian tertulis untuk user tertentu.
+     * Kini menampilkan pengajuan yang sudah diterima (untuk dikerjakan) dan selesai (untuk riwayat).
+     *
+     * @param int    $userId ID dari tabel users
+     * @param string $filter Tipe urutan ('terbaru' atau 'terlama')
+     * @return array
+     */
+    public function getByUserId(int $userId, string $filter = 'terbaru'): array
+    {
+        // Menggunakan alias untuk mempermudah pembacaan query
+        $builder = $this->db->table('pengajuan_asesmen pa');
+
+        $builder->select('
+            pa.id_pengajuan,
+            skema.nama_skema,
+            pt.id_ujian,
+            pt.tanggal_ujian,
+            pt.updated_at,
+            pa.created_at,
+            pa.status_pengajuan
+        ');
+
+        $builder->join('asesi', 'asesi.id_asesi = pa.id_asesi');
+        $builder->join('asesmen', 'asesmen.id_asesmen = pa.id_asesmen');
+        $builder->join('skema', 'skema.id_skema = asesmen.id_skema');
+        // Gunakan LEFT JOIN agar pengajuan yang diterima tapi ujiannya belum dimulai tetap muncul
+        $builder->join('pertanyaan_tertulis pt', 'pt.id_pengajuan = pa.id_pengajuan', 'left');
+
+        // Filter untuk user yang sedang login
+        $builder->where('asesi.id_user', $userId);
+        // Filter untuk pengajuan yang statusnya 'diterima' (untuk dikerjakan) atau 'selesai' (untuk riwayat)
+        $builder->whereIn('pa.status_pengajuan', ['diterima', 'selesai']);
+
+        // Logika untuk filter pengurutan data
+        if ($filter === 'terlama') {
+            $builder->orderBy('pa.created_at', 'ASC');
+        } else {
+            // Default pengurutan adalah 'terbaru'
+            $builder->orderBy('pa.created_at', 'DESC');
+        }
+
+        return $builder->get()->getResultArray();
+    }
+}

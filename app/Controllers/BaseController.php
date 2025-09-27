@@ -15,6 +15,7 @@ use App\Models\UnitModel;
 // Model imports (grouped by domain)
 use App\Models\UserModel;
 use App\Models\AsesiModel;
+use App\Models\AsesorModel;
 use App\Models\SkemaModel;
 use App\Models\ElemenModel;
 
@@ -85,6 +86,7 @@ abstract class BaseController extends Controller
     protected $asesmenModel;
     protected $pengajuanAsesmenModel;
     protected $asesiModel;
+    protected $asesorModel;
     protected $akModel;
 
     // Supporting Components
@@ -151,6 +153,7 @@ abstract class BaseController extends Controller
         $this->asesmenModel = new AsesmenModel();
         $this->pengajuanAsesmenModel = new PengajuanAsesmenModel();
         $this->asesiModel = new AsesiModel();
+        $this->asesorModel = new AsesorModel();
         $this->akModel = new AKModel();
 
         // Supporting Components

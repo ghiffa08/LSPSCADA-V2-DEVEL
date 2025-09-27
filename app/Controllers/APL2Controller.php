@@ -21,12 +21,9 @@ class APL2Controller extends BaseController
     public function index()
     {
         $data = [
-            'siteTitle' => "Asesmen Mandiri",
-            'listAPL2' => $this->apl2Model->findAllAPL2(),
-            'listEmailAPL2' => $this->apl2Model->getEmailValidasiToday(),
+            'siteTitle' => 'Kelola Asesmen Mandiri (APL2)',
         ];
-        // dd($data);
-        return view('dashboard/kelola_apl2', $data);
+        return view('admin/kelola_apl2', $data);
     }
 
     public function asesmen($name)

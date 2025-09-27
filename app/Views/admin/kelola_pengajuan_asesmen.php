@@ -1,7 +1,7 @@
 <?= $this->extend("layouts/admin/layout-admin"); ?>
 
 <?= $this->section("content"); ?>
-
+<?php dd($asesorList) ?>
 <h2 class="section-title">Kelola Pengajuan Asesmen</h2>
 <p class="section-lead">Validasi dan kelola semua data pengajuan asesmen dari asesi pada halaman ini.</p>
 
@@ -156,7 +156,6 @@
 
         $('#table-pengajuan tbody').on('click', '.btn-edit', function() {
             const id = $(this).data('id');
-            // Pastikan Anda sudah punya fungsi openEditModal(id)
             openEditModal(id);
         });
 
@@ -296,6 +295,105 @@
             $('#catatan-penolakan-section').hide();
             $('#catatan_penolakan').prop('required', false);
             $('input[name="status_pengajuan"][value="diterima"]').prop('checked', true);
+        });
+
+        // =================================================================
+        // Logika untuk Modal Edit
+        // =================================================================
+
+        function openEditModal(id) {
+            const modal = $('#editPengajuanModal');
+            const form = $('#edit-pengajuan-form');
+
+            // Reset form
+            form[0].reset();
+            $('#edit_nama_asesi, #edit_nama_skema, #edit_tujuan, #edit_tanggal').html(': Memuat...');
+            $('#id_asesor').empty().append('<option value="">-- Pilih Asesor --</option>'); // Reset dropdown asesor
+
+            $.get(`${baseUrl}/api/pengajuan-asesmen/getById/${id}`, function(response) {
+                if (response.status) {
+                    const {
+                        pengajuan,
+                        asesi,
+                        asesmen,
+                        asesorList
+                    } = response.data;
+
+                    $('#edit_id_pengajuan').val(pengajuan.id_pengajuan);
+                    $('#edit_nama_asesi').text(': ' + (asesi.nama_lengkap || '-'));
+                    $('#edit_nama_skema').text(': ' + (asesmen.nama_skema || '-'));
+                    $('#edit_tujuan').text(': ' + (asesmen.tujuan || '-'));
+                    $('#edit_tanggal').text(': ' + new Date(pengajuan.created_at).toLocaleString('id-ID'));
+
+                    // Isi form dengan data yang ada
+                    $('#edit_id_asesor').val(pengajuan.id_asesor || '');
+                    $(`input[name="status_pengajuan"][value="${pengajuan.status_pengajuan}"]`).prop('checked', true);
+                    $(`input[name="status_asesmen"][value="${pengajuan.status_asesmen}"]`).prop('checked', true);
+
+                    // Isi dropdown asesor dengan pengecekan
+                    if (asesorList && Array.isArray(asesorList)) {
+                        const asesorDropdown = $('#id_asesor');
+                        asesorList.forEach(function(asesor) {
+                            asesorDropdown.append(new Option(asesor.nama_asesor, asesor.id_asesor));
+                        });
+                    } else {
+                        console.warn('asesorList tidak tersedia atau bukan array');
+                    }
+
+                    // Pilih asesor yang sudah ada
+                    if (pengajuan.id_asesor) {
+                        $('#id_asesor').val(pengajuan.id_asesor).trigger('change');
+                    }
+
+                    modal.modal('show');
+                } else {
+                    Swal.fire('Gagal', response.message || 'Data tidak ditemukan', 'error');
+                }
+            }).fail(() => Swal.fire('Error', 'Gagal mengambil data dari server.', 'error'));
+        }
+
+        // Handler untuk submit form edit
+        $('#edit-pengajuan-form').on('submit', function(e) {
+            e.preventDefault();
+            const form = $(this);
+            const submitBtn = form.find('button[type="submit"]');
+            const originalBtnText = submitBtn.html();
+            const id_pengajuan = form.find('#edit_id_pengajuan').val();
+
+            if (!id_pengajuan) {
+                Swal.fire('Error', 'ID Pengajuan tidak ditemukan. Coba muat ulang halaman.', 'error');
+                return;
+            }
+
+            submitBtn.html('<i class="fas fa-spinner fa-spin"></i> Memproses...').prop('disabled', true);
+
+            $.ajax({
+                url: `${baseUrl}/api/pengajuan-asesmen/edit/${id_pengajuan}`,
+                type: 'POST',
+                data: form.serialize(),
+                dataType: 'json',
+                success: function(response) {
+                    $('#editPengajuanModal').modal('hide');
+                    Swal.fire('Berhasil', response.message, 'success');
+                    dataTable.ajax.reload();
+                },
+                error: function(xhr) {
+                    const errorMsg = xhr.responseJSON ? (xhr.responseJSON.messages.error || 'Terjadi kesalahan.') : 'Terjadi kesalahan server';
+                    Swal.fire('Gagal', errorMsg, 'error');
+                },
+                complete: function() {
+                    submitBtn.html(originalBtnText).prop('disabled', false);
+                }
+            });
+        });
+
+        // Reset form ketika modal edit ditutup
+        $('#editPengajuanModal').on('hidden.bs.modal', function() {
+            const form = $('#edit-pengajuan-form');
+            form[0].reset();
+            // Reset radio buttons
+            $('input[name="status_pengajuan"]').prop('checked', false);
+            $('input[name="status_asesmen"]').prop('checked', false);
         });
     });
 </script>

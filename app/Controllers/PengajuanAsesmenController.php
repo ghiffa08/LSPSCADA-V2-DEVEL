@@ -6,6 +6,8 @@ use CodeIgniter\HTTP\ResponseInterface;
 use App\Controllers\BaseController;
 use App\Models\User;
 
+use App\Services\HeaderService;
+
 use CodeIgniter\Exceptions\PageNotFoundException;
 
 use App\Services\PDFService;
@@ -16,6 +18,8 @@ class PengajuanAsesmenController extends BaseController
 {
 
     protected $pengajuanModel;
+
+    protected $headerService;
 
     protected $pdfService;
     protected $qrCodeService;
@@ -30,6 +34,8 @@ class PengajuanAsesmenController extends BaseController
         $this->unitModel = model('UnitModel');
         $this->pengajuanModel = model('PengajuanAsesmenModel');
 
+        $this->headerService = new HeaderService();
+
         $this->pdfService = new PDFService();
         $this->qrCodeService = new QRCodeService();
 
@@ -42,9 +48,15 @@ class PengajuanAsesmenController extends BaseController
      */
     public function index(): string
     {
+        $asesorList = $this->asesorModel->select('asesor.id_asesor, users.nama_lengkap as nama_asesor')
+            ->join('users', 'users.id = asesor.id_user')
+            ->orderBy('users.nama_lengkap', 'ASC')
+            ->findAll();
         $data = [
             'siteTitle' => 'Kelola Pengajuan Asesmen',
+            'asesorList' => $asesorList
         ];
+
 
         return view('admin/kelola_pengajuan_asesmen', $data);
     }
@@ -58,35 +70,30 @@ class PengajuanAsesmenController extends BaseController
     public function generateAPL1(string $id_pengajuan)
     {
         try {
-            // 1. Ambil data lengkap dari Model
             $data['pengajuan'] = $this->pengajuanModel->getCompletePengajuanData($id_pengajuan);
-
             if (!$data['pengajuan']) {
-                throw PageNotFoundException::forPageNotFound('Data pengajuan dengan ID ' . esc($id_pengajuan) . ' tidak ditemukan.');
+                throw PageNotFoundException::forPageNotFound('Data pengajuan tidak ditemukan.');
             }
 
-            // 2. Ambil data unit kompetensi
+            $assessorId = $this->asesorModel->getIdAsesorByUserId(user()->id ?? null) ?? null;
+
+            // 1. Dapatkan konfigurasi header yang sesuai untuk asesor ini
+            $headerData = $this->headerService->getHeaderForAssessor($assessorId);
+
             $data['listUnit'] = $this->unitModel->getUnit($data['pengajuan']['asesmen']['id_skema']);
-
-            // 3. Siapkan data dinamis untuk View
             $this->prepareDynamicDataForView($data);
-
-            // 4. Generate QR Codes
             $this->generateQRCodes($data);
 
-            // 5. Tentukan file view untuk setiap halaman PDF
             $views = [
-                'pdf/apl1_page1', // Bagian 1: Data Pemohon
-                'pdf/apl1_page2', // Bagian 2: Data Sertifikasi
-                'pdf/apl1_page3', // Bagian 3: Bukti Kelengkapan
+                'pdf/apl1_page1',
+                'pdf/apl1_page2',
+                'pdf/apl1_page3',
             ];
 
-            // 6. Tentukan nama file PDF
             $filename = 'FR.APL.01 - ' . $data['pengajuan']['asesi']['nama_lengkap'];
 
-            // 7. Panggil PDFService untuk membuat PDF
-            // Argumen terakhir (assessorId) adalah null karena tidak relevan untuk APL.01
-            $this->pdfService->generateMultiPagePdf($views, $data, $filename, null);
+            // 2. Panggil PDF service dan sertakan $headerData
+            $this->pdfService->generateMultiPagePdf($views, $data, $filename, $headerData);
         } catch (\Exception $e) {
             log_message('error', '[PengajuanAsesmenController::generateAPL1] ' . $e->getMessage());
             session()->setFlashdata('error', 'Gagal membuat PDF: ' . $e->getMessage());

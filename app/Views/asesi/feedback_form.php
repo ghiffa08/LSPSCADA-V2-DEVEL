@@ -1,4 +1,4 @@
-<?= $this->extend("layouts/admin/layout-admin"); ?>
+<?= $this->extend("layouts/asesi/layout-app") ?>
 <?= $this->section("content"); ?>
 <div class="row">
     <div class="col-12">

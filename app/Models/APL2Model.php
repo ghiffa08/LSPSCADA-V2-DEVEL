@@ -3,16 +3,21 @@
 namespace App\Models;
 
 use CodeIgniter\Model;
+use App\Traits\DataTableTrait;
+
 
 class APL2Model extends Model
 {
+    use DataTableTrait;
+
+
     protected $table            = 'apl2';
     protected $primaryKey       = 'id_apl2';
     protected $useAutoIncrement = true;
     protected $returnType       = 'array';
     protected $useSoftDeletes   = false;
     protected $protectFields    = false;
-    protected $allowedFields    = ['id_apl2', 'kode_jawaban_apl2', 'id_pengajuan', 'validasi_apl2', 'validator', 'email_validasi'];
+    protected $allowedFields    = ['id_apl2', 'kode_jawaban_apl2', 'id_pengajuan', 'validasi_apl2', 'validator', 'email_validasi', 'catatan'];
 
     protected bool $allowEmptyInserts = false;
     protected bool $updateOnlyChanged = true;
@@ -87,7 +92,8 @@ class APL2Model extends Model
             apl2.id_apl2,
             apl2.validasi_apl2,
             apl2.updated_at as updated_at_apl2,
-            pa.created_at
+            pa.created_at,
+            pa.status_pengajuan
         ')
             ->join('asesi', 'asesi.id_asesi = pa.id_asesi')
             ->join('asesmen', 'asesmen.id_asesmen = pa.id_asesmen')
@@ -95,8 +101,8 @@ class APL2Model extends Model
             // Gunakan LEFT JOIN agar asesmen yang belum dikerjakan (belum ada APL2) tetap muncul
             ->join('apl2', 'apl2.id_pengajuan = pa.id_pengajuan', 'left')
             ->where('asesi.id_user', $id_user)
-            // Tambahkan filter ini agar hanya pengajuan yang sudah diterima yang tampil
-            ->where('pa.status_pengajuan', 'diterima');
+            // Ubah filter agar menampilkan pengajuan 'diterima' (untuk dikerjakan) dan 'selesai' (untuk riwayat)
+            ->whereIn('pa.status_pengajuan', ['diterima', 'selesai']);
 
         // Logika untuk filter pengurutan data
         switch ($filter) {
@@ -401,13 +407,40 @@ class APL2Model extends Model
     public function getbyId($id)
     {
         return $this->db->table('apl2')
-            ->where('id_apl1', $id)
+            ->where('id_apl2', $id)  // Perbaiki dari id_apl1 ke id_apl2
             ->join('apl2_jawaban', 'apl2_jawaban.kode_jawaban_apl2=apl2.kode_jawaban_apl2', 'left')
             ->join('skema', 'skema.id_skema=apl2_jawaban.id_skema', 'left')
             ->join('unit', 'unit.id_unit=apl2_jawaban.id_unit', 'left')
             ->join('elemen', 'elemen.id_elemen=apl2_jawaban.id_elemen', 'left')
             ->join('kuk', 'kuk.id_kuk=apl2_jawaban.id_subelemen', 'left')
-            ->select('apl2.id_apl1,apl2_jawaban.kode_jawaban_apl2,apl2_jawaban.bukti_pendukung,apl2_jawaban.tk, skema.nama_skema, unit.id_unit, unit.nama_unit, elemen.id_elemen, elemen.nama_elemen,kuk.id_kuk, kuk.pertanyaan')
-            ->Get()->getResultArray();
+            ->select('apl2.id_apl2,apl2_jawaban.kode_jawaban_apl2,apl2_jawaban.bukti_pendukung,apl2_jawaban.tk, skema.nama_skema, unit.id_unit, unit.nama_unit, elemen.id_elemen, elemen.nama_elemen,kuk.id_kuk, kuk.pertanyaan')
+            ->get()->getResultArray();
+    }
+
+    /**
+     * Menerapkan join untuk query DataTable
+     */
+    protected function applyDataTableJoins($builder)
+    {
+        return $builder
+            ->join('pengajuan_asesmen pa', 'pa.id_pengajuan = apl2.id_pengajuan', 'inner')
+            ->join('asesmen', 'asesmen.id_asesmen = pa.id_asesmen', 'inner')
+            ->join('skema', 'skema.id_skema = asesmen.id_skema', 'inner')
+            ->join('asesi', 'asesi.id_asesi = pa.id_asesi', 'inner')
+            ->join('users as asesi_user', 'asesi_user.id = asesi.id_user', 'inner')
+            ->join('users as asesor_user', 'asesor_user.id = apl2.validator', 'left');
+    }
+
+    /**
+     * Menerapkan field select kustom untuk query DataTable
+     */
+    protected function applyDataTableSelects($builder)
+    {
+        return $builder->select(
+            'apl2.id_apl2, apl2.id_pengajuan, apl2.created_at, apl2.validasi_apl2,
+         asesi_user.nama_lengkap AS nama_asesi,
+         skema.nama_skema,
+         asesor_user.nama_lengkap AS nama_asesor'
+        );
     }
 }

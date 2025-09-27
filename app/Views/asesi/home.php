@@ -70,12 +70,14 @@
                                 <li class="nav-item">
                                     <a class="ud-menu-scroll" href="#home">Beranda</a>
                                 </li>
-
                                 <li class="nav-item">
                                     <a class="ud-menu-scroll" href="#about">Tentang Kami</a>
                                 </li>
                                 <li class="nav-item">
                                     <a class="ud-menu-scroll" href="#contact">Kontak</a>
+                                </li>
+                                <li class="nav-item d-block d-sm-none">
+                                    <a class="ud-menu-scroll" href="<?= site_url('/dashboard') ?>">Login</a>
                                 </li>
                             </ul>
                         </div>

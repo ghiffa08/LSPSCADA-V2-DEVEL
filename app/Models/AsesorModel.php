@@ -62,4 +62,19 @@ class AsesorModel extends Model
             ->orderBy('users.nama_lengkap', 'ASC')
             ->findAll();
     }
+
+    /**
+     * Get id_asesor by id_user
+     *
+     * @param int $userId
+     * @return int|null
+     */
+    public function getIdAsesorByUserId(int $userId): ?int
+    {
+        $result = $this->select('id_asesor')
+            ->where('id_user', $userId)
+            ->first();
+
+        return $result['id_asesor'] ?? null;
+    }
 }

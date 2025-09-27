@@ -8,6 +8,7 @@ use App\Models\APL1Model;
 use App\Services\PDFService;
 use App\Services\QRCodeService;
 use CodeIgniter\API\ResponseTrait;
+use App\Models\PengajuanAsesmenModel;
 use ZipArchive;
 use CodeIgniter\RESTful\ResourceController;
 
@@ -18,6 +19,7 @@ class CeklistPMOController extends ResourceController
     protected PMOModel $pmoModel;
     protected SkemaModel $skemaModel;
     protected APL1Model $apl1Model;
+    protected PengajuanAsesmenModel $pengajuanModel;
 
     // Services
     protected QRCodeService $qrCodeService;
@@ -32,6 +34,7 @@ class CeklistPMOController extends ResourceController
 
         $this->qrCodeService = new QRCodeService();
         $this->pdfService = new PDFService();
+        $this->pengajuanModel = new PengajuanAsesmenModel();
     }
 
     /**
@@ -68,45 +71,52 @@ class CeklistPMOController extends ResourceController
 
 
     /**
-     * Display the PMO checklist form for a specific asesi (APL1).
-     * This is the main interface for filling out the checklist.
+     * Display the PMO checklist form for a specific asesi's pengajuan.
      */
-    public function show($id_apl1 = null)
+    public function show($id_pengajuan = null) // Changed parameter
     {
         try {
-            if (!$id_apl1) {
-                throw new \Exception('ID APL1 (Asesi) tidak disediakan.');
+            if (!$id_pengajuan) {
+                throw new \Exception('ID Pengajuan Asesmen tidak disediakan.');
             }
 
-            // Fetch APL1 data along with related Skema and Asesor
-            $apl1Data = $this->apl1Model
-                ->select('apl1.*, skema.id_skema, skema.nama_skema, skema.kode_skema, asesor.id_asesor, user_asesor.nama_lengkap as nama_asesor')
-                ->join('asesmen', 'asesmen.id_asesmen = apl1.id_asesmen')
+            // Fetch Pengajuan data with all related info
+            $pengajuanData = $this->pengajuanModel
+                ->select([
+                    'pengajuan_asesmen.*',
+                    'asesi.nik',
+                    'user_asesi.nama_lengkap as nama_asesi',
+                    'skema.id_skema',
+                    'skema.nama_skema',
+                    'skema.kode_skema',
+                    'user_asesor.nama_lengkap as nama_asesor'
+                ])
+                ->join('asesi', 'asesi.id_asesi = pengajuan_asesmen.id_asesi')
+                ->join('users as user_asesi', 'user_asesi.id = asesi.id_user')
+                ->join('asesmen', 'asesmen.id_asesmen = pengajuan_asesmen.id_asesmen')
                 ->join('skema', 'skema.id_skema = asesmen.id_skema')
-                ->join('asesor', 'asesor.id_skema = skema.id_skema', 'left') // Assuming one asesor per skema for simplicity
+                ->join('asesor', 'asesor.id_asesor = pengajuan_asesmen.id_asesor', 'left')
                 ->join('users as user_asesor', 'user_asesor.id = asesor.id_user', 'left')
-                ->find($id_apl1);
+                ->find($id_pengajuan);
 
-            if (!$apl1Data) {
-                throw new \Exception('Data Asesi (APL1) tidak ditemukan.');
+            if (!$pengajuanData) {
+                throw new \Exception('Data Pengajuan Asesmen tidak ditemukan.');
             }
 
-            // Prepare data for the view
             $data = [
                 'siteTitle' => 'Pengisian Ceklis PMO',
-                'apl1_data' => $apl1Data,
-                'id_skema' => $apl1Data['id_skema'],
-                'id_asesor' => $apl1Data['id_asesor'], // Pass the assigned asesor ID
+                'pengajuan_data' => $pengajuanData, // Changed variable name
+                'id_skema' => $pengajuanData['id_skema'],
+                'id_asesor' => $pengajuanData['id_asesor'],
             ];
 
-            // The actual checklist will be loaded via AJAX using the API controller
             return view('asesi/pmo_ceklist', $data);
         } catch (\Exception $e) {
             log_message('error', '[CeklistPmoController] show error: ' . $e->getMessage());
-            // Redirect back with an error message
             return redirect()->back()->with('error', $e->getMessage());
         }
     }
+
 
 
     public function pdf($id_pmo = null)

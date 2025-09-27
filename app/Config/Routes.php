@@ -42,6 +42,12 @@ $routes->get('asesmen-mandiri/(:any)', 'AsesmenMandiriController::asesmen/$1');
 $routes->post('asesmen-mandiri/store', 'AsesmenMandiriController::store_asesmen');
 $routes->post('send-feedback', 'AsesmenMandiriController::send_feedback');
 
+$routes->get('/list-pertanyaan-tertulis', 'PertanyaanTertulisController::listAsesi');
+$routes->get('/pertanyaan-tertulis/filter', 'PertanyaanTertulisController::filterUjian');
+
+$routes->get('/feedback-asesi/list', 'FeedbackAsesiController::listAsesi');
+$routes->get('/feedback-asesi/filter', 'FeedbackAsesiController::filterFeedback');
+
 // --- Pemindaian Tanda Tangan (QR Code) ---
 $routes->group('scan', static function ($routes) {
     $routes->get('tanda-tangan-asesi/(:segment)', 'APL1Controller::scan_ttd_asesi/$1');
@@ -272,6 +278,7 @@ $routes->group('', ['filter' => 'login'], static function ($routes) {
 
         $routes->group('feedback', static function ($routes) {
             $routes->get('/', 'FeedbackAsesiController::asesiIndex');
+            $routes->get('/(:segment)', 'FeedbackAsesiController::asesiIndex/$1');
             $routes->post('save', 'FeedbackAsesiController::asesiSave');
         });
 
@@ -390,6 +397,10 @@ $routes->group('', ['filter' => 'login'], static function ($routes) {
             $routes->get('getById/(:num)', 'Api\PertanyaanTertulisSoal::getById/$1');
             $routes->post('get-data-table', 'Api\PertanyaanTertulisSoal::getDataTable');
         });
+
+        $routes->get('header-konfigurasi', 'HeaderKonfigurasiController::index');
+
+        $routes->get('instansi', 'InstansiController::index');
     });
 
     // --------------------------------------------------------------------
@@ -519,6 +530,7 @@ $routes->group('api', ['filter' => 'login'], static function ($routes) {
         $routes->post('get-data-table', 'Api\PengajuanAsesmen::getDataTable');
         $routes->get('getById/(:any)', 'Api\PengajuanAsesmen::getById/$1');
         $routes->post('save', 'Api\PengajuanAsesmen::save');
+        $routes->post('edit/(:any)', 'Api\PengajuanAsesmen::save/$1');
         $routes->delete('delete/(:any)', 'Api\PengajuanAsesmen::delete/$1');
         $routes->post('validate/(:any)', 'Api\PengajuanAsesmen::validatePengajuan/$1');
     });
@@ -647,13 +659,24 @@ $routes->group('api', ['filter' => 'login'], static function ($routes) {
         $routes->post('toggle-status/(:num)', 'Api\UserManagement::toggleStatus/$1');
     });
 
-    // --- Lain-lain ---
-    $routes->group('headerkonfigurasi', function ($routes) {
-        $routes->post('getDataTable', 'HeaderKonfigurasiController::getDataTable');
-        $routes->post('save', 'HeaderKonfigurasiController::save');
-        $routes->get('getById/(:num)', 'HeaderKonfigurasiController::getById/$1');
-        $routes->get('delete/(:num)', 'HeaderKonfigurasiController::delete/$1');
+    $routes->post('header-konfigurasi/get-data-table', 'Api\HeaderKonfigurasi::getDataTable');
+    $routes->post('header-konfigurasi/save', 'Api\HeaderKonfigurasi::save');
+    $routes->get('header-konfigurasi/delete/(:num)', 'Api\HeaderKonfigurasi::delete/$1');
+    $routes->get('header-konfigurasi/getById/(:num)', 'Api\HeaderKonfigurasi::getById/$1');
+
+    $routes->post('instansi/get-data-table', 'Api\Instansi::getDataTable');
+    $routes->post('instansi/save', 'Api\Instansi::save');
+    $routes->get('instansi/delete/(:num)', 'Api\Instansi::delete/$1');
+    $routes->get('instansi/getById/(:num)', 'Api\Instansi::getById/$1');
+
+    $routes->group('apl2', static function ($routes) {
+        $routes->post('get-data-table', 'Api\APL2::getDataTable');
+        $routes->get('getById/(:any)', 'Api\APL2::getById/$1');
+        $routes->post('validate/(:any)', 'Api\APL2::validateApl2/$1');
+        $routes->delete('delete/(:any)', 'Api\APL2::delete/$1');
     });
+
+    // --- Lain-lain ---
     $routes->post('get-date-validated-apl1', 'APL1Controller::getDateValidated');
     $routes->post('get-date-validated-apl2', 'APL2Controller::getDateValidated');
 });

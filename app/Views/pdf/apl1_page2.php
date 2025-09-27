@@ -56,10 +56,10 @@
                 <?php $no = 1;
                 foreach ($listUnit as $unit): ?>
                     <tr>
-                        <td style="text-align: center;"><?= $no++; ?>.</td>
-                        <td><?= esc($unit['kode_unit']); ?></td>
-                        <td><?= esc($unit['nama_unit']); ?></td>
-                        <td style="text-align: center;">SKKNI</td>
+                        <td style="width: 5%; text-align: center;"><?= $no++; ?>.</td>
+                        <td style="width: 25%;"><?= esc($unit['kode_unit']); ?></td>
+                        <td style="width: 45%;"><?= esc($unit['nama_unit']); ?></td>
+                        <td style="width: 25%; text-align: center;">SKKNI</td>
                     </tr>
                 <?php endforeach; ?>
             <?php else: ?>

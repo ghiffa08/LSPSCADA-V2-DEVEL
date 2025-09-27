@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Models\RekamanAsesmenModel;
 use CodeIgniter\Database\BaseConnection;
 
-class RekamanAsesmenService
+class RekamanAsesmenApi
 {
     protected RekamanAsesmenModel $rekamanModel;
     protected BaseConnection $db;

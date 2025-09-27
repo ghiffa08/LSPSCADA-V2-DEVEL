@@ -8,9 +8,8 @@
                 </button>
             </div>
             <form id="edit-pengajuan-form">
-                <?= csrf_field() ?>
-                <input type="hidden" name="id_pengajuan" id="id_pengajuan">
                 <div class="modal-body">
+                    <input type="hidden" name="id_pengajuan" id="edit_id_pengajuan">
                     <div class="row">
                         <div class="col-md-6">
                             <div class="form-group">
@@ -29,23 +28,40 @@
                     <div class="row">
                         <div class="col-md-4">
                             <div class="form-group">
-                                <label for="status_pengajuan">Status Pengajuan</label>
-                                <select name="status_pengajuan" id="status_pengajuan" class="form-control">
-                                    <option value="pending">Pending</option>
-                                    <option value="diterima">Diterima</option>
-                                    <option value="ditolak">Ditolak</option>
-                                    <option value="selesai">Selesai</option>
-                                </select>
+                                <label>Status Pengajuan</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="status_pengajuan" id="edit_status_pending" value="pending">
+                                    <label class="form-check-label" for="edit_status_pending">Pending</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="status_pengajuan" id="edit_status_diterima" value="diterima">
+                                    <label class="form-check-label" for="edit_status_diterima">Diterima</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="status_pengajuan" id="edit_status_ditolak" value="ditolak">
+                                    <label class="form-check-label" for="edit_status_ditolak">Ditolak</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="status_pengajuan" id="edit_status_selesai" value="selesai">
+                                    <label class="form-check-label" for="edit_status_selesai">Selesai</label>
+                                </div>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="form-group">
-                                <label for="status_asesmen">Status Asesmen</label>
-                                <select name="status_asesmen" id="status_asesmen" class="form-control">
-                                    <option value="proses">Proses</option>
-                                    <option value="kompeten">Kompeten</option>
-                                    <option value="belum_kompeten">Belum Kompeten</option>
-                                </select>
+                                <label>Status Asesmen</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="status_asesmen" id="edit_status_proses" value="proses">
+                                    <label class="form-check-label" for="edit_status_proses">Proses</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="status_asesmen" id="edit_status_kompeten" value="kompeten">
+                                    <label class="form-check-label" for="edit_status_kompeten">Kompeten</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="status_asesmen" id="edit_status_belum_kompeten" value="belum_kompeten">
+                                    <label class="form-check-label" for="edit_status_belum_kompeten">Belum Kompeten</label>
+                                </div>
                             </div>
                         </div>
                         <div class="col-md-4">

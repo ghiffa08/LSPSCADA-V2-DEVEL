@@ -49,8 +49,7 @@
         <tr>
             <td rowspan="2">Alamat Rumah</td>
             <td rowspan="2">:</td>
-            <td style="border-bottom: 1px solid #000;">
-                Kel. <?= esc($pengajuan['asesi']['alamat']['desa_nama']); ?>, Kec. <?= esc($pengajuan['asesi']['alamat']['kecamatan_nama']); ?>, <?= esc($pengajuan['asesi']['alamat']['kabupaten_nama']); ?>, Prov. <?= esc($pengajuan['asesi']['alamat']['provinsi_nama']); ?>
+            <td style="border-bottom: 1px solid #000;">Kel. <?= esc($pengajuan['asesi']['alamat']['desa_nama']); ?>, Kec. <?= esc($pengajuan['asesi']['alamat']['kecamatan_nama']); ?>, <?= esc($pengajuan['asesi']['alamat']['kabupaten_nama']); ?>, Prov. <?= esc($pengajuan['asesi']['alamat']['provinsi_nama']); ?>
             </td>
         </tr>
         <tr>

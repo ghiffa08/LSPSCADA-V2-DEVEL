@@ -15,31 +15,44 @@ class HeaderService
     }
 
     /**
-     * Mengambil konfigurasi header untuk asesor tertentu.
-     * Jika tidak ada, cari header default. Jika masih tidak ada, gunakan fallback.
+     * Mengambil konfigurasi header berdasarkan ID asesor.
+     * Logikanya: Cari instansi asesor -> cari kop surat instansi -> jika tidak ada, cari kop surat default.
      *
      * @param int|null $assessorId ID dari asesor.
-     * @return object Objek berisi data konfigurasi.
+     * @return object Objek berisi data konfigurasi header.
      */
     public function getHeaderForAssessor(?int $assessorId): object
     {
         try {
             $headerConfig = null;
-            $builder = $this->db->table('header_konfigurasi');
 
-            // 1. Coba cari header spesifik untuk asesor
+            // 1. Cari instansi dari asesor
             if ($assessorId) {
-                $query = $builder->where('assessor_id', $assessorId)->get();
-                $headerConfig = $query->getRow();
+                $instansiQuery = $this->db->table('asesor_instansi')
+                    ->where('asesor_id', $assessorId)
+                    ->get()
+                    ->getRow();
+
+                // 2. Jika asesor punya instansi, cari header untuk instansi tersebut
+                if ($instansiQuery) {
+                    $instansiId = $instansiQuery->instansi_id;
+                    $headerConfig = $this->db->table('header_konfigurasi')
+                        ->where('instansi_id', $instansiId)
+                        ->get()
+                        ->getRow();
+                }
             }
 
-            // 2. Jika tidak ada, cari header yang ditandai sebagai default
+            // 3. Jika header spesifik instansi tidak ditemukan, cari header default global
             if (!$headerConfig) {
-                $query = $this->db->table('header_konfigurasi')->where('is_active', 1)->get();
-                $headerConfig = $query->getRow();
+                $headerConfig = $this->db->table('header_konfigurasi')
+                    ->where('is_active', 1) // is_active = 1 menandakan default
+                    ->where('instansi_id IS NULL') // Pastikan ini adalah default global
+                    ->get()
+                    ->getRow();
             }
 
-            // 3. Jika masih belum ada, gunakan fallback
+            // 4. Jika masih tidak ada, gunakan fallback hardcode
             if (!$headerConfig) {
                 return $this->getDefaultHeaderFallback();
             }
@@ -54,10 +67,10 @@ class HeaderService
     private function getDefaultHeaderFallback(): object
     {
         $fallback = new stdClass();
-        $fallback->logo = 'logolsp.png'; // Logo fallback jika semua gagal
+        $fallback->logo = 'logolsp.png';
         $fallback->logo_width = 30;
-        $fallback->title = 'LEMBAGA SERTIFIKASI PROFESI';
-        $fallback->header_string = "Alamat Default";
+        $fallback->title = 'LEMBAGA SERTIFIKASI PROFESI (FALLBACK)';
+        $fallback->header_string = "Alamat Default\nKontak Default";
         return $fallback;
     }
 }

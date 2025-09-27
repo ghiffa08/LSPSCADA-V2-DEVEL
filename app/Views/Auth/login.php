@@ -68,14 +68,14 @@
 							<!-- $link -->
 							<hr>
 
-							<div class="d-flex">
+							<!-- <div class="d-flex">
 								<?php if ($config->allowRegistration) : ?>
 									<p class="mr-auto"><a href="<?= url_to('register') ?>"><?= lang('Auth.needAnAccount') ?></a></p>
 								<?php endif; ?>
 								<?php if ($config->activeResetter) : ?>
 									<p><a href="<?= url_to('forgot') ?>"><?= lang('Auth.forgotYourPassword') ?></a></p>
 								<?php endif; ?>
-							</div>
+							</div> -->
 
 
 						</form>

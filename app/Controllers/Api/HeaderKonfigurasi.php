@@ -13,18 +13,22 @@ class HeaderKonfigurasi extends DataTableController
     public function __construct()
     {
         parent::__construct();
-        $this->model = $this->headerKonfigurasiModel;
+        $this->model = model('HeaderKonfigurasiModel');
 
+        // Mapping kolom untuk sorting dan searching di DataTable
         $this->columnMap = [
             0 => null, // No
             1 => 'nama_kop',
-            2 => 'assessor_name',
+            2 => 'instansi_name', // Kolom hasil join
             3 => null, // Logo
             4 => 'title',
             5 => null  // Aksi
         ];
     }
 
+    /**
+     * Menyimpan atau memperbarui data konfigurasi header.
+     */
     public function save(): ResponseInterface
     {
         if (!$this->request->isAJAX()) {
@@ -34,20 +38,33 @@ class HeaderKonfigurasi extends DataTableController
         $id = $this->request->getPost('id');
         $isUpdate = !empty($id);
 
+        $instansiIdRule = 'permit_empty|is_natural_no_zero|is_not_unique[instansi.id]';
+        if ($this->request->getPost('instansi_id')) {
+            if ($isUpdate) {
+                // Saat update, abaikan ID saat ini
+                $instansiIdRule .= '|is_unique[header_konfigurasi.instansi_id,id,' . $id . ']';
+            } else {
+                // Saat tambah baru, harus unik
+                $instansiIdRule .= '|is_unique[header_konfigurasi.instansi_id]';
+            }
+        }
+
         $rules = [
             'nama_kop'      => 'required|max_length[255]',
-            'assessor_id'   => 'permit_empty|is_natural_no_zero|is_not_unique[asesor.id_asesor]',
+            'instansi_id'   => $instansiIdRule,
             'logo_width'    => 'required|integer|greater_than[0]',
-            'title'         => 'required|max_length[255]',
-            'header_string' => 'required',
+            'title'         => 'permit_empty|max_length[255]',
+            'header_string' => 'permit_empty',
         ];
 
-        // Validasi logo: wajib diisi saat membuat baru.
-        // Saat update, validasi hanya jika ada file baru yang diunggah.
+        // Validasi logo: wajib saat tambah baru, opsional saat update
         if (!$isUpdate) {
             $rules['logo'] = 'uploaded[logo]|max_size[logo,1024]|is_image[logo]|mime_in[logo,image/png,image/jpeg,image/gif]';
         } else {
-            $rules['logo'] = 'permit_empty|max_size[logo,1024]|is_image[logo]|mime_in[logo,image/png,image/jpeg,image/gif]';
+            // Hanya validasi jika ada file baru diupload
+            if ($this->request->getFile('logo')->isValid()) {
+                $rules['logo'] = 'max_size[logo,1024]|is_image[logo]|mime_in[logo,image/png,image/jpeg,image/gif]';
+            }
         }
 
         if (!$this->validate($rules)) {
@@ -57,31 +74,27 @@ class HeaderKonfigurasi extends DataTableController
         try {
             $data = $this->validator->getValidated();
 
-            // Hapus 'logo' dari data jika tidak ada file yang diupload saat update
-            if ($isUpdate && !$this->request->getFile('logo')->isValid()) {
-                unset($data['logo']);
-            }
-
+            // Proses upload logo jika ada
             $logoFile = $this->request->getFile('logo');
             if ($logoFile && $logoFile->isValid() && !$logoFile->hasMoved()) {
-                // Hapus logo lama jika ada (saat update)
+                // Hapus logo lama saat update
                 if ($isUpdate) {
                     $oldData = $this->model->find($id);
                     if ($oldData && !empty($oldData->logo)) {
-                        $oldLogoPath = ROOTPATH . 'public/uploads/logos/' . $oldData->logo;
+                        $oldLogoPath = FCPATH . 'uploads/logos/' . $oldData->logo;
                         if (file_exists($oldLogoPath)) {
                             unlink($oldLogoPath);
                         }
                     }
                 }
                 $logoName = $logoFile->getRandomName();
-                $logoFile->move(ROOTPATH . 'public/uploads/logos', $logoName);
+                $logoFile->move(FCPATH . 'uploads/logos', $logoName);
                 $data['logo'] = $logoName;
             }
 
-            // Pastikan assessor_id adalah null jika string kosong
-            if (isset($data['assessor_id']) && $data['assessor_id'] === '') {
-                $data['assessor_id'] = null;
+            // Pastikan instansi_id adalah null jika string kosong
+            if (isset($data['instansi_id']) && $data['instansi_id'] === '') {
+                $data['instansi_id'] = null;
             }
 
             if ($isUpdate) {
@@ -94,11 +107,14 @@ class HeaderKonfigurasi extends DataTableController
 
             return $this->respondCreated(['status' => true, 'message' => $message]);
         } catch (\Exception $e) {
-            log_message('error', '[HeaderKonfigurasi::save] ' . $e->getMessage());
+            log_message('error', '[Api/HeaderKonfigurasi::save] ' . $e->getMessage());
             return $this->failServerError('Terjadi kesalahan pada server.');
         }
     }
 
+    /**
+     * Menghapus data konfigurasi header.
+     */
     public function delete($id = null): ResponseInterface
     {
         if (!$this->request->isAJAX()) {
@@ -113,7 +129,7 @@ class HeaderKonfigurasi extends DataTableController
         try {
             // Hapus file logo dari server
             if (!empty($header->logo)) {
-                $logoPath = ROOTPATH . 'public/uploads/logos/' . $header->logo;
+                $logoPath = FCPATH . 'uploads/logos/' . $header->logo;
                 if (file_exists($logoPath)) {
                     unlink($logoPath);
                 }
@@ -122,11 +138,14 @@ class HeaderKonfigurasi extends DataTableController
             $this->model->delete($id);
             return $this->respondDeleted(['status' => true, 'message' => 'Konfigurasi berhasil dihapus.']);
         } catch (\Exception $e) {
-            log_message('error', '[HeaderKonfigurasi::delete] ' . $e->getMessage());
-            return $this->failServerError('Gagal menghapus data karena terikat dengan data lain atau kesalahan server.');
+            log_message('error', '[Api/HeaderKonfigurasi::delete] ' . $e->getMessage());
+            return $this->failServerError('Gagal menghapus data.');
         }
     }
 
+    /**
+     * Mengambil data berdasarkan ID untuk form edit.
+     */
     public function getById($id = null): ResponseInterface
     {
         if (!$this->request->isAJAX()) {

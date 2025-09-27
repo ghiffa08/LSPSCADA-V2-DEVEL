@@ -134,6 +134,15 @@
                     <div class="form-group"><label>Password <span class="text-danger">*</span></label><input type="password" name="password" class="form-control" required></div>
                     <div class="form-group"><label>Nomor Registrasi</label><input type="text" name="nomor_registrasi" class="form-control"></div>
                     <div class="form-group">
+                        <label>Instansi (Opsional)</label>
+                        <select class="form-control select2" name="instansi_id" style="width: 100%;">
+                            <option value="">Pilih Instansi</option>
+                            <?php foreach ($listInstansi as $instansi) : ?>
+                                <option value="<?= $instansi->id ?>"><?= esc($instansi->nama_instansi) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label>Skema Sertifikasi <span class="text-danger">*</span></label>
                         <select class="form-control select2" name="skema_id" style="width: 100%;" required>
                             <option value="">Pilih Skema</option>
@@ -167,6 +176,15 @@
                             <option value="Admin">Admin</option>
                             <option value="Asesor">Asesor</option>
                             <option value="Asesi">Asesi</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="edit-instansi-field" style="display: none;">
+                        <label>Instansi (untuk Asesor)</label>
+                        <select class="form-control select2" name="instansi_id" style="width: 100%;">
+                            <option value="">Pilih Instansi</option>
+                            <?php foreach ($listInstansi as $instansi) : ?>
+                                <option value="<?= $instansi->id ?>"><?= esc($instansi->nama_instansi) ?></option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="form-group" id="edit-skema-field" style="display: none;">
@@ -336,7 +354,7 @@
                     form.find('[name="id"]').val(user.id);
                     form.find('[name="username"]').val(user.username);
                     form.find('[name="nama_lengkap"]').val(user.nama_lengkap);
-                    
+
                     console.log(user.nama_lengkap);
                     form.find('[name="email"]').val(user.email);
                     const role = user.groups[0] || 'Asesi';
@@ -344,11 +362,14 @@
 
                     if (role === 'Asesor') {
                         $('#edit-skema-field').show();
+                        $('#edit-instansi-field').show();
                         if (user.asesor_data) {
                             form.find('[name="skema_id"]').val(user.asesor_data.id_skema).trigger('change');
+                            form.find('[name="instansi_id"]').val(user.instansi_id).trigger('change');
                         }
                     } else {
                         $('#edit-skema-field').hide();
+                        $('#edit-instansi-field').hide();
                     }
                     $('#editUserModal').modal('show');
                 }
@@ -358,8 +379,10 @@
         $('#editUserForm [name="role"]').on('change', function() {
             if ($(this).val() === 'Asesor') {
                 $('#edit-skema-field').slideDown();
+                $('#edit-instansi-field').slideDown();
             } else {
                 $('#edit-skema-field').slideUp();
+                $('#edit-instansi-field').slideUp();
             }
         });
 

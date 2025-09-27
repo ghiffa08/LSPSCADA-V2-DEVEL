@@ -3619,34 +3619,63 @@ body.layout-4 .main-footer {
   width: calc(100% - 250px);
 }
 
+/* --- PERBAIKAN: Responsive Layout 4 - Secondary Navbar menjadi Vertikal --- */
 @media (max-width: 1024px) {
 
-  /* Hide the secondary navbar on smaller screens to prevent overflow */
+  /* 1. Ubah navbar sekunder menjadi blok statis (tidak melayang) */
   body.layout-4 .navbar.navbar-secondary {
+    position: static; /* Membuatnya menjadi bagian dari alur konten */
+    height: auto;     /* Biarkan tingginya menyesuaikan isi menu */
+    padding: 10px 0;  /* Beri sedikit padding vertikal */
+    background-color: #fcfcfc;
+    border-bottom: 1px solid #e3eaef;
+  }
+
+  /* 2. Susun item menu secara vertikal */
+  body.layout-4 .navbar.navbar-secondary .navbar-nav {
+    flex-direction: column; /* Ini adalah kunci untuk mengubahnya menjadi vertikal */
+    width: 100%;
+  }
+
+  /* 3. Atur ulang style setiap link agar terlihat rapi */
+  body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item > .nav-link {
+    height: auto;
+    padding: 10px 30px !important; /* Padding yang lebih cocok untuk daftar vertikal */
+    margin: 0;
+    line-height: normal; /* Atur ulang line-height */
+  }
+  
+  body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item > .nav-link span {
+    line-height: normal;
+  }
+
+  /* 4. Hilangkan garis bawah yang aktif pada mode desktop */
+  body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item > .nav-link::before {
     display: none;
   }
-
-  /* Adjust main content to fill the screen width and add correct top padding */
-  body.layout-4 .main-content {
-    /* Corrected padding-top. 70px for the main navbar + 20px space. */
-    padding-top: 90px;
-    padding-left: 30px;
-    padding-right: 30px;
-    width: 100% !important;
+  
+  /* 5. Sesuaikan posisi panah dropdown */
+  body.layout-4 .navbar.navbar-secondary .navbar-nav > .nav-item > .nav-link.has-dropdown::after {
+    right: 30px;
   }
 
-  /* Adjust the footer to fill the screen width */
+  /* 6. Atur ulang padding atas untuk konten utama */
+  body.layout-4 .main-content {
+    /* Cukup beri jarak dari navbar utama (70px) + sedikit spasi */
+    padding-top: 90px; 
+  }
+  
+  /* Sisanya tetap sama agar layout tidak berantakan */
+  body.layout-4 .main-wrapper {
+    display: block;
+    padding: 0;
+  }
+  
   body.layout-4 .main-footer {
     width: 100% !important;
     margin-left: 0;
     padding-left: 30px;
     padding-right: 30px;
-  }
-
-  /* Ensure the main wrapper stacks elements correctly */
-  body.layout-4 .main-wrapper {
-    display: block;
-    padding: 0;
   }
 }
 

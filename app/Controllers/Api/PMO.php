@@ -29,9 +29,9 @@ class PMO extends DataTableController
         // Definisikan pemetaan kolom untuk sorting server-side
         $this->columnMap = [
             0 => null, // Kolom Nomor
-            1 => 'apl1.nama_siswa',
+            1 => 'asesi_user.nama_lengkap',
             2 => 'skema.nama_skema',
-            3 => 'users.nama_lengkap', // Ditambahkan kolom asesor
+            3 => 'asesor_user.nama_lengkap',
             4 => 'pmo.tanggal_observasi',
             5 => null // Kolom Aksi
         ];
@@ -83,10 +83,6 @@ class PMO extends DataTableController
         return $this->respond($output);
     }
 
-    /**
-     * Load PMO checklist data via AJAX.
-     * Fetches the question structure for a schema and any existing answers for the asesi.
-     */
     public function loadPmo(): ResponseInterface
     {
         if (!$this->request->isAJAX()) {
@@ -94,24 +90,22 @@ class PMO extends DataTableController
         }
 
         $id_skema = $this->request->getGet('id_skema');
-        $id_apl1 = $this->request->getGet('id_apl1');
+        $id_pengajuan = $this->request->getGet('id_pengajuan'); // Changed from id_apl1
 
         if (!$id_skema || !filter_var($id_skema, FILTER_VALIDATE_INT)) {
             return $this->fail('ID Skema is required and must be an integer.', 400);
         }
-        if (!$id_apl1) {
-            return $this->fail('ID APL1 is required.', 400);
+        if (!$id_pengajuan) {
+            return $this->fail('ID Pengajuan is required.', 400);
         }
 
         try {
-            // Get the hierarchical structure of PMO questions for the schema
             $strukturPmo = $this->model->getStrukturPmoSkema((int)$id_skema);
 
-            // Find if a PMO session already exists for this asesi and schema
-            $pmo = $this->model->where('id_apl1', $id_apl1)->where('id_skema', $id_skema)->first();
+            // Find PMO session by id_pengajuan
+            $pmo = $this->model->where('id_pengajuan', $id_pengajuan)->first();
             $existingJawaban = [];
             if ($pmo) {
-                // If it exists, get the saved answers
                 $existingJawaban = $this->model->getExistingJawaban($pmo['id_pmo']);
             }
 
@@ -127,10 +121,6 @@ class PMO extends DataTableController
         }
     }
 
-    /**
-     * Save the entire PMO checklist data.
-     * Handles both creating a new PMO session and updating an existing one.
-     */
     public function save(): ResponseInterface
     {
         if (!$this->request->isAJAX()) {
@@ -140,24 +130,22 @@ class PMO extends DataTableController
         $data = $this->request->getPost();
 
         // Basic validation
-        $id_apl1 = $data['id_apl1'] ?? null;
+        $id_pengajuan = $data['id_pengajuan'] ?? null; // Changed from id_apl1
         $id_skema = $data['id_skema'] ?? null;
-        $id_asesor = $data['id_asesor'] ?? null; // Asesor might be assigned
+        $id_asesor = $data['id_asesor'] ?? null;
 
-        if (!$id_apl1 || !$id_skema || !$id_asesor) {
-            return $this->fail('APL1 ID, Skema ID, and Asesor ID are required.', 400);
+        if (!$id_pengajuan || !$id_skema || !$id_asesor) {
+            return $this->fail('Pengajuan ID, Skema ID, and Asesor ID are required.', 400);
         }
 
-        // Prepare master data for the 'pmo' table
         $masterData = [
-            'id_apl1' => $id_apl1,
+            'id_pengajuan' => $id_pengajuan,
             'id_skema' => (int)$id_skema,
             'id_asesor' => (int)$id_asesor,
             'tanggal_observasi' => $data['tanggal_observasi'] ?? date('Y-m-d'),
             'catatan' => $data['catatan'] ?? null,
         ];
 
-        // Prepare answer data for the 'pmo_jawaban' table
         $jawabanData = $data['jawaban'] ?? [];
 
         try {
@@ -178,11 +166,9 @@ class PMO extends DataTableController
         }
     }
 
-    /**
-     * Delete a PMO session and its related answers.
-     */
     public function delete($id_pmo = null): ResponseInterface
     {
+        // This method works with id_pmo, so no changes are needed.
         if (!$this->request->isAJAX()) {
             return $this->failForbidden('Direct access is not allowed.');
         }
@@ -192,11 +178,6 @@ class PMO extends DataTableController
         }
 
         try {
-            $pmo = $this->model->find($id_pmo);
-            if (!$pmo) {
-                return $this->failNotFound('PMO session not found.');
-            }
-
             if ($this->model->delete($id_pmo)) {
                 return $this->respondDeleted(['success' => true, 'message' => 'PMO session deleted successfully.']);
             } else {

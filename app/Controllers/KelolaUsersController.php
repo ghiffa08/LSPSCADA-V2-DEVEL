@@ -7,6 +7,7 @@ use App\Models\UserMythModel;
 use App\Models\GroupUserModel;
 use Myth\Auth\Models\GroupModel;
 use CodeIgniter\HTTP\ResponseInterface;
+use App\Models\InstansiModel;
 use CodeIgniter\Database\Exceptions\DatabaseException;
 
 class KelolaUsersController extends BaseController
@@ -14,6 +15,7 @@ class KelolaUsersController extends BaseController
     protected $userMythModel;
     protected $groupModel;
     protected $groupUserModel;
+    protected $instansiModel;
     protected $db;
     protected $cache;
 
@@ -32,6 +34,7 @@ class KelolaUsersController extends BaseController
         $this->groupUserModel = new GroupUserModel();
         $this->db = \Config\Database::connect();
         $this->cache = \Config\Services::cache();
+        $this->instansiModel = new InstansiModel();
 
         // Security check - Admin only
         if (!in_groups(['Admin'])) {
@@ -40,24 +43,23 @@ class KelolaUsersController extends BaseController
         }
     }
 
- public function index()
+    public function index()
     {
         // // Security check - Hanya Admin yang bisa akses
         // if (!in_groups('Admin')) {
         //     throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound();
         // }
 
-        $skemaModel = new \App\Models\SkemaModel();
-
         $data = [
             'siteTitle' => 'Kelola Pengguna',
             // Data ini dibutuhkan untuk mengisi dropdown 'Skema' di modal Tambah dan Edit Asesor
-            'listSkema' => $skemaModel->where('status', 'Y')->findAll(),
+            'listSkema' => $this->skemaModel->getActiveSchemes(),
+            'listInstansi' => $this->instansiModel->orderBy('nama_instansi', 'ASC')->findAll(),
         ];
 
         return view('admin/kelola_users', $data);
     }
-    
+
     /**
      * Get users data for DataTables (AJAX) - Optimized for production
      */

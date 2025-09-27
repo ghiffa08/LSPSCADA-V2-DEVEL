@@ -60,17 +60,42 @@ class FeedbackAsesiController extends ResourceController
 
         return view('admin/feedback_asesi', $data);
     }
+
+    /**
+     * [FUNGSI BARU] Menampilkan halaman daftar feedback untuk Asesi.
+     */
+    public function listAsesi()
+    {
+        $data = [
+            'siteTitle' => 'Daftar Umpan Balik Asesmen',
+        ];
+        // Hanya menampilkan view, data akan di-load via AJAX
+        return view('asesi/list-feedback-asesi', $data);
+    }
+
+    /**
+     * [FUNGSI BARU] Endpoint AJAX untuk filter daftar feedback.
+     */
+    public function filterFeedback()
+    {
+        if ($this->request->isAJAX()) {
+            $filter = $this->request->getGet('filter') ?? 'terbaru';
+            $userId = user()->id;
+
+            // Panggil method baru di model untuk mendapatkan data
+            $data = $this->feedbackAsesiModel->getListByUserId($userId, $filter);
+
+            return $this->response->setJSON($data);
+        }
+        return $this->response->setStatusCode(403, 'Forbidden Access');
+    }
+
     /**
      * Menampilkan halaman pengisian feedback untuk asesi yang sedang login.
      * Mengoptimalkan pengambilan data untuk menghindari N+1 query.
      */
-    public function asesiIndex()
+    public function asesiIndex($id_pengajuan = null)
     {
-        // if (!in_groups('asesi')) {
-        //     return redirect()->to('dashboard')->with('error', 'Anda tidak memiliki akses.');
-        // }
-
-        // Pastikan helper 'auth' sudah di-load
         helper('auth');
         $id_user = user()->id;
 
@@ -87,24 +112,20 @@ class FeedbackAsesiController extends ResourceController
                 asesi_user.nama_lengkap as nama_asesi 
             ')
             ->join('asesi', 'asesi.id_asesi = pengajuan_asesmen.id_asesi')
-            // PERBAIKAN 1: Tambahkan JOIN ke tabel users dengan alias 'asesi_user' untuk mendapatkan nama asesi
-            ->join('users as asesi_user', 'asesi_user.id = asesi.id_user')
+            ->join('users as asesi_user', 'asesi_user.id = asesi.id_user') // Join untuk nama asesi
             ->join('asesmen', 'asesmen.id_asesmen = pengajuan_asesmen.id_asesmen')
             ->join('skema', 'skema.id_skema = asesmen.id_skema')
-            ->join('asesor', 'asesor.id_asesor = pengajuan_asesmen.id_asesor', 'left')
-            ->join('users as asesor_user', 'asesor_user.id = asesor.id_user', 'left')
+            // PENYESUAIAN: Join langsung ke tabel users untuk mendapatkan nama asesor
+            ->join('users as asesor_user', 'asesor_user.id = pengajuan_asesmen.id_asesor', 'left')
             ->where('asesi.id_user', $id_user)
             ->whereIn('pengajuan_asesmen.status_pengajuan', ['diterima', 'selesai'])
             ->orderBy('pengajuan_asesmen.created_at', 'DESC')
             ->first();
 
-        // if (!$pengajuan) {
-        //     return redirect()->to('dashboard')->with('error', 'Tidak ada jadwal asesmen aktif yang ditemukan untuk Anda.');
-        // }
+        // if (!$pengajuan) { ... }
 
         $feedbackModel = new \App\Models\FeedbackAsesiModel();
-
-        $feedback = $feedbackModel->where('id_pengajuan', $pengajuan['id_pengajuan'])->first();
+        $feedback = $pengajuan ? $feedbackModel->where('id_pengajuan', $pengajuan['id_pengajuan'])->first() : null;
 
         $existingAnswers = [];
         if ($feedback) {
@@ -121,10 +142,6 @@ class FeedbackAsesiController extends ResourceController
             'existingAnswers' => $existingAnswers
         ];
 
-        // Hapus atau beri komentar pada dd() setelah selesai debugging
-        // dd($data); 
-
-        // Ganti nama view jika berbeda
         return view('asesi/feedback_asesi', $data);
     }
 }

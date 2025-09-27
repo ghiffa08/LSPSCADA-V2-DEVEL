@@ -14,7 +14,7 @@ class HeaderKonfigurasiModel extends Model
     protected $useAutoIncrement = true;
     protected $returnType       = 'object';
     protected $allowedFields    = [
-        'assessor_id',
+        'instansi_id',
         'nama_kop',
         'logo',
         'logo_width',
@@ -27,16 +27,16 @@ class HeaderKonfigurasiModel extends Model
     protected $createdField  = 'created_at';
     protected $updatedField  = 'updated_at';
 
-    protected array $dataTableSearchFields = ['header_konfigurasi.nama_kop', 'header_konfigurasi.title', 'users.nama_lengkap'];
+    // Kolom yang dapat dicari untuk DataTable
+    protected array $dataTableSearchFields = ['header_konfigurasi.nama_kop', 'header_konfigurasi.title', 'instansi.nama_instansi'];
 
     /**
-     * Menerapkan join ke tabel asesor dan user untuk DataTable.
+     * Menerapkan join ke tabel instansi untuk DataTable.
      */
     protected function applyDataTableJoins(object $builder): object
     {
         return $builder
-            ->join('asesor', 'asesor.id_asesor = header_konfigurasi.assessor_id', 'left')
-            ->join('users', 'users.id = asesor.id_user', 'left');
+            ->join('instansi', 'instansi.id = header_konfigurasi.instansi_id', 'left');
     }
 
     /**
@@ -44,6 +44,6 @@ class HeaderKonfigurasiModel extends Model
      */
     protected function applyDataTableSelects(object $builder): object
     {
-        return $builder->select('header_konfigurasi.*, users.nama_lengkap as assessor_name');
+        return $builder->select('header_konfigurasi.*, instansi.nama_instansi as instansi_name');
     }
 }

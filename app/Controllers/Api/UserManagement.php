@@ -8,6 +8,9 @@ use Myth\Auth\Models\UserModel;
 use App\Models\AsesorModel;
 use App\Models\GroupsModel;
 
+use App\Models\AsesorInstansiModel;
+use App\Models\InstansiModel;
+
 class UserManagement extends BaseController
 {
     use ResponseTrait;
@@ -166,25 +169,32 @@ class UserManagement extends BaseController
         if (in_array('Asesor', $userGroups)) {
             $asesorModel = new AsesorModel();
             $data['asesor_data'] = $asesorModel->where('id_user', $id)->first();
+
+            if (!empty($data['asesor_data'])) {
+                $asesorInstansiModel = new AsesorInstansiModel();
+                $instansiLink = $asesorInstansiModel->find($data['asesor_data']['id_asesor']);
+                $data['instansi_id'] = $instansiLink['instansi_id'] ?? null;
+            }
         }
 
         return $this->respond(['status' => true, 'data' => $data]);
     }
 
-/**
+    /**
      * Membuat user baru (Admin atau Asesor).
      * Diperbaiki untuk memastikan semua field wajib terisi.
      */
     public function create(): \CodeIgniter\HTTP\ResponseInterface
     {
         $users = new UserModel();
-        
+
         // Aturan validasi
         $rules = [
             'username'     => 'required|alpha_numeric_space|min_length[3]|is_unique[users.username]',
             'email'        => 'required|valid_email|is_unique[users.email]',
             'password'     => 'required|min_length[8]',
-            'nama_lengkap' => 'required|min_length[3]'
+            'nama_lengkap' => 'required|min_length[3]',
+            'instansi_id'  => 'permit_empty|is_natural_no_zero|is_not_unique[instansi.id]',
         ];
 
         // Validasi tambahan khusus untuk Asesor
@@ -204,10 +214,7 @@ class UserManagement extends BaseController
         $user->password = $this->request->getPost('password');
         $user->nama_lengkap = $this->request->getPost('nama_lengkap');
         $user->activate();
-        
-     var_dump($user);
-        die();
-        
+
         $role = $this->request->getPost('role');
 
         if ($users->withGroup($role)->save($user)) {
@@ -221,10 +228,23 @@ class UserManagement extends BaseController
                     'nomor_registrasi' => $this->request->getPost('nomor_registrasi'),
                     'id_skema' => $this->request->getPost('skema_id')
                 ]);
+
+                $asesorId = $asesorModel->getInsertID();
+
+                $instansiId = $this->request->getPost('instansi_id');
+                if ($asesorId && !empty($instansiId)) {
+                    $asesorInstansiModel = new AsesorInstansiModel();
+                    $asesorInstansiModel->insert([
+                        'asesor_id'   => $asesorId,
+                        'instansi_id' => $instansiId,
+                    ]);
+                }
             }
+
+
             return $this->respondCreated(['status' => true, 'message' => "User {$role} berhasil dibuat."]);
         }
-        
+
         return $this->fail($users->errors());
     }
 
@@ -252,7 +272,8 @@ class UserManagement extends BaseController
         $rules = [
             'nama_lengkap' => 'required|min_length[3]',
             'email'        => "required|valid_email|is_unique[users.email,id,{$id}]",
-            'role'         => 'required|in_list[Admin,Asesor,Asesi]'
+            'role'         => 'required|in_list[Admin,Asesor,Asesi]',
+            'instansi_id'  => 'permit_empty|is_natural_no_zero|is_not_unique[instansi.id]',
         ];
 
         if (!$this->validate($rules)) {
@@ -274,18 +295,48 @@ class UserManagement extends BaseController
             $groups->addUserToGroup((int)$id, $group->id);
         }
 
-        // 3. Update skema jika rolenya adalah Asesor
-        if ($postData['role'] === 'Asesor') {
-            $asesorModel = new AsesorModel();
-            $asesorData = $asesorModel->where('id_user', $id)->first();
-            $skemaId = $postData['skema_id'] ?? null;
+        $asesorModel = new AsesorModel();
+        $asesorInstansiModel = new AsesorInstansiModel();
+        $asesorData = $asesorModel->where('id_user', $id)->first();
 
+        if ($postData['role'] === 'Asesor') {
+            $skemaId = $postData['skema_id'] ?? null;
+            $instansiId = $postData['instansi_id'] ?? null;
+            $asesorId = null;
+
+            // Update atau buat data di tabel 'asesor'
             if ($skemaId) {
                 if ($asesorData) {
                     $asesorModel->update($asesorData['id_asesor'], ['id_skema' => $skemaId]);
+                    $asesorId = $asesorData['id_asesor'];
                 } else {
-                    $asesorModel->save(['id_user' => $id, 'id_skema' => $skemaId]);
+                    $asesorModel->insert(['id_user' => $id, 'id_skema' => $skemaId]);
+                    $asesorId = $asesorModel->getInsertID();
                 }
+            }
+
+            // "Upsert" logic untuk tabel 'asesor_instansi'
+            if ($asesorId) {
+                $existingLink = $asesorInstansiModel->find($asesorId);
+
+                if (!empty($instansiId)) {
+                    // Jika ada instansi baru, update atau insert
+                    if ($existingLink) {
+                        $asesorInstansiModel->update($asesorId, ['instansi_id' => $instansiId]);
+                    } else {
+                        $asesorInstansiModel->insert(['asesor_id' => $asesorId, 'instansi_id' => $instansiId]);
+                    }
+                } else {
+                    // Jika instansi dikosongkan, hapus relasinya
+                    if ($existingLink) {
+                        $asesorInstansiModel->delete($asesorId);
+                    }
+                }
+            }
+        } else {
+            // Jika role diubah dari Asesor ke lain, hapus relasi instansi
+            if ($asesorData) {
+                $asesorInstansiModel->delete($asesorData['id_asesor']);
             }
         }
 
